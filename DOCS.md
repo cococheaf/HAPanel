@@ -20,13 +20,13 @@ Die Demo besitzt Beispieldaten und speichert Konfigurationen nur im jeweiligen B
 
 ## Home Assistant OS / Supervisor
 
-Diese Alpha enthält ein aus Quellcode baubares Add-on für `amd64` und `aarch64`. Es wurde noch nicht auf einer echten Supervisor-Installation abgenommen. Für die erste Inbetriebnahme den voreingestellten Demo-Modus verwenden.
+Diese Alpha enthält ein aus Quellcode baubares Add-on für `amd64` und `aarch64`. Installation, Updates, Ingress und Live-Daten wurden auf Home Assistant OS 18.4 mit Core 2026.10.4 (amd64) geprüft. Für die erste Inbetriebnahme kann der voreingestellte Demo-Modus verwendet werden.
 
 1. Unter **Einstellungen → Apps/Add-ons → App-Store → Repositories** dieses Repository hinzufügen:
    `https://github.com/cococheaf/HAPanel`
 2. **HAPanel** installieren. Das Containerimage wird aus dem Repository gebaut; der erste Build kann einige Minuten dauern.
 3. Starten und **In Seitenleiste anzeigen** aktivieren.
-4. Studio als HA-Administrator öffnen. Der Server prüft die von Ingress gelieferte Benutzer-ID gegen die aktiven HA-Administratoren.
+4. **HAPanel** in der HA-Seitenleiste öffnet das veröffentlichte Dashboard. **Studio erkunden** führt zum Editor. Beide Ansichten verwenden den geprüften HA-Administratorzugang; dafür ist kein zusätzlicher Port und keine Displaykopplung erforderlich. Das Haus-Symbol im Studio führt zurück zum Dashboard.
 5. Nach dem ersten Design-Test `demo_mode` auf `false` setzen und das Add-on neu starten. Die Kacheln im Studio den eigenen Entitäten zuordnen und veröffentlichen.
 
 Das Add-on liest `/data/options.json` und schreibt ausschließlich in `/data/hapanel`. Es fordert HA-Core-API-Zugriff an, aber keine Supervisor-Verwaltungsrechte, Host-Netzwerkfreigaben oder HA-Konfigurations-Mounts.

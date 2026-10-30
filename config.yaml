@@ -1,5 +1,5 @@
 name: HAPanel
-version: '0.1.0-alpha.3'
+version: '0.1.0-alpha.4'
 slug: hapanel
 description: Independent iOS-inspired wall dashboards with a visual editor
 url: https://github.com/cococheaf/HAPanel
@@ -11,6 +11,7 @@ boot: auto
 init: false
 ingress: true
 ingress_port: 8099
+ingress_entry: /display.html
 panel_icon: mdi:view-dashboard-variant
 panel_title: HAPanel
 panel_admin: true

@@ -93,7 +93,10 @@ export async function createApp(options: AppOptions) {
         throw new HttpError(403, 'error.localEditor');
     }
   };
+  const ingressDisplay = options.mode === 'ingress' && options.surface === 'editor';
   const requireDisplay = async (request: FastifyRequest) => {
+    // The embedded player inherits the same administrator gate as Studio.
+    if (ingressDisplay) return requireEditor(request);
     sameOrigin(request);
     if (!pairings.authenticate(request.cookies.hapanel_device))
       throw new HttpError(401, 'error.pairRequired');
@@ -134,7 +137,7 @@ export async function createApp(options: AppOptions) {
   );
   app.get('/api/health', async () => ({
     ok: true,
-    version: '0.1.0-alpha.3',
+    version: '0.1.0-alpha.4',
     source: hub.getSnapshot([]).status,
   }));
 
@@ -274,6 +277,7 @@ export async function createApp(options: AppOptions) {
       display.get('/bootstrap', async () => ({
         published: store.get().published,
         snapshot: hub.getSnapshot(entityIds(store.get().published.document)),
+        canEdit: ingressDisplay,
       }));
       display.post(
         '/action',
@@ -296,7 +300,7 @@ export async function createApp(options: AppOptions) {
         const token = request.cookies.hapanel_device;
         let revision = -1;
         const send = () => {
-          if (!pairings.authenticate(token)) {
+          if (!ingressDisplay && !pairings.authenticate(token)) {
             socket.close(1008, 'Device access revoked');
             return;
           }

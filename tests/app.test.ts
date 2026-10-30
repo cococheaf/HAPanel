@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
+import type { Socket } from 'node:net';
 import WebSocket from 'ws';
 import { createApp, type AppOptions } from '../src/server/app';
 import { DocumentStore, PairingStore } from '../src/server/store';
@@ -166,6 +167,76 @@ test('display reads the published version while draft updates use optimistic rev
     document.greeting,
   );
 });
+test('Ingress player shares the administrator gate and controls only published entities', async (t) => {
+  const { app, store, hub, pairings } = await fixture(t, {
+    mode: 'ingress',
+    isAdmin: async (id) => id === 'admin-user',
+  });
+  const headers = { 'x-remote-user-id': 'admin-user' };
+  const remoteAddress = '172.30.32.2';
+  const document = store.get().draft.document;
+  document.pages[0].tiles.find((tile) => tile.id === 'light')!.entityId = 'light.kitchen';
+  await store.save(document, 1);
+  assert.equal((await app.inject({ url: '/api/display/bootstrap', headers })).statusCode, 403);
+  assert.equal(
+    (await app.inject({ url: '/api/display/bootstrap', remoteAddress })).statusCode,
+    403,
+  );
+  const response = await app.inject({ url: '/api/display/bootstrap', headers, remoteAddress });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().canEdit, true);
+  assert.equal(response.json().published.revision, 1);
+  assert.equal(response.json().snapshot.entities['light.kitchen'], undefined);
+  assert.equal(pairings.list().length, 0);
+  const action = await app.inject({
+    method: 'POST',
+    url: '/api/display/action',
+    headers,
+    remoteAddress,
+    payload: { tileId: 'light', command: 'toggle' },
+  });
+  assert.equal(action.statusCode, 200);
+  assert.equal(hub.getSnapshot().entities['light.living_room'].state, 'off');
+  assert.equal(hub.getSnapshot().entities['light.kitchen'].state, 'off');
+});
+test(
+  'Ingress player streams published updates without creating a device session',
+  { timeout: 5000 },
+  async (t) => {
+    const { app, store, pairings } = await fixture(t, {
+      mode: 'ingress',
+      isAdmin: async (id) => id === 'admin-user',
+    });
+    const context = {
+      headers: { 'x-remote-user-id': 'admin-user' },
+      socket: { remoteAddress: '172.30.32.2' } as Socket,
+    };
+    await assert.rejects(app.injectWS('/api/display/stream'), /403/);
+    let initial!: Promise<any[]>;
+    const client = await app.injectWS('/api/display/stream', context, {
+      onInit: (ws) => {
+        initial = once(ws, 'message');
+      },
+    });
+    t.after(() => client.terminate());
+    assert.equal(JSON.parse((await initial)[0].toString()).published.revision, 1);
+    const document = store.get().draft.document;
+    document.greeting = 'An unpublished greeting';
+    const draftMessage = once(client, 'message');
+    await store.save(document, 1);
+    assert.equal(JSON.parse((await draftMessage)[0].toString()).published, undefined);
+    const publishedMessage = once(client, 'message');
+    await store.publish(2);
+    assert.equal(
+      JSON.parse((await publishedMessage)[0].toString()).published.document.greeting,
+      document.greeting,
+    );
+    assert.equal(pairings.list().length, 0);
+    const closed = once(client, 'close');
+    client.terminate();
+    await closed;
+  },
+);
 test('YAML import is validated and remains an unpublished draft', async (t) => {
   const { app, store } = await fixture(t);
   const result = await app.inject({ url: '/api/editor/export?format=yaml' });

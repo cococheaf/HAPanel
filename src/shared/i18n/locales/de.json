@@ -266,5 +266,6 @@
   "error.serverUnreachable": "Server nicht erreichbar.",
   "error.exportFailed": "Export fehlgeschlagen.",
   "error.invalidField": "Ungültige Konfiguration bei {path}.",
-  "error.rateLimit": "Zu viele Anfragen. Bitte kurz warten."
+  "error.rateLimit": "Zu viele Anfragen. Bitte kurz warten.",
+  "editor.openDashboard": "Dashboard öffnen"
 }

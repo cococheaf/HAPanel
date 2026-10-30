@@ -440,6 +440,23 @@ function Studio({
           <Check size={14} />
           {statusText}
         </span>
+        {!service.local && (
+          <button
+            className="button icon-button"
+            aria-label={t('editor.openDashboard')}
+            title={t('editor.openDashboard')}
+            onClick={async () => {
+              try {
+                await flush();
+                window.location.assign(new URL('./display.html', window.document.baseURI));
+              } catch (error) {
+                notify(describeError(error));
+              }
+            }}
+          >
+            <House size={16} />
+          </button>
+        )}
         <button
           className="button preview-button"
           onClick={async () => {

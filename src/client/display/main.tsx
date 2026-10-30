@@ -10,14 +10,18 @@ import '../styles.css';
 function Display() {
   const { t, describeError } = useI18n();
 
-  const [data, setData] = useState<{ published: Revision; snapshot: Snapshot }>();
+  const [data, setData] = useState<{
+    published: Revision;
+    snapshot: Snapshot;
+    canEdit?: boolean;
+  }>();
   const [pairing, setPairing] = useState(false),
     [error, setError] = useState<unknown>();
   const [code, setCode] = useState(''),
     [name, setName] = useState<string>();
   const displayName = name ?? t('pairing.defaultName');
   const load = useCallback(() => {
-    api<{ published: Revision; snapshot: Snapshot }>('api/display/bootstrap')
+    api<{ published: Revision; snapshot: Snapshot; canEdit?: boolean }>('api/display/bootstrap')
       .then((result) => {
         setData(result);
         setPairing(false);
@@ -111,7 +115,14 @@ function Display() {
     );
   return (
     <>
-      <Player published={data.published} snapshot={data.snapshot} onAction={act} />
+      <Player
+        published={data.published}
+        snapshot={data.snapshot}
+        onAction={act}
+        onEdit={
+          data.canEdit ? () => window.location.assign(new URL('./', document.baseURI)) : undefined
+        }
+      />
       {Boolean(error) && (
         <div className="toast" role="alert">
           <span>{describeError(error)}</span>

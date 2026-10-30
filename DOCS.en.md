@@ -20,12 +20,12 @@ The demo uses sample data and browser-local configuration. Safari and a Home Scr
 
 ## Home Assistant OS / Supervisor
 
-This alpha includes a source-built add-on for `amd64` and `aarch64`. It has not yet passed acceptance on a real Supervisor installation. Start with the default demo mode.
+This alpha includes a source-built add-on for `amd64` and `aarch64`. Installation, updates, Ingress and live data have been checked on Home Assistant OS 18.4 with Core 2026.10.4 (amd64). The default demo mode remains available for initial setup.
 
 1. In **Settings → Apps/Add-ons → Store → Repositories**, add `https://github.com/cococheaf/HAPanel`.
 2. Install **HAPanel**. The container image is built from the repository; the first build may take several minutes.
 3. Start it and enable **Show in sidebar**.
-4. Open Studio as a HA administrator. The backend checks the Ingress user ID against active HA administrators.
+4. **HAPanel** in the HA sidebar opens the published dashboard. **Explore Studio** opens the editor. Both views use the verified HA administrator session, without a separate network port or device pairing. The home icon in Studio returns to the dashboard.
 5. After testing the design, set `demo_mode` to `false` and restart. Assign your own entities in Studio and publish.
 
 The add-on reads `/data/options.json` and writes only to `/data/hapanel`. It requests HA Core API access, but no Supervisor management permissions, host networking or HA configuration mounts.

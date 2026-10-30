@@ -1,8 +1,8 @@
-# Prüfstand für 0.1.0-alpha.2
+# Prüfstand für 0.1.0-alpha.4
 
 ## Automatisiert
 
-21 Tests mit Node.js-Test-Runner: Geometrie aller Beispielprofile, Schema- und Domänenvalidierung, Rastergrenzen und Überlappungen, Revisionskonflikte, Entwurf/Veröffentlichung/Wiederherstellung, persistente Sitzungen, einmalige Kopplungscodes, Zugriffsschutz für Ingress und lokale Verwaltung, eingeschränkte Display-API, YAML-Import und aktiver WebSocket-Widerruf.
+23 Tests mit Node.js-Test-Runner: Geometrie aller Beispielprofile, Schema- und Domänenvalidierung, Rastergrenzen und Überlappungen, Revisionskonflikte, Entwurf/Veröffentlichung/Wiederherstellung, persistente Sitzungen, einmalige Kopplungscodes, Zugriffsschutz für Ingress und lokale Verwaltung, eingeschränkte Display-API, YAML-Import und aktiver WebSocket-Widerruf.
 
 Der HA-Adapter wird mit einem lokalen WebSocket-Simulator geprüft: Authentifizierung, gefilterte Abonnements, komprimierte Attribut-Deltas, Prognosen, Administratorprüfung, typisierte Serviceaufrufe und Unterbrechung. Es werden keine echten HA-Geräte angesteuert.
 
@@ -19,7 +19,7 @@ TypeScript-Prüfung, Produktionsbuild, separater Demo-Build und Abhängigkeitspr
 - JSON-Import eines vollständigen Beispieldashboards im Editor.
 - Ansichten mit 1080 × 810, 810 × 1080 und 800 × 480 CSS-Pixeln visuell geprüft.
 
-Die Prüfung erfolgt im In-App-Browser auf dem Entwicklungsrechner. Physische Touch-Eingabe, Safari auf dem iPad und die tatsächliche Supervisor-Installation müssen separat abgenommen werden. Siehe [Roadmap](roadmap.md).
+Die Prüfung erfolgt im In-App-Browser auf dem Entwicklungsrechner. Physische Touch-Eingabe, Safari auf dem iPad müssen separat abgenommen werden. Siehe [Roadmap](roadmap.md).
 
 Eine im Browser gefundene Abweichung in React Grid Layout 2.3.0 wurde bei der Integration umgangen: Die skalierte Positionierungsstrategie muss den Ursprung relativ zum Grid-Elternelement berechnen. HAPanel übernimmt die Transform-Strategie mit Skalierungsfaktor und verwendet den eingebauten relativen Drag-Ursprung.
 
@@ -28,3 +28,9 @@ Eine im Browser gefundene Abweichung in React Grid Layout 2.3.0 wurde bei der In
 Zusätzliche Prüfungen decken vollständige Übersetzungskataloge, Platzhalter, Sprachpräferenzen und englischen Fallback, Zahlenformate, API-Sprachwahl und den Erhalt eigener Dashboard-Texte ab. Sprachwechsel speichern keine Dashboard-Revisionen.
 
 Im Browser wurden deutsche und englische Oberflächen, persistente Sprachwahl, Importfehler innerhalb des Dialogs und Kopplungsfehler in beiden Sprachen geprüft. Der vorbelegte Gerätename folgt der Sprachwahl; selbst eingegebene Namen bleiben erhalten. Die englische iPad-Ansicht wurde im Quer- und Hochformat visuell geprüft.
+
+## Supervisor und Live-Anbindung
+
+Installation aus dem GitHub-Repository, Update mit App-Backup, Start/Neustart, Autostart, Watchdog und Ingress-Administratorzugriff wurden auf HA OS 18.4 / Core 2026.10.4 (amd64) geprüft. Reale Wetter-, Licht-, Klima-, Medien-, Szenen- und Sensorentitäten sind im privaten Dashboard zugeordnet und veröffentlicht. Keine Geräteaktionen wurden zur Abnahme ausgelöst. Bestehende HA-Dashboards und Konfigurationsdateien wurden nicht verändert.
+
+Die Ingress-Player-API verwendet dieselbe Administratorprüfung wie Studio. Tests prüfen den Zugriffsschutz, veröffentlichte statt ungespeicherte Ziele und WebSocket-Aktualisierungen ohne zusätzliche Gerätesitzung. Der separate Displayserver bleibt an die Kopplung gebunden. Physisches iPad-/Touch-Verhalten ist weiterhin nicht abgenommen.
