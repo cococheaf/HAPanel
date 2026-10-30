@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.0-alpha.5
+
+Ingress-Startpfad relativ zum Supervisor-Präfix korrigiert. / Use the relative player entry path required by Supervisor URL concatenation.
+
 ## 0.1.0-alpha.4
 
 Die HA-Seitenleiste öffnet jetzt das veröffentlichte Dashboard direkt über Ingress. Studio bleibt über „Studio erkunden“ erreichbar. Dashboard-Daten, Medien und Bedienaktionen nutzen denselben geprüften HA-Administratorzugang wie der Editor und benötigen weder separaten Netzwerkport noch zusätzliche Gerätesitzung. Der optionale eigenständige Displayserver verlangt weiterhin eine Kopplung. / The HA sidebar now opens the published player through authenticated Ingress, with Studio one click away. Separate display endpoints still require device pairing.

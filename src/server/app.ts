@@ -137,7 +137,7 @@ export async function createApp(options: AppOptions) {
   );
   app.get('/api/health', async () => ({
     ok: true,
-    version: '0.1.0-alpha.4',
+    version: '0.1.0-alpha.5',
     source: hub.getSnapshot([]).status,
   }));
 
