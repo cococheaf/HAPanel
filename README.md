@@ -6,6 +6,8 @@
 
 **Deutsch · [English](README.en.md)**
 
+**Ein Vibe-Coding-Projekt:** HAPanel entsteht mit KI-Unterstützung. Der Projektinitiator bringt Idee, Gestaltung und Praxistests ein und hat selbst keine Programmiererfahrung. Code-Reviews, verständliche Fehlermeldungen und Beiträge aus der Community sind ausdrücklich willkommen.
+
 ![HAPanel Dashboard](docs/images/dashboard-ipad.png)
 
 <details><summary>Visuellen Editor ansehen</summary>
@@ -22,7 +24,7 @@
 
 HAPanel verbindet großzügige, abgerundete Kacheln, ruhige Farben und direkte Touch-Bedienung mit einem visuellen Layout-Editor. Es läuft als eigene Home Assistant App (Add-on) oder als lokaler Node.js-Prozess. Bestehende Lovelace-Dashboards und HA-Konfigurationsdateien bleiben unverändert.
 
-**Version: 1.2.0.** Die Vorschau, der Editor und die API sind implementiert. Die HA-Anbindung ist gegen einen simulierten WebSocket-Server geprüft. Installation, Update, Ingress und Live-Daten sind auf HA OS 18.4 / Core 2026.10.4 (amd64) geprüft. Tests auf physischer iPad-Hardware stehen noch aus.
+**Version: 1.3.0.** Die Vorschau, der Editor und die API sind implementiert. Die HA-Anbindung ist gegen einen simulierten WebSocket-Server geprüft. Installation, Update, Ingress und Live-Daten sind auf HA OS 18.4 / Core 2026.10.4 (amd64) geprüft. Tests auf physischer iPad-Hardware stehen noch aus.
 
 ## Ausprobieren
 
@@ -103,3 +105,22 @@ Im Designer befindet sich oben **Display bearbeiten** mit der Display-Auswahl. *
 In einer Kamerakachel unter **Kameraübersicht** zwischen **Standbild** und **Livestream** wählen. **Automatisch** bevorzugt die von HA angebotene WebRTC-Verbindung und fällt bei Bedarf auf HLS zurück. WebRTC benötigt eine erreichbare direkte Medienverbindung im Netzwerk; HLS kann weiterhin verzögert sein. Im HLS-Detail hilft **Zur Livekante springen**.
 
 ![Display-Verwaltung](docs/images/displays.png)
+
+## Licht einfach und passend bedienen
+
+Im Designer eine Lichtkachel auswählen → **Schaltverhalten**. Die Checkboxen **Einschalten erlauben** und **Ausschalten erlauben** bestimmen die Schaltfläche:
+
+| Einschalten | Ausschalten | Verhalten                     |
+| ----------- | ----------- | ----------------------------- |
+| ✓           | ✓           | Zwischen Ein und Aus wechseln |
+| ✓           | —           | Nur einschalten               |
+| —           | ✓           | Nur ausschalten               |
+| —           | —           | Nur Zustand anzeigen          |
+
+Das gilt auch für Schalter wie General Licht und für Geräte innerhalb einer Raumkachel. Die Regeln werden im Backend geprüft. Sie beschränken die jeweilige HAPanel-Kachel; andere HA-Bedienelemente und Automationen bleiben davon unabhängig.
+
+Ein Dimmer erscheint nur bei bestätigter Dimmfähigkeit. Bei Gruppen müssen **alle** Mitglieder dimmbar sein; normale Lampen, Schalter, gemischte oder nicht vollständig bekannte Gruppen erhalten keinen Slider. Die Helligkeit eines eingeschalteten Lichts wird bei fehlendem Messwert als unbekannt angezeigt. Bei einseitiger Schaltbedienung bleibt der Slider ausgeblendet. Für dimmbare Kacheln lässt er sich zusätzlich über **Dimmerslider anzeigen** ausblenden.
+
+Seitennamen, Seitenüberschriften und eigene Beschriftungen behalten Leerzeichen beim Tippen und Speichern. Pflichtfelder lassen sich zum Umbenennen vorübergehend leeren; beim Verlassen eines noch leeren Feldes wird der letzte gültige Text wiederhergestellt.
+
+![Schaltverhalten im Designer](docs/images/light-settings.png)

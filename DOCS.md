@@ -1,5 +1,7 @@
 # HAPanel installieren und bedienen
 
+HAPanel ist ein **Vibe-Coding-Projekt mit KI-Unterstützung**. Der Initiator hat keine Programmiererfahrung und entwickelt die Idee durch Gestaltung und Praxistests weiter. Reviews und Beiträge sind willkommen; Entwicklung und Prüfgrenzen sind in [Prüfstand](docs/validation.md) dokumentiert.
+
 **Deutsch · [English](DOCS.en.md)**
 
 ## Sprache
@@ -147,3 +149,13 @@ Live-Kacheln starten nur sichtbar und pausieren hinter einem geöffneten Detaild
 ## Icon
 
 `public/mark.svg` ist die skalierbare Quelle des HAPanel-Icons. `npm run icons` erzeugt Browser-, iPad- und Web-App-PNGs sowie `icon.png`/`logo.png` für das Add-on. Die eigenständige Display-Web-App besitzt ein eigenes Apple-Touch-Icon; eine innerhalb der HA-App geöffnete Oberfläche ersetzt nicht das HA-App-Icon.
+
+## Lichtoptionen und Texteingaben
+
+Im Designer die Lichtkachel auswählen und **Schaltverhalten** öffnen. Die beiden Checkboxen erlauben Ein/Aus, nur Ein, nur Aus oder eine reine Zustandsanzeige. Geräte in einer Raumkachel besitzen dieselben Optionen unter dem jeweiligen Gerät. Ohne eigene Einstellung bleibt Ein/Aus aktiv. Dimmen wird nur für nachweislich dimmbare Lampen und vollständig dimmbare Gruppen angeboten. Gemischte und unvollständig bekannte Gruppen bleiben ohne Slider. Eingeschränkte Schaltbedienung blendet den Dimmer aus.
+
+Die Fähigkeiten werden aus den HA-Farbmodi und rekursiv aus Gruppenmitgliedern ermittelt. Zusätzliche Gruppenmitglieder werden nicht an Displays ausgeliefert und erhalten keine weiteren Live-Abonnements. HA-Metadaten werden gecacht; nach Änderungen an HA-Gruppen den Designer nach etwa einer Minute neu laden.
+
+Eigene Texte behalten ihre Leerzeichen. Leere Pflichtfelder sind während des Umbenennens vorübergehend erlaubt, werden aber nicht gespeichert. **Veröffentlichen** aktiviert die gültige Konfiguration.
+
+Die Erweiterung bleibt in Schema 1 und liest vorhandene Konfigurationen mit bisherigen Standardaktionen. Ältere HAPanel-Versionen kennen die neuen Lichtoptionen nicht. Vor einem Downgrade die zum alten Add-on passende Sicherung wiederherstellen; die Update-Sicherung im Supervisor beibehalten.

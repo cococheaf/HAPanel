@@ -1,8 +1,8 @@
-# Prüfstand für 1.2.0
+# Prüfstand für 1.3.0
 
 ## Automatisiert
 
-54 Tests mit Node.js-Test-Runner: Geometrie aller Beispielprofile, Schema- und Domänenvalidierung, Rastergrenzen und Überlappungen, Revisionskonflikte, Entwurf/Veröffentlichung/Wiederherstellung, persistente Sitzungen, einmalige Kopplungscodes, Zugriffsschutz für Ingress und lokale Verwaltung, eingeschränkte Display-API, YAML-Import und aktiver WebSocket-Widerruf.
+62 Tests mit Node.js-Test-Runner: Geometrie aller Beispielprofile, Schema- und Domänenvalidierung, Rastergrenzen und Überlappungen, Revisionskonflikte, Entwurf/Veröffentlichung/Wiederherstellung, persistente Sitzungen, einmalige Kopplungscodes, Zugriffsschutz für Ingress und lokale Verwaltung, eingeschränkte Display-API, YAML-Import und aktiver WebSocket-Widerruf.
 
 Der HA-Adapter wird mit einem lokalen WebSocket-Simulator geprüft: Authentifizierung, gefilterte Abonnements, komprimierte Attribut-Deltas, Prognosen, Administratorprüfung, typisierte Serviceaufrufe und Unterbrechung. Es werden keine echten HA-Geräte angesteuert.
 
@@ -46,3 +46,13 @@ Im Browser sind die direkte Moduswahl, Bestätigung und Abbrechen, Kontaktfilter
 Automatisierte Prüfungen ergänzen unabhängige Ansichten, unveränderte Entitätsbindungen, stabile Migration, bytegenaue Original-Sicherung, Kopieren auf neue und unterschiedlich große Displays, Löschgrenzen, Navigation, Erscheinungsbild und Lokalisierung. Ein simulierter HA-WebSocket prüft WebRTC-Signalisierung, private Sitzungsschlüssel, Cache und Freigabe der HA-Sitzung. API-Prüfungen decken Ingress-Schutz, feste Kamerabindung und Sitzungsende bei Änderung der Veröffentlichung ab.
 
 Im Browser wurden Anlage, Kopieren einer Ansicht auf ein neues und ein vorhandenes Display, Löschen gefüllter Ansichten, Entfernen eines Displays und Rückgängig mit reinen Beispieldaten geprüft. Die Verwaltung wurde auf 1440 × 900 und im iPad-Hochformat geprüft. Keine echten Gerätezugänge wurden für die Abnahme widerrufen oder erstellt.
+
+## 1.3.0 · Licht und Eingaben
+
+Gezielte Regressionen prüfen Dimmfähigkeit mit ausgeschalteten Lampen, On/Off-Geräten mit irreführendem Helligkeitsattribut, gemischten, verschachtelten und unvollständigen Gruppen sowie Zyklen. Der HA-Simulator prüft, dass Gruppenmetadaten keine zusätzlichen Mitgliedsabonnements oder Zustandsfreigaben erzeugen und ein unerlaubter Dimmerbefehl keinen Serviceaufruf erreicht.
+
+Einseitige Schaltregeln und Zustandsanzeige werden in verschachtelten Geräten, im Action-Resolver und über die veröffentlichte HTTP-API geprüft. Verbotene Toggle-, Ein- und Dimmerbefehle bleiben wirkungslos. Texte behalten Leerzeichen über Schema- und JSON-Roundtrips. Echte Lichter werden zur Abnahme nicht geschaltet.
+
+Die Durchsicht umfasst Schema und Migration, Entwurf/Veröffentlichung, Eingaben, Lichtaktionen, WebSocket-Daten, Kamera- und Alarmgrenzen, Kopplungen, Übersetzungen und Builds. Das ist keine vollständige Hardware-, Langzeit- oder unabhängige Sicherheitsprüfung; die offenen Abnahmen bleiben oben dokumentiert.
+
+Im Browser wurden alle vier Licht-Schaltmodi mit Beispieldaten durchgespielt, Dimmer in Raumdetails ein-/ausgeblendet, ein Raumgerät hinzugefügt und per Undo wieder entfernt. Seitenname und Überschrift wurden Wort für Wort eingegeben und nach Neuladen im gespeicherten Entwurf wiedergefunden. Deutsch/Englisch sowie Designer bei 1440 × 900 und 810 × 1080 wurden geprüft.

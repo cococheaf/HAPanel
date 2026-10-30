@@ -1,5 +1,7 @@
 # Install and use HAPanel
 
+HAPanel is a **vibe-coded project built with AI assistance**. Its creator has no programming background and develops the idea through design and hands-on testing. Reviews and contributions are welcome; validation and remaining limits are documented in [Validation](docs/validation.md).
+
 **[Deutsch](DOCS.md) · English**
 
 ## Language
@@ -143,3 +145,13 @@ Live tiles start only while visible and pause behind an open detail view. For mu
 ## Icon
 
 `public/mark.svg` is the scalable source. `npm run icons` generates browser, iPad and Web App PNGs, plus `icon.png`/`logo.png` for the add-on. The standalone display Web App has its own Apple Touch icon; viewing HAPanel inside HA does not replace the HA app icon.
+
+## Light options and text editing
+
+Select a light tile in the Designer and open **Switch behaviour**. The two checkboxes allow toggling, on only, off only or a state-only display. Devices inside room cards have the same options beneath each device. Existing controls keep toggling unless configured otherwise. Dimming requires confirmed support from the light and every group member. Mixed and incomplete groups have no slider; restricted switching hides it as well.
+
+Capabilities use HA colour modes and recursive group membership. Extra group members are neither exposed to displays nor added to live subscriptions. HA metadata is cached; reload the Designer after about a minute when changing HA groups.
+
+Custom text retains spaces. Required names may be cleared temporarily while renaming, but empty values are not saved. **Publish** activates the valid configuration.
+
+The extension retains schema 1 and reads existing configurations with their previous default actions. Older HAPanel versions do not understand the new light options. Retain the Supervisor update backup and restore its matching configuration when downgrading.

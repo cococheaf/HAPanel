@@ -12,6 +12,89 @@ async function until(predicate: () => boolean, timeout = 3000) {
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 }
+test('group dimming is derived from cached member metadata without subscribing or exposing extra entities', async (t) => {
+  const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
+  await once(server, 'listening');
+  const calls: any[] = [];
+  const metadata = [
+    { entity_id: 'light.dim', state: 'off', attributes: { supported_color_modes: ['brightness'] } },
+    {
+      entity_id: 'light.normal',
+      state: 'off',
+      attributes: { supported_color_modes: ['onoff'], brightness: 255 },
+    },
+  ];
+  server.on('connection', (socket) => {
+    socket.send(JSON.stringify({ type: 'auth_required' }));
+    socket.on('message', (raw) => {
+      const message = JSON.parse(raw.toString());
+      calls.push(message);
+      if (message.type === 'auth') {
+        socket.send(JSON.stringify({ type: 'auth_ok' }));
+        return;
+      }
+      socket.send(
+        JSON.stringify({
+          id: message.id,
+          type: 'result',
+          success: true,
+          result: message.type === 'get_states' ? metadata : null,
+        }),
+      );
+      if (message.type === 'subscribe_entities')
+        socket.send(
+          JSON.stringify({
+            id: message.id,
+            type: 'event',
+            event: {
+              a: {
+                'light.living_room': {
+                  s: 'on',
+                  a: {
+                    supported_color_modes: ['brightness'],
+                    entity_id: ['light.dim', 'light.normal'],
+                    brightness: 100,
+                  },
+                },
+              },
+            },
+          }),
+        );
+    });
+  });
+  const hub = new HomeAssistantHub({
+    demo: false,
+    token: 'test-only',
+    websocketUrl: `ws://127.0.0.1:${(server.address() as { port: number }).port}`,
+  });
+  t.after(async () => {
+    await hub.stop();
+    for (const client of server.clients) client.terminate();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+  hub.setDocuments([demoDocument]);
+  hub.start();
+  await until(() => Boolean(hub.getSnapshot().entities['light.living_room']));
+  const snapshot = hub.getSnapshot(['light.living_room']);
+  assert.deepEqual(Object.keys(snapshot.entities), ['light.living_room']);
+  assert.deepEqual(snapshot.entities['light.living_room'].lightCapabilities, {
+    dimmable: false,
+    reason: 'mixed',
+  });
+  assert.equal(
+    calls.find((call) => call.type === 'subscribe_entities').entity_ids.includes('light.normal'),
+    false,
+  );
+  await assert.rejects(
+    hub.act(demoDocument, { tileId: 'light', command: 'brightness', value: 40 }),
+  );
+  assert.equal(
+    calls.some((call) => call.type === 'call_service'),
+    false,
+  );
+  await Promise.all([hub.getCatalog(), hub.getCatalog()]);
+  assert.equal(calls.filter((call) => call.type === 'get_states').length, 1);
+});
 test('HA adapter authenticates, filters subscriptions, merges deltas, receives forecasts and sends typed actions', async (t) => {
   const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
   await once(server, 'listening');
@@ -51,7 +134,12 @@ test('HA adapter authenticates, filters subscriptions, merges deltas, receives f
             id: subscription,
             type: 'event',
             event: {
-              a: { 'light.living_room': { s: 'on', a: { brightness: 100, old_attribute: 1 } } },
+              a: {
+                'light.living_room': {
+                  s: 'on',
+                  a: { brightness: 100, supported_color_modes: ['brightness'], old_attribute: 1 },
+                },
+              },
             },
           }),
         );

@@ -52,3 +52,11 @@ Firmware, USB-Flashing, ESPHome-Generierung und Mikrocontroller-Protokolle gehö
 - [ ] Optionale Kamera-Detailansicht bei Klingel- oder Bewegungsereignissen, ohne dauernde Vollbildwechsel.
 - [ ] Gerätespezifische Zuordnung eines Standardlayouts und Startansicht.
 - [ ] Sichtbare Verbindungsdiagnose mit tatsächlich gemessener Startzeit und Netzwerklast.
+
+## 1.3 · Licht und Designer bereinigen
+
+- [x] Dimmerslider anhand bestätigter Fähigkeiten und aller Gruppenmitglieder.
+- [x] Ein-/Ausschaltrechte pro Kachel und Raumgerät, serverseitig geprüft.
+- [x] Leerzeichen und vorübergehend leere Pflichtfelder beim Bearbeiten.
+- [x] HTTP-taugliche IDs beim Hinzufügen von Raumgeräten.
+- [x] Vibe-Coding-Herkunft und Möglichkeiten zur Mitarbeit transparent dokumentiert.

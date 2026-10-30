@@ -6,6 +6,8 @@
 
 **[Deutsch](README.md) · English**
 
+**A vibe-coded project:** HAPanel is built with AI assistance. Its creator contributes the idea, design and hands-on testing and has no programming background. Code reviews, clear bug reports and community contributions are very welcome.
+
 ![HAPanel dashboard](docs/images/dashboard-ipad-en.png)
 
 <details><summary>Energy cockpit</summary>
@@ -16,7 +18,7 @@
 
 HAPanel combines rounded tiles, calm colours and direct touch controls with a visual layout editor. It runs as a Home Assistant app (add-on) or a local Node.js process. Existing Lovelace dashboards and HA configuration files are preserved.
 
-**Version: 1.2.0.** The preview, editor and API are implemented. The HA adapter is tested against a simulated WebSocket server. Installation, updates, Ingress and live data are verified on HA OS 18.4 / Core 2026.10.4 (amd64). Testing on physical iPad hardware remains pending.
+**Version: 1.3.0.** The preview, editor and API are implemented. The HA adapter is tested against a simulated WebSocket server. Installation, updates, Ingress and live data are verified on HA OS 18.4 / Core 2026.10.4 (amd64). Testing on physical iPad hardware remains pending.
 
 ## Try it
 
@@ -28,7 +30,7 @@ For a standalone view, choose **Share → Add to Home Screen**. Landscape, portr
 
 - **German and English from the start**, with automatic browser-language detection, a manual language selector, localised dates/numbers and translatable errors.
 - Light groups, automations, inline alarm controls with configurable modes and filtered door/window summaries.
-- Camera tiles with snapshots and on-demand HLS video, plus an image-sequence fallback for cameras without streaming.
+- Camera tiles with snapshots, optional live overview, WebRTC and HLS video, plus an image-sequence fallback for cameras without streaming.
 - Floor navigation and room cards with individual device detail views.
 - Lights, climate, shades, media with album art, hourly weather, scenes and sensors.
 - Energy cockpit for solar, grid, battery and monitored loads, plus 24-hour meter history.
@@ -76,7 +78,7 @@ The Supervisor token stays in the backend and is treated as an administrator cre
 
 ## Development status
 
-Real HA/iPad acceptance, automatic viewport calibration, additional device capabilities and adaptive reflow are the next milestones. German and English are implemented; more languages can follow through the shared catalogs. Unknown stored schema versions are explicitly rejected and their files are preserved. Schema migration will accompany the first format change.
+Real HA/iPad acceptance, automatic viewport calibration, additional device capabilities and adaptive reflow are the next milestones. German and English are implemented; more languages can follow through the shared catalogs. Unknown stored schema versions are explicitly rejected and their files are preserved. Shared layouts are migrated to independent display views with a backup of the original file.
 
 ## Credits and licence
 
@@ -99,3 +101,22 @@ At the top of the Designer, **Edit display** selects the layout you are working 
 In a camera tile, choose **Snapshot** or **Live stream** under **Camera overview**. **Automatic** prefers the WebRTC connection offered by HA and falls back to HLS when needed. WebRTC requires a reachable direct media connection in your network; HLS can still introduce delay. **Jump to live edge** is available in HLS details.
 
 ![Display management](docs/images/displays-en.png)
+
+## Light controls that match your devices
+
+Select a light tile in the Designer → **Switch behaviour**. **Allow turning on** and **Allow turning off** configure its power button:
+
+| Turn on | Turn off | Behaviour          |
+| ------- | -------- | ------------------ |
+| ✓       | ✓        | Toggle on and off  |
+| ✓       | —        | Turn on only       |
+| —       | ✓        | Turn off only      |
+| —       | —        | Display state only |
+
+This also applies to switch entities and devices inside room cards. The backend enforces the options. These are rules for the individual HAPanel control; other HA interfaces and automations operate independently.
+
+Dimmer sliders require confirmed dimming support. **Every** group member must be dimmable; ordinary on/off lights, switches, mixed groups and groups with unknown members receive no slider. Missing brightness values on active lights remain unknown. One-way controls hide the slider to prevent it from triggering a disabled action. Eligible dimmable controls also offer **Show dimmer slider** to hide it manually.
+
+Page names, headings and custom labels preserve spaces while typing and saving. Required fields can be cleared temporarily while renaming; leaving an empty required field restores its last valid text.
+
+![Switch behaviour in the Designer](docs/images/light-settings-en.png)

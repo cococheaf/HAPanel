@@ -1,5 +1,7 @@
 # Mit HAPanel arbeiten
 
+HAPanel ist ein Vibe-Coding-Projekt mit KI-Unterstützung. Der Initiator hat keine Programmiererfahrung. Erklärende Reviews, kleine nachvollziehbare Pull Requests und Hilfe bei reproduzierbaren Fehlern sind besonders willkommen.
+
 **Deutsch · [English](CONTRIBUTING.en.md)**
 
 Node.js 24 LTS verwenden und Abhängigkeiten mit `npm ci` installieren. `npm run dev` startet Beispieldaten-API und Vite. Die Browservorschau unter `/preview.html` benötigt keine HA-Zugangsdaten.

@@ -4,6 +4,9 @@ import { alarmModes } from '../../shared/model';
 import { alarmModeLabel, supportsAlarmMode } from '../../shared/security';
 import type { Energy, EntityState, Room, Tile, TileKind } from '../../shared/model';
 import { useI18n } from '../i18n';
+import { layoutId } from '../../shared/display-layouts';
+import { LightSettings } from './LightSettings';
+import { TextInput } from './TextInput';
 
 const domains: Record<string, TileKind> = {
   light: 'light',
@@ -18,7 +21,7 @@ const domains: Record<string, TileKind> = {
   automation: 'automation',
   alarm_control_panel: 'alarm',
 };
-const freshControl = () => 'control_' + crypto.randomUUID().slice(0, 12);
+const freshControl = () => layoutId('control');
 
 export function InsightSettings({
   tile,
@@ -109,6 +112,11 @@ export function InsightSettings({
     );
   return (
     <>
+      {tile.kind === 'light' && !tile.room && (
+        <div className="form-section">
+          <LightSettings control={tile} catalog={catalog} update={(light) => update({ light })} />
+        </div>
+      )}
       {tile.kind === 'camera' && (
         <div className="form-section">
           <h3>{t('kind.camera')}</h3>
@@ -253,14 +261,16 @@ export function InsightSettings({
           <h3>{t('kind.contacts')}</h3>
           {tile.contacts.map((item) => (
             <div className="inspector-reference" key={item.entityId}>
-              <input
+              <TextInput
+                key={item.entityId}
                 aria-label={item.label}
                 value={item.label}
-                onChange={(event) =>
-                  event.target.value.trim() &&
+                maxLength={64}
+                required
+                onValue={(value) =>
                   update({
                     contacts: tile.contacts!.map((row) =>
-                      row.entityId === item.entityId ? { ...row, label: event.target.value } : row,
+                      row.entityId === item.entityId ? { ...row, label: value } : row,
                     ),
                   })
                 }
@@ -420,28 +430,50 @@ export function InsightSettings({
           <h3>{t('editor.roomControls')}</h3>
           <div className="inspector-controls">
             {tile.room.controls.map((control) => (
-              <div className="inspector-reference" key={control.id}>
-                <input
-                  aria-label={control.title}
-                  value={control.title}
-                  onChange={(event) =>
-                    event.target.value.trim() &&
-                    room({
-                      controls: tile.room!.controls.map((item) =>
-                        item.id === control.id ? { ...item, title: event.target.value } : item,
-                      ),
-                    })
-                  }
-                />
-                <button
-                  className="icon-button"
-                  aria-label={t('editor.remove')}
-                  onClick={() =>
-                    room({ controls: tile.room!.controls.filter((item) => item.id !== control.id) })
-                  }
-                >
-                  <X size={14} />
-                </button>
+              <div className="room-control-settings" key={control.id}>
+                <div className="inspector-reference">
+                  <TextInput
+                    key={control.id}
+                    aria-label={control.title}
+                    value={control.title}
+                    maxLength={64}
+                    required
+                    onValue={(value) =>
+                      room({
+                        controls: tile.room!.controls.map((item) =>
+                          item.id === control.id ? { ...item, title: value } : item,
+                        ),
+                      })
+                    }
+                  />
+                  <button
+                    className="icon-button"
+                    aria-label={t('editor.remove')}
+                    onClick={() =>
+                      room({
+                        controls: tile.room!.controls.filter((item) => item.id !== control.id),
+                      })
+                    }
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                {control.kind === 'light' && (
+                  <details>
+                    <summary>{t('light.settings')}</summary>
+                    <LightSettings
+                      control={control}
+                      catalog={catalog}
+                      update={(light) =>
+                        room({
+                          controls: tile.room!.controls.map((item) =>
+                            item.id === control.id ? { ...item, light } : item,
+                          ),
+                        })
+                      }
+                    />
+                  </details>
+                )}
               </div>
             ))}
           </div>
@@ -537,14 +569,16 @@ export function InsightSettings({
               <h3>{t(key === 'consumers' ? 'energy.monitored' : 'energy.metrics')}</h3>
               {tile.energy![key].map((item, index) => (
                 <div className="inspector-reference" key={item.entityId}>
-                  <input
+                  <TextInput
+                    key={item.entityId}
                     aria-label={item.label}
                     value={item.label}
-                    onChange={(event) =>
-                      event.target.value.trim() &&
+                    maxLength={64}
+                    required
+                    onValue={(value) =>
                       energy({
                         [key]: tile.energy![key].map((row, number) =>
-                          number === index ? { ...row, label: event.target.value } : row,
+                          number === index ? { ...row, label: value } : row,
                         ),
                       })
                     }

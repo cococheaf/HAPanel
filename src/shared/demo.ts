@@ -1,4 +1,5 @@
 import { validateAlarmCommand } from './security';
+import { lightDimming } from './lights';
 import { UserError, translate, type Language, type MessageKey } from './i18n';
 import {
   dashboardSchema,
@@ -410,6 +411,8 @@ export function applyDemoAction(snapshot: Snapshot, document: Dashboard, action:
   const next = structuredClone(snapshot);
   const entity = next.entities[id];
   if (!entity) throw new UserError('error.demoEntity');
+  if (action.command === 'brightness' && !lightDimming(id, next.entities).dimmable)
+    throw new UserError('error.lightNotDimmable');
   if (action.command === 'alarm') {
     validateAlarmCommand(entity, action.mode!, action.code);
     entity.state = action.mode!;

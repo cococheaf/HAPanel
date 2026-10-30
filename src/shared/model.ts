@@ -2,6 +2,20 @@ import { UserError } from './i18n';
 import { z } from 'zod';
 
 const id = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/);
+// Keep spaces while typing: transforming on every keystroke joins words in controlled inputs.
+const text = (max: number) =>
+  z
+    .string()
+    .min(1)
+    .max(max)
+    .refine((value) => value.trim().length > 0, 'error.requiredText');
+export const lightOptionsSchema = z
+  .object({
+    allowTurnOn: z.boolean().default(true),
+    allowTurnOff: z.boolean().default(true),
+    showBrightness: z.boolean().default(true),
+  })
+  .strict();
 export const tileKinds = [
   'light',
   'climate',
@@ -41,7 +55,7 @@ export const contactsSchema = z
     z
       .object({
         entityId: z.string().regex(/^binary_sensor\.[a-z0-9_]+$/),
-        label: z.string().trim().min(1).max(64),
+        label: text(64),
       })
       .strict(),
   )
@@ -64,10 +78,11 @@ export const controlSchema = z
     id,
     originId: id.optional(),
     kind: z.enum(tileKinds),
-    title: z.string().trim().min(1).max(64),
+    title: text(64),
     entityId,
     accent: z.enum(['amber', 'mint', 'blue', 'rose']),
     alarm: alarmOptionsSchema.optional(),
+    light: lightOptionsSchema.optional(),
   })
   .strict();
 export const roomSchema = z
@@ -121,9 +136,9 @@ export const rectSchema = z
 export const profileSchema = z
   .object({
     id,
-    name: z.string().trim().min(1).max(64),
+    name: text(64),
     theme: z.enum(['dusk', 'ocean', 'sand']).optional(),
-    greeting: z.string().trim().min(1).max(80).optional(),
+    greeting: text(80).optional(),
     subtitle: z.string().max(100).optional(),
     physicalWidth: z.number().int().min(240).max(16384),
     physicalHeight: z.number().int().min(240).max(16384),
@@ -145,7 +160,7 @@ export const tileSchema = z
     id,
     originId: id.optional(),
     kind: z.enum(tileKinds),
-    title: z.string().trim().min(1).max(64),
+    title: text(64),
     entityId,
     accent: z.enum(['amber', 'mint', 'blue', 'rose']),
     layouts: z.record(id, rectSchema),
@@ -155,6 +170,7 @@ export const tileSchema = z
     contacts: contactsSchema.optional(),
     homeAssistantUrl: alarmLink.optional(),
     alarm: alarmOptionsSchema.optional(),
+    light: lightOptionsSchema.optional(),
     camera: z
       .object({
         refreshSeconds: z.number().int().min(15).max(120).default(30),
@@ -170,8 +186,8 @@ export const dashboardSchema = z
   .object({
     schemaVersion: z.literal(1),
     id,
-    name: z.string().trim().min(1).max(64),
-    greeting: z.string().trim().min(1).max(80),
+    name: text(64),
+    greeting: text(80),
     subtitle: z.string().max(100),
     theme: z.enum(['dusk', 'ocean', 'sand']),
     profiles: z.array(profileSchema).min(1).max(8),
@@ -180,10 +196,10 @@ export const dashboardSchema = z
         z
           .object({
             id,
-            name: z.string().trim().min(1).max(40),
+            name: text(40),
             profileIds: z.array(id).min(1).max(8).optional(),
             originId: id.optional(),
-            heading: z.string().trim().min(1).max(80).optional(),
+            heading: text(80).optional(),
             subtitle: z.string().max(100).optional(),
             tiles: z.array(tileSchema).max(64),
           })
@@ -278,7 +294,8 @@ export const dashboardSchema = z
         if (
           (tile.kind === 'contacts') !== Boolean(tile.contacts) ||
           ((tile.homeAssistantUrl || tile.alarm) && tile.kind !== 'alarm') ||
-          (tile.camera && tile.kind !== 'camera')
+          (tile.camera && tile.kind !== 'camera') ||
+          (tile.light && (tile.kind !== 'light' || Boolean(tile.room)))
         )
           ctx.addIssue({
             code: 'custom',
@@ -313,6 +330,7 @@ export const dashboardSchema = z
             control.kind === 'contacts' ||
             control.kind === 'camera' ||
             (control.alarm && control.kind !== 'alarm') ||
+            (control.light && control.kind !== 'light') ||
             !domains[control.kind].includes(control.entityId.split('.')[0])
           )
             ctx.addIssue({
@@ -346,6 +364,7 @@ export type EntityState = {
   state: string;
   attributes: Record<string, unknown>;
   last_updated?: string;
+  lightCapabilities?: { dimmable: boolean; reason: 'dimmable' | 'onoff' | 'mixed' | 'unknown' };
 };
 export type Forecast = { datetime: string; temperature: number; condition: string };
 export type Snapshot = {
@@ -360,6 +379,8 @@ export type Action = {
   tileId: string;
   command:
     | 'toggle'
+    | 'turn_on'
+    | 'turn_off'
     | 'brightness'
     | 'temperature'
     | 'play_pause'
@@ -381,6 +402,8 @@ export const actionSchema = z
     tileId: id,
     command: z.enum([
       'toggle',
+      'turn_on',
+      'turn_off',
       'brightness',
       'temperature',
       'play_pause',
@@ -438,6 +461,7 @@ export function allControls(document: {
       kind: TileKind;
       entityId: string;
       alarm?: z.infer<typeof alarmOptionsSchema>;
+      light?: z.infer<typeof lightOptionsSchema>;
       room?: { controls: Control[] };
     }[];
   }[];
@@ -522,8 +546,14 @@ export function resolveAction(document: Dashboard, action: Action) {
     return result(services[action.mode], action.code ? { code: action.code } : {});
   }
   if (tile.kind === 'light') {
-    if (action.command === 'toggle') return result('toggle');
+    const allowOn = tile.light?.allowTurnOn ?? true;
+    const allowOff = tile.light?.allowTurnOff ?? true;
+    if (action.command === 'toggle' && allowOn && allowOff) return result('toggle');
+    if (action.command === 'turn_on' && allowOn) return result('turn_on');
+    if (action.command === 'turn_off' && allowOff) return result('turn_off');
     if (action.command === 'brightness' && domain === 'light') {
+      if (!allowOn || !allowOff || tile.light?.showBrightness === false)
+        throw new UserError('error.actionNotAllowed');
       const brightness = value(0, 100);
       return brightness === 0
         ? result('turn_off')

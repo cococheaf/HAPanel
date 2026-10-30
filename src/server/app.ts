@@ -20,6 +20,7 @@ import { HomeAssistantHub } from './hub';
 import { documentContacts } from '../shared/security';
 import { cameraSignalSchema } from '../shared/camera';
 import { publicEntity } from './cameras';
+import packageInfo from '../../package.json';
 import { errorMessage, isMessageKey, resolveLanguage, translate, UserError } from '../shared/i18n';
 
 export interface AppOptions {
@@ -186,7 +187,7 @@ export async function createApp(options: AppOptions) {
   );
   app.get('/api/health', async () => ({
     ok: true,
-    version: '1.2.0',
+    version: packageInfo.version,
     source: hub.getSnapshot([]).status,
   }));
 

@@ -3,6 +3,7 @@ import { EventEmitter } from 'node:events';
 import WebSocket from 'ws';
 import { applyDemoAction, demoSnapshot } from '../shared/demo';
 import { validateAlarmCommand } from '../shared/security';
+import { lightDimming } from '../shared/lights';
 import {
   rtcCandidateSchema,
   type CameraCandidate,
@@ -49,6 +50,8 @@ export class HomeAssistantHub extends EventEmitter {
   private subscriptionQueue: Promise<unknown> = Promise.resolve();
   private admins?: { until: number; ids: Set<string> };
   private catalog?: { until: number; entities: EntityState[] };
+  private catalogStates: Record<string, EntityState> = {};
+  private catalogRequest?: Promise<EntityState[]>;
   private history = new Map<string, { until: number; data: Promise<HistoryPoint[]> }>();
   private cameras: CameraProxy;
   private cameraCapabilitiesCache = new Map<
@@ -71,15 +74,29 @@ export class HomeAssistantHub extends EventEmitter {
     if (!this.options.demo) this.connect();
   }
   getSnapshot(ids?: string[]): Snapshot {
-    const snapshot = structuredClone(this.snapshot);
-    if (ids) {
-      snapshot.entities = Object.fromEntries(
-        ids.filter((id) => snapshot.entities[id]).map((id) => [id, snapshot.entities[id]]),
-      );
-      snapshot.forecasts = Object.fromEntries(
-        ids.filter((id) => snapshot.forecasts[id]).map((id) => [id, snapshot.forecasts[id]]),
-      );
-    }
+    const selected = ids ?? Object.keys(this.snapshot.entities);
+    const lookup = (id: string) => this.snapshot.entities[id] ?? this.catalogStates[id];
+    const snapshot = structuredClone({
+      ...this.snapshot,
+      entities: Object.fromEntries(
+        selected
+          .filter((id) => this.snapshot.entities[id])
+          .map((id) => [
+            id,
+            {
+              ...this.snapshot.entities[id],
+              ...(id.startsWith('light.') ? { lightCapabilities: lightDimming(id, lookup) } : {}),
+            },
+          ]),
+      ),
+      forecasts: ids
+        ? Object.fromEntries(
+            ids
+              .filter((id) => this.snapshot.forecasts[id])
+              .map((id) => [id, this.snapshot.forecasts[id]]),
+          )
+        : this.snapshot.forecasts,
+    });
     return snapshot;
   }
   private emitSnapshot() {
@@ -106,6 +123,7 @@ export class HomeAssistantHub extends EventEmitter {
           this.snapshot.forecasts = {};
           this.admins = undefined;
           this.catalog = undefined;
+          this.catalogStates = {};
           this.subscriptions = [];
           this.refreshSubscriptions();
           this.heartbeat = setInterval(() => {
@@ -190,6 +208,8 @@ export class HomeAssistantHub extends EventEmitter {
         this.subscriptions = [];
         const ids = [...this.desired];
         if (!ids.length) return;
+        // One cached metadata read, not extra live subscriptions for every group member.
+        await this.ensureCatalog().catch(() => undefined);
         const subscription = this.request(
           { type: 'subscribe_entities', entity_ids: ids },
           (event) => {
@@ -246,14 +266,27 @@ export class HomeAssistantHub extends EventEmitter {
         /* reconnect starts a fresh subscription */
       });
   }
+  private async ensureCatalog() {
+    if (!this.catalog || this.catalog.until < Date.now()) {
+      this.catalogRequest ??= this.rpc({ type: 'get_states' })
+        .then((result) => {
+          const entities: EntityState[] = Array.isArray(result) ? result : [];
+          this.catalogStates = Object.fromEntries(
+            entities.map((entity) => [entity.entity_id, entity]),
+          );
+          this.catalog = { until: Date.now() + 60_000, entities };
+          return entities;
+        })
+        .finally(() => {
+          this.catalogRequest = undefined;
+        });
+      await this.catalogRequest;
+    }
+  }
   async getCatalog(): Promise<EntityState[]> {
-    if (this.options.demo) return Object.values(this.snapshot.entities);
-    if (!this.catalog || this.catalog.until < Date.now())
-      this.catalog = {
-        until: Date.now() + 60_000,
-        entities: await this.rpc({ type: 'get_states' }),
-      };
-    return structuredClone(this.catalog.entities);
+    if (this.options.demo) return structuredClone(Object.values(this.snapshot.entities));
+    await this.ensureCatalog();
+    return structuredClone(this.catalog?.entities ?? []);
   }
   async getHistory(entityId: string): Promise<HistoryPoint[]> {
     if (this.options.demo) {
@@ -354,6 +387,16 @@ export class HomeAssistantHub extends EventEmitter {
     }
     const entity = this.snapshot.entities[resolved.target.entity_id];
     if (!entity || entity.state === 'unavailable') throw new UserError('error.entityUnavailable');
+    if (action.command === 'brightness') {
+      await this.ensureCatalog();
+      if (
+        !lightDimming(
+          entity.entity_id,
+          (id) => this.snapshot.entities[id] ?? this.catalogStates[id],
+        ).dimmable
+      )
+        throw new UserError('error.lightNotDimmable');
+    }
     if (action.command === 'alarm') validateAlarmCommand(entity, action.mode!, action.code);
     if (action.command === 'temperature') {
       const min = Number(entity.attributes.min_temp ?? 5),

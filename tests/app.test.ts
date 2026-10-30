@@ -27,6 +27,35 @@ async function fixture(t: { after: (fn: () => unknown) => void }, extra: Partial
   });
   return { app, store, pairings, hub };
 }
+test('published light policies reject forged toggles and dimming while accepting the configured one-way command', async (t) => {
+  const { app, store, hub } = await fixture(t, { mode: 'ingress', isAdmin: async () => true });
+  const draft = store.getRevision('draft');
+  draft.document.pages[0].tiles.find((tile) => tile.id === 'light')!.light = {
+    allowTurnOn: false,
+    allowTurnOff: true,
+    showBrightness: true,
+  };
+  const saved = await store.save(draft.document, draft.revision);
+  await store.publish(saved.draft.revision);
+  const invoke = (command: string, value?: number) =>
+    app.inject({
+      method: 'POST',
+      url: '/api/display/action',
+      remoteAddress: '172.30.32.2',
+      headers: { 'x-remote-user-id': 'admin-user' },
+      payload: { tileId: 'light', command, ...(value !== undefined ? { value } : {}) },
+    });
+  for (const [command, value] of [
+    ['toggle', undefined],
+    ['turn_on', undefined],
+    ['brightness', 0],
+    ['brightness', 50],
+  ] as const)
+    assert.equal((await invoke(command, value)).statusCode, 400);
+  assert.equal(hub.getSnapshot().entities['light.living_room'].state, 'on');
+  assert.equal((await invoke('turn_off')).statusCode, 200);
+  assert.equal(hub.getSnapshot().entities['light.living_room'].state, 'off');
+});
 test('local editor rejects non-loopback clients, hostile hosts and cross-site writes', async (t) => {
   const { app } = await fixture(t);
   assert.equal(

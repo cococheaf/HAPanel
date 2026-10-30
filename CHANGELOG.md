@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.0
+
+- Licht-Dimmer nur bei bestätigter Dimmfähigkeit; Gruppen werden rekursiv geprüft. Gemischte oder unvollständig bekannte Gruppen und normale Schalter erhalten keinen Slider. Fehlende Helligkeitswerte bleiben unbekannt.
+- Checkboxen für Ein/Aus, nur Ein, nur Aus oder reine Zustandsanzeige, auch für Geräte in Räumen. Gesperrte Aktionen und Dimmerbefehle werden im Backend abgewiesen.
+- Leerzeichen in Seitenüberschriften und eigenen Beschriftungen bleiben beim Tippen und Speichern erhalten. Pflichtfelder lassen sich zum Umbenennen vorübergehend leeren.
+- Raumgeräte können auch über HTTP hinzugefügt werden; Entitätsauswahl alphabetisch sortiert und neue Namen auf das erlaubte Format begrenzt.
+- Gefilterte Snapshots kopieren nur benötigte Entitäten; gecachte Gruppenmetadaten erzeugen keine zusätzlichen Live-Abonnements.
+- Dokumentation auf Deutsch und Englisch, transparenter Hinweis auf das Vibe-Coding-Projekt und erweiterte Regressionstests.
+
 ## 1.2.0
 
 - Zentrale Display-Verwaltung: Layouts auswählen, anlegen, duplizieren und entfernen; Ansichten kopieren, auch auf neue Displays, sortieren und mit ihren Kacheln löschen.

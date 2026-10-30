@@ -1,5 +1,7 @@
 # Contributing to HAPanel
 
+HAPanel is a vibe-coded project built with AI assistance. Its creator has no programming background. Explanatory reviews, small understandable pull requests and help reproducing bugs are especially welcome.
+
 **[Deutsch](CONTRIBUTING.md) · English**
 
 Use Node.js 24 LTS and `npm ci`. `npm run dev` starts the sample-data API and Vite. `/preview.html` needs no HA credentials.

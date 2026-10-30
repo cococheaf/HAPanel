@@ -38,6 +38,7 @@ import { AlarmStatus, ContactsSummary } from './Security';
 import { AlarmControls } from './AlarmControls';
 import { documentContacts } from '../../shared/security';
 import { CameraThumbnail, CameraStream } from './CameraView';
+import { lightDimming, lightTapCommand } from '../../shared/lights';
 import {
   WeatherGlyph,
   EnergyPanel,
@@ -286,35 +287,57 @@ export function TileView({
         </div>
       );
     if (tile.kind === 'light') {
+      const reportedBrightness = numberAttr(entity, 'brightness', NaN);
       const brightness =
-        entity.state === 'on' ? Math.round(numberAttr(entity, 'brightness', 255) / 2.55) : 0;
-      const modes = entity.attributes.supported_color_modes as string[] | undefined;
+        entity.state === 'on'
+          ? Number.isFinite(reportedBrightness)
+            ? Math.round(Math.min(255, Math.max(0, reportedBrightness)) / 2.55)
+            : undefined
+          : 0;
       const dimmable =
-        tile.entityId.startsWith('light.') &&
-        (entity.attributes.brightness !== undefined ||
-          modes?.some((mode) => !['onoff', 'unknown'].includes(mode)));
+        lightDimming(tile.entityId, snapshot.entities).dimmable &&
+        tile.light?.showBrightness !== false &&
+        tile.light?.allowTurnOn !== false &&
+        tile.light?.allowTurnOff !== false;
+      const tapCommand = lightTapCommand(tile);
+      const tapDisabled =
+        !tapCommand ||
+        (tapCommand === 'turn_on' && active) ||
+        (tapCommand === 'turn_off' && !active);
+      const actionLabel =
+        tapCommand === 'turn_off'
+          ? 'dashboard.turnOff'
+          : tapCommand === 'turn_on'
+            ? 'dashboard.turnOn'
+            : !tapCommand
+              ? 'light.readOnlyNamed'
+              : active
+                ? 'dashboard.turnOff'
+                : 'dashboard.turnOn';
       return (
         <>
           <div className="light-main">
             <button
               className="light-power"
-              aria-label={t(active ? 'dashboard.turnOff' : 'dashboard.turnOn', {
+              aria-label={t(actionLabel, {
                 title: tile.title,
               })}
-              disabled={disabled}
-              onClick={() => act('toggle')}
+              disabled={disabled || tapDisabled}
+              onClick={() => tapCommand && act(tapCommand)}
             >
               <Power size={25} />
             </button>
             <span className="light-value">
               {active
                 ? dimmable
-                  ? (brightness / 100).toLocaleString(intlLocale, { style: 'percent' })
+                  ? brightness === undefined
+                    ? '—'
+                    : (brightness / 100).toLocaleString(intlLocale, { style: 'percent' })
                   : t('common.on')
                 : t('common.off')}
             </span>
           </div>
-          {dimmable && (
+          {dimmable && brightness !== undefined && (
             <Slider
               label={t('dashboard.brightness', { title: tile.title })}
               value={brightness}
@@ -323,11 +346,19 @@ export function TileView({
             />
           )}
           <div className="tile-caption light-caption">
-            {Array.isArray(entity.attributes.entity_id)
-              ? t('dashboard.groupLightCaption')
-              : active
-                ? t('dashboard.lightOnCaption')
-                : t('dashboard.lightOffCaption')}
+            {tapCommand !== 'toggle'
+              ? t(
+                  !tapCommand
+                    ? 'light.readOnly'
+                    : tapCommand === 'turn_on'
+                      ? 'light.onlyOn'
+                      : 'light.onlyOff',
+                )
+              : Array.isArray(entity.attributes.entity_id)
+                ? t('dashboard.groupLightCaption')
+                : active
+                  ? t('dashboard.lightOnCaption')
+                  : t('dashboard.lightOffCaption')}
           </div>
         </>
       );

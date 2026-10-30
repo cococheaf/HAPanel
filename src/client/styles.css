@@ -4343,3 +4343,41 @@ label + label {
   line-height: 1.55;
   color: #795b4c;
 }
+
+.light-settings {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.light-settings legend {
+  font-size: 12px;
+  font-weight: 650;
+  margin-bottom: 12px;
+}
+.light-settings .field-hint {
+  line-height: 1.5;
+}
+.light-settings .alarm-setting-toggle {
+  margin: 10px 0;
+}
+.room-control-settings {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px;
+}
+.room-control-settings details {
+  font-size: 12px;
+  padding: 8px 2px 2px;
+}
+.room-control-settings summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.room-control-settings fieldset {
+  margin-top: 12px;
+}
+input[aria-invalid='true'] {
+  outline: 2px solid #c76869;
+  outline-offset: 1px;
+}

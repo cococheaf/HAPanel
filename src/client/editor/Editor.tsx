@@ -53,6 +53,7 @@ import { Modal } from '../ui/Modal';
 import { DisplayManager, type DisplayIntent } from './DisplayManager';
 import { createDisplay, resizeDisplay, layoutId } from '../../shared/display-layouts';
 import { InsightSettings } from './InsightSettings';
+import { TextInput } from './TextInput';
 
 const freshId = layoutId;
 type Dialog = 'preview' | 'devices' | 'displays' | 'history' | 'import' | 'export' | null;
@@ -349,7 +350,7 @@ function Studio({
     const tile: Tile = {
       id,
       kind,
-      title: entityName(entity),
+      title: entityName(entity).slice(0, 64),
       entityId: entity.entity_id,
       accent:
         kind === 'light'
@@ -363,7 +364,7 @@ function Studio({
       ...(kind === 'contacts'
         ? {
             title: t('kind.contacts'),
-            contacts: [{ entityId: entity.entity_id, label: entityName(entity) }],
+            contacts: [{ entityId: entity.entity_id, label: entityName(entity).slice(0, 64) }],
           }
         : {}),
     };
@@ -950,6 +951,7 @@ function Studio({
                         )}
                         {bootstrap.catalog
                           .filter((e) => domainKinds[e.entity_id.split('.')[0]] === selected.kind)
+                          .sort((a, b) => entityName(a).localeCompare(entityName(b), intlLocale))
                           .map((e) => (
                             <option key={e.entity_id} value={e.entity_id}>
                               {entityName(e)}
@@ -969,12 +971,12 @@ function Studio({
                     <h3>{t('editor.appearanceHeading')}</h3>
                     <label>
                       {t('common.title')}
-                      <input
+                      <TextInput
+                        key={selected.id + '-title'}
                         value={viewSelected!.title}
                         maxLength={64}
-                        onChange={(e) => {
-                          if (e.target.value.trim()) updateTile({ title: e.target.value });
-                        }}
+                        required
+                        onValue={(title) => updateTile({ title })}
                       />
                     </label>
                     <label>{t('editor.accent')}</label>
@@ -1084,25 +1086,29 @@ function Studio({
                   <p>{t('editor.noSelectionHint')}</p>
                   <label>
                     {t('editor.pageName')}
-                    <input
+                    <TextInput
+                      key={page.id + '-name'}
                       value={viewPage.name}
-                      onChange={(e) => {
-                        if (e.target.value.trim())
-                          change((d) => {
-                            d.pages.find((p) => p.id === page.id)!.name = e.target.value;
-                          });
+                      maxLength={40}
+                      required
+                      onValue={(value) => {
+                        change((d) => {
+                          d.pages.find((p) => p.id === page.id)!.name = value;
+                        });
                       }}
                     />
                   </label>
                   <label>
                     {t('editor.pageHeading')}
-                    <input
+                    <TextInput
+                      key={page.id + '-heading'}
                       value={page.heading ?? ''}
                       maxLength={80}
-                      onChange={(event) =>
+                      onValue={(value) =>
                         change((d) => {
-                          d.pages.find((item) => item.id === page.id)!.heading =
-                            event.target.value || undefined;
+                          d.pages.find((item) => item.id === page.id)!.heading = value.trim()
+                            ? value
+                            : undefined;
                         })
                       }
                     />
@@ -1196,12 +1202,12 @@ function Studio({
                   </div>
                   <label>
                     {t('editor.greeting')}
-                    <input
+                    <TextInput
+                      key={profile.id + '-greeting'}
                       value={viewProfile.greeting ?? viewDocument.greeting}
                       maxLength={80}
-                      onChange={(e) => {
-                        if (e.target.value.trim()) profileUpdate({ greeting: e.target.value });
-                      }}
+                      required
+                      onValue={(greeting) => profileUpdate({ greeting })}
                     />
                   </label>
                   <label>
@@ -1594,11 +1600,12 @@ function DisplayFields({
         <h3>{t('editor.profileHeading')}</h3>
         <label>
           {t('common.name')}
-          <input
+          <TextInput
+            key={p.id + '-name'}
             value={p.name}
-            onChange={(e) => {
-              if (e.target.value.trim()) onChange({ name: e.target.value });
-            }}
+            maxLength={64}
+            required
+            onValue={(name) => onChange({ name })}
           />
         </label>
         <div className="number-grid">
