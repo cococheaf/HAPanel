@@ -57,7 +57,7 @@ async function main() {
   const editor = await createApp({ ...common, surface: 'editor' });
   const port = Number(process.env.PORT ?? (mode === 'ingress' ? 8099 : 4310));
   await editor.listen({ host: mode === 'ingress' ? '0.0.0.0' : '127.0.0.1', port });
-  console.log(`HAPanel ${demo ? 'Demo' : 'Live'} · Editor: http://127.0.0.1:${port}`);
+  console.log(`HAPanel ${demo ? 'Beispieldaten' : 'Live'} · Editor: http://127.0.0.1:${port}`);
   const display = displayEnabled ? await createApp({ ...common, surface: 'display' }) : undefined;
   if (display) {
     const displayPort = Number(process.env.HAPANEL_DISPLAY_PORT ?? 8098);

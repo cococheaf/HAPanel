@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { alarmModes } from '../../shared/model';
+import { alarmModeLabel, supportsAlarmMode } from '../../shared/security';
 import type { Energy, EntityState, Room, Tile, TileKind } from '../../shared/model';
 import { useI18n } from '../i18n';
 
@@ -96,19 +98,134 @@ export function InsightSettings({
     );
   return (
     <>
+      {tile.kind === 'camera' && (
+        <div className="form-section">
+          <h3>{t('kind.camera')}</h3>
+          <label>
+            {t('camera.refresh')}
+            <input
+              type="number"
+              min={15}
+              max={120}
+              value={tile.camera?.refreshSeconds ?? 30}
+              onChange={(event) =>
+                update({
+                  camera: {
+                    refreshSeconds: Number(event.target.value),
+                    fit: tile.camera?.fit ?? 'cover',
+                  },
+                })
+              }
+            />
+          </label>
+          <label>
+            {t('camera.fit')}
+            <select
+              value={tile.camera?.fit ?? 'cover'}
+              onChange={(event) =>
+                update({
+                  camera: {
+                    refreshSeconds: tile.camera?.refreshSeconds ?? 30,
+                    fit: event.target.value as 'cover' | 'contain',
+                  },
+                })
+              }
+            >
+              <option value="cover">{t('camera.fitCover')}</option>
+              <option value="contain">{t('camera.fitContain')}</option>
+            </select>
+          </label>
+          <p className="field-hint">{t('camera.onDemand')}</p>
+        </div>
+      )}
       {tile.kind === 'alarm' && (
         <div className="form-section">
           <h3>{t('kind.alarm')}</h3>
-          <label>
-            {t('alarm.haUrl')}
+          <label className="alarm-setting-toggle">
             <input
-              type="url"
-              value={tile.homeAssistantUrl ?? ''}
-              placeholder="https://homeassistant.local:8123/lovelace"
-              onChange={(event) => update({ homeAssistantUrl: event.target.value || undefined })}
+              type="checkbox"
+              checked={Boolean(tile.alarm)}
+              onChange={(event) =>
+                update({
+                  alarm: event.target.checked
+                    ? {
+                        modes: alarmModes.filter((mode) =>
+                          supportsAlarmMode(
+                            catalog.find((entity) => entity.entity_id === tile.entityId),
+                            mode,
+                          ),
+                        ).length
+                          ? alarmModes.filter((mode) =>
+                              supportsAlarmMode(
+                                catalog.find((entity) => entity.entity_id === tile.entityId),
+                                mode,
+                              ),
+                            )
+                          : ['disarmed'],
+                      }
+                    : undefined,
+                  homeAssistantUrl: undefined,
+                })
+              }
             />
+            {t('alarm.enableControls')}
           </label>
-          <p className="field-hint">{t('alarm.manageInHA')}</p>
+          {tile.alarm && (
+            <>
+              <p className="field-hint">{t('alarm.modeConfiguration')}</p>
+              <div className="alarm-mode-settings">
+                {alarmModes.map((mode) => (
+                  <label key={mode}>
+                    <input
+                      type="checkbox"
+                      checked={tile.alarm!.modes.includes(mode)}
+                      disabled={tile.alarm!.modes.length === 1 && tile.alarm!.modes.includes(mode)}
+                      onChange={(event) =>
+                        update({
+                          alarm: {
+                            modes: event.target.checked
+                              ? [...tile.alarm!.modes, mode]
+                              : tile.alarm!.modes.filter((item) => item !== mode),
+                          },
+                        })
+                      }
+                    />
+                    <span>{t(alarmModeLabel(mode))}</span>
+                  </label>
+                ))}
+              </div>
+              <h3>{t('alarm.modeOrder')}</h3>
+              {tile.alarm.modes.map((mode, index) => (
+                <div key={mode} className="inspector-reference">
+                  <span>{t(alarmModeLabel(mode))}</span>
+                  {([-1, 1] as const).map((direction) => (
+                    <button
+                      key={direction}
+                      type="button"
+                      className="icon-button"
+                      disabled={
+                        index + direction < 0 || index + direction >= tile.alarm!.modes.length
+                      }
+                      aria-label={t(direction < 0 ? 'alarm.moveUp' : 'alarm.moveDown', {
+                        mode: t(alarmModeLabel(mode)),
+                      })}
+                      onClick={() => {
+                        const modes = [...tile.alarm!.modes];
+                        [modes[index], modes[index + direction]] = [
+                          modes[index + direction],
+                          modes[index],
+                        ];
+                        update({ alarm: { modes } });
+                      }}
+                    >
+                      {direction < 0 ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </>
+          )}
+          <p className="field-hint">{t('alarm.codePrivacy')}</p>
         </div>
       )}
       {tile.contacts && (
@@ -164,7 +281,7 @@ export function InsightSettings({
             )}
         </div>
       )}
-      {!['contacts', 'alarm', 'automation'].includes(tile.kind) && (
+      {!['contacts', 'alarm', 'automation', 'camera'].includes(tile.kind) && (
         <>
           <div className="form-section">
             <h3>{t('editor.cardView')}</h3>

@@ -96,3 +96,58 @@ test('only untouched legacy demo layouts upgrade; personalised layouts and publi
     'A custom published greeting',
   );
 });
+
+test('alarm modes use explicit services and configured allowlists; PINs retain leading zeros', async () => {
+  const { actionSchema } = await import('../src/shared/model');
+  const { validateAlarmCommand, supportsAlarmMode, alarmCodeRequired } =
+    await import('../src/shared/security');
+  const expected = [
+    'alarm_disarm',
+    'alarm_arm_home',
+    'alarm_arm_away',
+    'alarm_arm_night',
+    'alarm_arm_vacation',
+    'alarm_arm_custom_bypass',
+  ];
+  const document = structuredClone(showcaseDocument);
+  const alarm = document.pages[0].tiles.find((tile) => tile.kind === 'alarm')!;
+  for (const [index, mode] of alarm.alarm!.modes.entries()) {
+    const call = resolveAction(document, {
+      tileId: alarm.id,
+      command: 'alarm',
+      mode,
+      code: '0012',
+    });
+    assert.equal(call.service, expected[index]);
+    assert.deepEqual(call.service_data, { code: '0012' });
+    assert.deepEqual(call.target, { entity_id: alarm.entityId });
+  }
+  alarm.alarm!.modes = ['disarmed'];
+  assert.throws(() =>
+    resolveAction(document, { tileId: alarm.id, command: 'alarm', mode: 'armed_away' }),
+  );
+  assert.equal(actionSchema.safeParse({ tileId: alarm.id, command: 'alarm' }).success, false);
+  assert.equal(
+    actionSchema.safeParse({ tileId: alarm.id, command: 'toggle', code: '0012' }).success,
+    false,
+  );
+  alarm.alarm!.modes = ['disarmed', 'disarmed'];
+  assert.equal(dashboardSchema.safeParse(document).success, false);
+  alarm.alarm!.modes = ['disarmed'];
+  (alarm.alarm as any).code = '0012';
+  assert.equal(dashboardSchema.safeParse(document).success, false);
+  const entity: EntityState = {
+    entity_id: alarm.entityId,
+    state: 'disarmed',
+    attributes: { supported_features: 3, code_format: 'number', code_arm_required: false },
+  };
+  assert.equal(supportsAlarmMode(entity, 'armed_home'), true);
+  assert.equal(supportsAlarmMode(entity, 'armed_night'), false);
+  assert.equal(alarmCodeRequired(entity, 'armed_home'), false);
+  assert.equal(alarmCodeRequired(entity, 'disarmed'), true);
+  assert.throws(() => validateAlarmCommand(entity, 'disarmed'));
+  assert.throws(() => validateAlarmCommand(entity, 'disarmed', 'abc'));
+  assert.doesNotThrow(() => validateAlarmCommand(entity, 'disarmed', '0012'));
+  entity.state = 'unavailable';
+  assert.throws(() => validateAlarmCommand(entity, 'disarmed', '0012'));
+});

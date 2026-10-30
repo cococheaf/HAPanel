@@ -13,10 +13,29 @@ export const tileKinds = [
   'automation',
   'alarm',
   'contacts',
+  'camera',
 ] as const;
 export type TileKind = (typeof tileKinds)[number];
 const entityId = z.string().regex(/^[a-z_]+\.[a-z0-9_]+$/);
 const sensorId = z.string().regex(/^sensor\.[a-z0-9_]+$/);
+export const alarmModes = [
+  'disarmed',
+  'armed_home',
+  'armed_away',
+  'armed_night',
+  'armed_vacation',
+  'armed_custom_bypass',
+] as const;
+export type AlarmMode = (typeof alarmModes)[number];
+export const alarmOptionsSchema = z
+  .object({
+    modes: z
+      .array(z.enum(alarmModes))
+      .min(1)
+      .max(6)
+      .refine((modes) => new Set(modes).size === modes.length, 'error.uniqueIds'),
+  })
+  .strict();
 export const contactsSchema = z
   .array(
     z
@@ -47,6 +66,7 @@ export const controlSchema = z
     title: z.string().trim().min(1).max(64),
     entityId,
     accent: z.enum(['amber', 'mint', 'blue', 'rose']),
+    alarm: alarmOptionsSchema.optional(),
   })
   .strict();
 export const roomSchema = z
@@ -129,6 +149,14 @@ export const tileSchema = z
     navigateTo: id.optional(),
     contacts: contactsSchema.optional(),
     homeAssistantUrl: alarmLink.optional(),
+    alarm: alarmOptionsSchema.optional(),
+    camera: z
+      .object({
+        refreshSeconds: z.number().int().min(15).max(120).default(30),
+        fit: z.enum(['cover', 'contain']).default('cover'),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export const dashboardSchema = z
@@ -217,12 +245,14 @@ export const dashboardSchema = z
       automation: ['automation'],
       alarm: ['alarm_control_panel'],
       contacts: ['binary_sensor'],
+      camera: ['camera'],
     };
     for (const [pageIndex, page] of doc.pages.entries())
       for (const [ti, tile] of page.tiles.entries()) {
         if (
           (tile.kind === 'contacts') !== Boolean(tile.contacts) ||
-          (tile.homeAssistantUrl && tile.kind !== 'alarm')
+          ((tile.homeAssistantUrl || tile.alarm) && tile.kind !== 'alarm') ||
+          (tile.camera && tile.kind !== 'camera')
         )
           ctx.addIssue({
             code: 'custom',
@@ -246,6 +276,8 @@ export const dashboardSchema = z
         for (const control of tile.room?.controls ?? []) {
           if (
             control.kind === 'contacts' ||
+            control.kind === 'camera' ||
+            (control.alarm && control.kind !== 'alarm') ||
             !domains[control.kind].includes(control.entityId.split('.')[0])
           )
             ctx.addIssue({
@@ -285,6 +317,9 @@ export type Snapshot = {
   status: 'demo' | 'connected' | 'reconnecting';
   entities: Record<string, EntityState>;
   forecasts: Record<string, Forecast[]>;
+  alarmControl?: boolean;
+  contactSources?: { entityId: string; label: string }[];
+  cameraView?: boolean;
 };
 export type Action = {
   tileId: string;
@@ -300,8 +335,11 @@ export type Action = {
     | 'stop'
     | 'position'
     | 'volume'
-    | 'activate';
+    | 'activate'
+    | 'alarm';
   value?: number;
+  mode?: AlarmMode;
+  code?: string;
 };
 export const actionSchema = z
   .object({
@@ -319,10 +357,21 @@ export const actionSchema = z
       'position',
       'volume',
       'activate',
+      'alarm',
     ]),
     value: z.number().finite().optional(),
+    mode: z.enum(alarmModes).optional(),
+    code: z.string().min(1).max(64).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((action, ctx) => {
+    if (
+      action.command === 'alarm'
+        ? !action.mode || action.value !== undefined
+        : action.mode !== undefined || action.code !== undefined
+    )
+      ctx.addIssue({ code: 'custom', message: 'error.actionNotAllowed' });
+  });
 
 export function geometry(p: Profile) {
   const width = p.width - p.margin * 2;
@@ -349,7 +398,13 @@ export function findSpace(profile: Profile, tiles: Tile[], w = 4, h = 2): Rect |
 }
 export function allControls(document: {
   pages: {
-    tiles: { id: string; kind: TileKind; entityId: string; room?: { controls: Control[] } }[];
+    tiles: {
+      id: string;
+      kind: TileKind;
+      entityId: string;
+      alarm?: z.infer<typeof alarmOptionsSchema>;
+      room?: { controls: Control[] };
+    }[];
   }[];
 }) {
   return document.pages.flatMap((page) =>
@@ -405,6 +460,8 @@ export function resolveAction(document: Dashboard, action: Action) {
   const tile = allControls(document).find((t) => t.id === action.tileId);
   if (!tile) throw new UserError('error.tileNotAllowed');
   const domain = tile.entityId.split('.')[0];
+  if (action.command !== 'alarm' && (action.mode !== undefined || action.code !== undefined))
+    throw new UserError('error.actionNotAllowed');
   const result = (service: string, service_data: Record<string, unknown> = {}) => ({
     domain,
     service,
@@ -416,6 +473,19 @@ export function resolveAction(document: Dashboard, action: Action) {
       throw new UserError('error.valueRange');
     return action.value;
   };
+  if (tile.kind === 'alarm' && action.command === 'alarm') {
+    const services: Record<AlarmMode, string> = {
+      disarmed: 'alarm_disarm',
+      armed_home: 'alarm_arm_home',
+      armed_away: 'alarm_arm_away',
+      armed_night: 'alarm_arm_night',
+      armed_vacation: 'alarm_arm_vacation',
+      armed_custom_bypass: 'alarm_arm_custom_bypass',
+    };
+    if (!action.mode || !tile.alarm?.modes.includes(action.mode))
+      throw new UserError('error.actionNotAllowed');
+    return result(services[action.mode], action.code ? { code: action.code } : {});
+  }
   if (tile.kind === 'light') {
     if (action.command === 'toggle') return result('toggle');
     if (action.command === 'brightness' && domain === 'light') {

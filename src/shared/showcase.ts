@@ -152,6 +152,16 @@ const homeControls: Tile[] = [
     kind: 'alarm',
     title: 'Alarmpanel',
     entityId: 'alarm_control_panel.demo_home',
+    alarm: {
+      modes: [
+        'disarmed',
+        'armed_home',
+        'armed_away',
+        'armed_night',
+        'armed_vacation',
+        'armed_custom_bypass',
+      ],
+    },
     accent: 'mint',
     layouts: {
       ipad: { x: 0, y: 4, w: 4, h: 2 },
@@ -212,6 +222,25 @@ export const showcaseDocument: Dashboard = dashboardSchema.parse({
       tiles: og,
     },
     {
+      id: 'surveillance',
+      name: 'Überwachung',
+      heading: 'Zuhause im Blick.',
+      subtitle: 'Kameras · Live-Ansichten bei Bedarf.',
+      tiles: ['entrance', 'garden'].map((name, index) => ({
+        id: 'sample_camera_' + name,
+        kind: 'camera',
+        title: index === 0 ? 'Eingang' : 'Garten',
+        entityId: 'camera.sample_' + name,
+        accent: 'mint',
+        camera: { refreshSeconds: 30, fit: 'cover' },
+        layouts: {
+          ipad: { x: index * 6, y: 0, w: 6, h: 4 },
+          compact: { x: index * 6, y: 0, w: 6, h: 4 },
+          portrait: { x: 0, y: index * 4, w: 8, h: 4 },
+        },
+      })),
+    },
+    {
       id: 'energy',
       name: 'Energie',
       heading: 'Dein Energiecockpit.',
@@ -235,29 +264,43 @@ export const showcaseDocument: Dashboard = dashboardSchema.parse({
 // Upgrade only untouched 0.2 sample layouts; personalised browser layouts stay intact.
 export const legacyShowcaseDocument: Dashboard = dashboardSchema.parse({
   ...showcaseDocument,
-  pages: showcaseDocument.pages.map((page, index) =>
-    index !== 0
-      ? page
-      : {
-          ...page,
-          tiles: [
-            weather,
-            ...page.tiles.filter((tile) => ['demo_home_eg', 'demo_home_og'].includes(tile.id)),
-            {
-              ...base.pages[0].tiles[3],
-              layouts: {
-                ipad: { x: 0, y: 2, w: 8, h: 4 },
-                compact: { x: 0, y: 2, w: 8, h: 4 },
-                portrait: { x: 0, y: 4, w: 8, h: 3 },
+  pages: showcaseDocument.pages
+    .filter((page) => page.id !== 'surveillance')
+    .map((page, index) =>
+      index !== 0
+        ? page
+        : {
+            ...page,
+            tiles: [
+              weather,
+              ...page.tiles.filter((tile) => ['demo_home_eg', 'demo_home_og'].includes(tile.id)),
+              {
+                ...base.pages[0].tiles[3],
+                layouts: {
+                  ipad: { x: 0, y: 2, w: 8, h: 4 },
+                  compact: { x: 0, y: 2, w: 8, h: 4 },
+                  portrait: { x: 0, y: 4, w: 8, h: 3 },
+                },
               },
-            },
-            {
-              ...homeEnergy,
-              layouts: { ...homeEnergy.layouts, portrait: { x: 0, y: 7, w: 8, h: 3 } },
-            },
-          ],
-        },
-  ),
+              {
+                ...homeEnergy,
+                layouts: { ...homeEnergy.layouts, portrait: { x: 0, y: 7, w: 8, h: 3 } },
+              },
+            ],
+          },
+    ),
+});
+
+export const legacyV1ShowcaseDocument: Dashboard = dashboardSchema.parse({
+  ...showcaseDocument,
+  pages: showcaseDocument.pages
+    .filter((page) => page.id !== 'surveillance')
+    .map((page) => ({
+      ...page,
+      tiles: page.tiles.map((tile) =>
+        tile.id === 'demo_alarm' ? { ...tile, alarm: undefined } : tile,
+      ),
+    })),
 });
 
 export function showcaseSnapshot(): Snapshot {
@@ -279,13 +322,20 @@ export function showcaseSnapshot(): Snapshot {
       last_updated: new Date().toISOString(),
     };
   };
+  for (const name of ['entrance', 'garden'])
+    add('camera.sample_' + name, 'idle', undefined, { supported_features: 2 });
   add('light.demo_general', 'on', undefined, {
     friendly_name: 'General Licht',
     entity_id: ['light.living_room', 'light.kitchen'],
     supported_color_modes: ['onoff'],
   });
   add('automation.demo_summer', 'on', undefined, { friendly_name: 'Beschattung Sommer' });
-  add('alarm_control_panel.demo_home', 'disarmed', undefined, { friendly_name: 'Alarmpanel' });
+  add('alarm_control_panel.demo_home', 'disarmed', undefined, {
+    friendly_name: 'Alarmpanel',
+    supported_features: 63,
+    code_format: null,
+    code_arm_required: false,
+  });
   for (const [id, state] of [
     ['demo_terrace', 'off'],
     ['demo_kitchen_window', 'on'],

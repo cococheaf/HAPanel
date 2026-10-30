@@ -17,6 +17,8 @@ import {
 } from '../shared/model';
 import { DocumentStore, HttpError, PairingStore } from './store';
 import { HomeAssistantHub } from './hub';
+import { documentContacts } from '../shared/security';
+import { publicEntity } from './cameras';
 import { errorMessage, isMessageKey, resolveLanguage, translate, UserError } from '../shared/i18n';
 
 export interface AppOptions {
@@ -36,15 +38,60 @@ const revisionBody = z.object({ expectedRevision: z.number().int().positive() })
 
 export async function createApp(options: AppOptions) {
   const { store, pairings, hub } = options;
-  const performAction = async (document: Dashboard, action: Action) => {
+  const alarmAttempts = new Map<string, number[]>();
+  const snapshotFor = (document: Dashboard, alarmControl: boolean) => {
+    const snapshot = hub.getSnapshot(entityIds(document));
+    snapshot.entities = Object.fromEntries(
+      Object.entries(snapshot.entities).map(([id, entity]) => [id, publicEntity(entity)]),
+    );
+    return {
+      ...snapshot,
+      alarmControl,
+      cameraView: alarmControl,
+      contactSources: documentContacts(document, snapshot),
+    };
+  };
+  const actor = (request: FastifyRequest) =>
+    options.mode === 'ingress' ? String(request.headers['x-remote-user-id']) : request.ip;
+  const performAction = async (
+    document: Dashboard,
+    action: Action,
+    alarmControl = false,
+    identity = '',
+  ) => {
+    if (action.command === 'alarm' && !alarmControl)
+      throw new HttpError(403, 'error.alarmAdminRequired');
     try {
       resolveAction(document, action);
     } catch (error) {
       throw new HttpError(400, error instanceof UserError ? error : (error as Error).message);
     }
+    if (action.command === 'alarm') {
+      const now = Date.now();
+      const attempts = (alarmAttempts.get(identity) ?? []).filter((time) => time > now - 60_000);
+      if (attempts.length >= 5) throw new HttpError(429, 'error.alarmRateLimit');
+      if (!alarmAttempts.has(identity) && alarmAttempts.size >= 128)
+        alarmAttempts.delete(alarmAttempts.keys().next().value!);
+      alarmAttempts.set(identity, [...attempts, now]);
+    }
     try {
       await hub.act(document, action);
     } catch (error) {
+      if (action.command === 'alarm') {
+        const safeKeys = [
+          'error.alarmUnsupported',
+          'error.alarmCodeRequired',
+          'error.alarmCodeFormat',
+          'error.entityUnavailable',
+          'error.haDisconnected',
+        ];
+        throw new HttpError(
+          hub.getSnapshot([]).status === 'reconnecting' ? 503 : 400,
+          error instanceof UserError && safeKeys.includes(error.messageKey)
+            ? new UserError(error.messageKey)
+            : 'error.alarmRejected',
+        );
+      }
       throw new HttpError(
         hub.getSnapshot([]).status === 'reconnecting' ? 503 : 400,
         error instanceof UserError ? error : (error as Error).message,
@@ -108,7 +155,7 @@ export async function createApp(options: AppOptions) {
     reply.header('Referrer-Policy', 'same-origin');
     reply.header(
       'Content-Security-Policy',
-      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss:; font-src 'self'; base-uri 'self'; object-src 'none'",
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self' ws: wss:; font-src 'self'; base-uri 'self'; object-src 'none'",
     );
   });
   app.setErrorHandler(
@@ -138,7 +185,7 @@ export async function createApp(options: AppOptions) {
   );
   app.get('/api/health', async () => ({
     ok: true,
-    version: '1.0.0',
+    version: '1.1.0',
     source: hub.getSnapshot([]).status,
   }));
 
@@ -151,8 +198,8 @@ export async function createApp(options: AppOptions) {
         });
         admin.get('/bootstrap', async () => ({
           workspace: store.get(),
-          snapshot: hub.getSnapshot(),
-          catalog: await hub.getCatalog(),
+          snapshot: snapshotFor(store.get().draft.document, true),
+          catalog: (await hub.getCatalog()).map(publicEntity),
           mode: hub.getSnapshot([]).status === 'demo' ? 'demo' : 'live',
           displayEnabled: options.displayEnabled ?? false,
         }));
@@ -210,7 +257,7 @@ export async function createApp(options: AppOptions) {
               .object({ enabled: z.literal(true), action: actionSchema })
               .strict()
               .parse(request.body);
-            await performAction(store.get().draft.document, body.action);
+            await performAction(store.get().draft.document, body.action, true, actor(request));
             return { ok: true };
           },
         );
@@ -243,7 +290,7 @@ export async function createApp(options: AppOptions) {
               socket.send(
                 JSON.stringify({
                   type: 'snapshot',
-                  snapshot: hub.getSnapshot(entityIds(store.get().draft.document)),
+                  snapshot: snapshotFor(store.get().draft.document, true),
                 }),
               );
           };
@@ -285,14 +332,19 @@ export async function createApp(options: AppOptions) {
       });
       display.get('/bootstrap', async () => ({
         published: store.get().published,
-        snapshot: hub.getSnapshot(entityIds(store.get().published.document)),
+        snapshot: snapshotFor(store.get().published.document, ingressDisplay),
         canEdit: ingressDisplay,
       }));
       display.post(
         '/action',
         { config: { rateLimit: { max: 20, timeWindow: 1000 } } },
         async (request) => {
-          await performAction(store.get().published.document, actionSchema.parse(request.body));
+          await performAction(
+            store.get().published.document,
+            actionSchema.parse(request.body),
+            ingressDisplay,
+            actor(request),
+          );
           return { ok: true };
         },
       );
@@ -328,7 +380,7 @@ export async function createApp(options: AppOptions) {
           socket.send(
             JSON.stringify({
               type: 'snapshot',
-              snapshot: hub.getSnapshot(entityIds(published.document)),
+              snapshot: snapshotFor(published.document, ingressDisplay),
               ...(changed ? { published } : {}),
             }),
           );
@@ -346,6 +398,66 @@ export async function createApp(options: AppOptions) {
     },
     { prefix: '/api/display' },
   );
+
+  const cameraContexts = [
+    {
+      prefix: '/api/display/camera',
+      document: () => store.get().published.document,
+      authorize: requireDisplay,
+      allowed: ingressDisplay,
+    },
+    ...(options.surface === 'editor'
+      ? [
+          {
+            prefix: '/api/editor/camera',
+            document: () => store.get().draft.document,
+            authorize: requireEditor,
+            allowed: true,
+          },
+        ]
+      : []),
+  ];
+  for (const context of cameraContexts) {
+    for (const suffix of ['still', 'stream.m3u8', 'assets/:asset']) {
+      app.get<{ Params: { id: string; asset?: string }; Querystring: Record<string, unknown> }>(
+        context.prefix + '/:id/' + suffix,
+        {
+          onRequest: context.authorize,
+          config: {
+            rateLimit: { max: suffix === 'assets/:asset' ? 3000 : 120, timeWindow: 60_000 },
+          },
+        },
+        async (request, reply) => {
+          if (!context.allowed) throw new HttpError(403, 'error.cameraAdminRequired');
+          const tile = allControls(context.document()).find(
+            (tile) => tile.id === request.params.id && tile.kind === 'camera',
+          );
+          if (!tile) throw new HttpError(404, 'error.tileNotAllowed');
+          if (request.params.asset && !/^[a-f0-9]{32}\.[a-z0-9]+$/.test(request.params.asset))
+            throw new HttpError(400, 'error.cameraSource');
+          try {
+            const result =
+              suffix === 'still'
+                ? await hub.cameraStill(tile.entityId, request.query.live === '1')
+                : await hub.cameraLive(
+                    tile.entityId,
+                    request.params.asset,
+                    request.query,
+                    request.headers.range,
+                  );
+            reply
+              .header('Cache-Control', 'no-store')
+              .type(result.type)
+              .code(result.status ?? 200);
+            if (result.contentRange) reply.header('Content-Range', result.contentRange);
+            return reply.send(result.buffer);
+          } catch {
+            throw new HttpError(502, 'error.cameraUnavailable');
+          }
+        },
+      );
+    }
+  }
 
   if (options.staticDir && existsSync(options.staticDir)) {
     await app.register(staticFiles, { root: options.staticDir, index: false, wildcard: true });

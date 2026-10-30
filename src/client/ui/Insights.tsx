@@ -509,7 +509,18 @@ export function TileDetails({
       ) : (
         <>
           {!metric && tile.kind !== 'weather' && (
-            <div className="detail-primary-control">{renderControl(tile)}</div>
+            <div
+              className={
+                'detail-primary-control' +
+                (tile.kind === 'alarm'
+                  ? ' alarm-detail'
+                  : tile.kind === 'camera'
+                    ? ' camera-detail'
+                    : '')
+              }
+            >
+              {renderControl(tile)}
+            </div>
           )}
           {tile.kind === 'weather' && !metric && (
             <>

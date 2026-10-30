@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => ({
     outDir: mode === 'demo' ? 'dist/demo' : 'dist/web',
     rollupOptions: {
       input: (mode === 'demo'
-        ? { demo: resolve('demo.html') }
+        ? { preview: resolve('preview.html') }
         : { editor: resolve('index.html'), display: resolve('display.html') }) as Record<
         string,
         string

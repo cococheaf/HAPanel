@@ -2,6 +2,8 @@ import { UserError } from '../shared/i18n';
 import { EventEmitter } from 'node:events';
 import WebSocket from 'ws';
 import { applyDemoAction, demoSnapshot } from '../shared/demo';
+import { validateAlarmCommand } from '../shared/security';
+import { CameraProxy } from './cameras';
 import {
   entityIds,
   resolveAction,
@@ -42,12 +44,18 @@ export class HomeAssistantHub extends EventEmitter {
   private admins?: { until: number; ids: Set<string> };
   private catalog?: { until: number; entities: EntityState[] };
   private history = new Map<string, { until: number; data: Promise<HistoryPoint[]> }>();
+  private cameras: CameraProxy;
   constructor(private options: HubOptions) {
     super();
     this.setMaxListeners(0); // Each connected display removes its listener on close.
     this.snapshot = options.demo
       ? demoSnapshot()
       : { status: 'reconnecting', entities: {}, forecasts: {} };
+    this.cameras = new CameraProxy({
+      apiUrl: options.apiUrl,
+      token: options.token,
+      stream: (entityId) => this.rpc({ type: 'camera/stream', entity_id: entityId, format: 'hls' }),
+    });
   }
   start() {
     if (!this.options.demo) this.connect();
@@ -335,6 +343,7 @@ export class HomeAssistantHub extends EventEmitter {
     }
     const entity = this.snapshot.entities[resolved.target.entity_id];
     if (!entity || entity.state === 'unavailable') throw new UserError('error.entityUnavailable');
+    if (action.command === 'alarm') validateAlarmCommand(entity, action.mode!, action.code);
     if (action.command === 'temperature') {
       const min = Number(entity.attributes.min_temp ?? 5),
         max = Number(entity.attributes.max_temp ?? 35);
@@ -382,6 +391,24 @@ export class HomeAssistantHub extends EventEmitter {
       chunks.push(chunk);
     }
     return { buffer: Buffer.concat(chunks), type: contentType };
+  }
+  private requireCamera(entityId: string) {
+    const entity = this.snapshot.entities[entityId];
+    if (
+      this.options.demo ||
+      !entityId.startsWith('camera.') ||
+      !entity ||
+      ['off', 'unknown', 'unavailable'].includes(entity.state)
+    )
+      throw new UserError('error.cameraUnavailable');
+  }
+  cameraStill(entityId: string, live = false) {
+    this.requireCamera(entityId);
+    return this.cameras.still(entityId, live);
+  }
+  cameraLive(entityId: string, asset?: string, query?: Record<string, unknown>, range?: string) {
+    this.requireCamera(entityId);
+    return this.cameras.live(entityId, asset, query, range);
   }
   async stop() {
     this.stopped = true;

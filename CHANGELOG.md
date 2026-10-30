@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0
+
+- Alarmpanel direkt in HAPanel: konfigurierbare Modi und Reihenfolge, Bestätigung, bedarfsabhängige PIN-Abfrage und Hinweise zu offenen oder unbekannten Kontakten.
+- Neuer Kamerakacheltyp und Reiter Überwachung. Vorschaubilder und Streams werden über das Add-on ausgeliefert; HA-Kameratokens bleiben auf dem Server.
+- Safari nutzt HLS direkt, andere Browser laden den HLS-Player bei Bedarf. Kameras ohne Stream-Unterstützung erhalten eine aktualisierte Bildfolge. Wiedergabe stoppt beim Schließen oder Ausblenden.
+- Türen und Fenster lassen sich nach offen und nicht verfügbar filtern. Bedienungen verhindern doppelte Befehle während laufender Anfragen.
+- Deutsche und englische Oberfläche, aktualisierte Vorschau und Dokumentation. Alarmsteuerung und Kamerabilder sind auf den bestehenden Administratorzugang über Ingress begrenzt. Bestehende Displaykopplungen behalten ihre bisherigen Rechte.
+
 ## 1.0.0
 
 Erste finale Veröffentlichung. Die Zuhause-Übersicht unterstützt jetzt Lichtgruppen, Automationen, ein Alarmpanel mit Live-Status und direktem Zugang zur authentifizierten HA-Bedienung sowie offene Türen/Fenster mit klarer Kennzeichnung nicht erreichbarer Kontakte. Manuelle Automationsaufrufe respektieren bestehende Bedingungen. Die Schaltfläche zum Editor heißt „Designer öffnen“. Deutsch und Englisch, bestehende Räume und das Energiecockpit bleiben enthalten.
@@ -30,4 +38,4 @@ Deutsch und Englisch sind jetzt in Studio, Dashboard, Kopplungsdialog und HAPane
 
 ## 0.1.0-alpha.1
 
-Erste eigenständige Vorschau von HAPanel: gemeinsamer Kachelrenderer, visueller Editor, exakte Displayprofile, getrennte Entwürfe und Veröffentlichungen, JSON/YAML-Import und Export, HA-WebSocket-Adapter und widerrufbare Displaykopplung. Enthält eine statische iPad-Demo, Add-on-Paketierung und automatisierte Prüfungen. Echte Supervisor- und iPad-Hardwareabnahme stehen noch aus.
+Erste eigenständige Vorschau von HAPanel: gemeinsamer Kachelrenderer, visueller Editor, exakte Displayprofile, getrennte Entwürfe und Veröffentlichungen, JSON/YAML-Import und Export, HA-WebSocket-Adapter und widerrufbare Displaykopplung. Enthält eine statische iPad-Vorschau, Add-on-Paketierung und automatisierte Prüfungen. Echte Supervisor- und iPad-Hardwareabnahme stehen noch aus.

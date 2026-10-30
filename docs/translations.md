@@ -9,7 +9,7 @@ HAPanel ships with German and English. Additional languages use the same UI and 
 3. Import the catalog into `src/shared/i18n/index.ts` and add it to `languages`, with a native display name and an `Intl` locale, for example `fr: { name: 'Français', intlLocale: 'fr-FR', messages: fr satisfies Catalog }`.
 4. Use a lowercase base language tag as the registry key. Browser language tags such as `fr-CA` will resolve to that base language. The selector is populated from the registry automatically.
 5. Add `translations/fr.yaml` if localising Home Assistant’s native add-on configuration fields as well.
-6. Run `npm test`, `npm run build` and `npm run build:demo`. Review the editor, pairing form and all display profiles in the new language.
+6. Run `npm test`, `npm run build` and `npm run build:preview`. Review the editor, pairing form and all display profiles in the new language.
 
 TypeScript checks catalog keys and UI lookups. Tests check complete coverage and matching interpolation placeholders across every registered language. Unsupported languages fall back to English. English is the canonical catalog for new message IDs.
 

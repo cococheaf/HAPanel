@@ -8,7 +8,7 @@
 - [x] Drag/Resize, numerische Eigenschaften, Undo/Redo.
 - [x] Entwurf, Veröffentlichung, Import/Export und Revisionen.
 - [x] HA-WebSocket-Adapter, Ingress-Administratoren und Displaykopplung.
-- [x] Statische, interaktive iPad-Demo ohne HA-Verbindung.
+- [x] Statische, interaktive iPad-Vorschau ohne HA-Verbindung.
 - [x] Add-on-Metadaten, Dockerfile und CI.
 - [x] Deutsch und Englisch für Editor, Dashboard, Kopplung und Fehlermeldungen; erweiterbare Übersetzungskataloge.
 

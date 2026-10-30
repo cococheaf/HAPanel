@@ -1,3 +1,4 @@
+import { validateAlarmCommand } from './security';
 import { UserError, translate, type Language, type MessageKey } from './i18n';
 import {
   dashboardSchema,
@@ -160,6 +161,8 @@ const sampleTileKeys = {
   sensor: 'sample.sensor',
 } as const;
 const showcaseCopy: Record<string, { title: string; key: MessageKey }> = {
+  sample_camera_entrance: { title: 'Eingang', key: 'sample.entrance' },
+  sample_camera_garden: { title: 'Garten', key: 'sample.garden' },
   demo_general: { title: 'General Licht', key: 'sample.generalLight' },
   demo_summer: { title: 'Beschattung Sommer', key: 'sample.summer' },
   demo_alarm: { title: 'Alarmpanel', key: 'kind.alarm' },
@@ -236,7 +239,9 @@ export function localizeSampleDocument(document: Dashboard, language: Language):
             ? sample(page.heading ?? '', 'Deine Rückzugsorte.', 'sample.headingOG')
             : page.id === 'energy'
               ? sample(page.heading ?? '', 'Dein Energiecockpit.', 'sample.headingEnergy')
-              : page.heading,
+              : page.id === 'surveillance'
+                ? sample(page.heading, 'Zuhause im Blick.', 'sample.headingSurveillance')
+                : page.heading,
       subtitle:
         page.id === 'eg'
           ? sample(
@@ -256,7 +261,13 @@ export function localizeSampleDocument(document: Dashboard, language: Language):
                   'Erzeugung, Netz und Speicher auf einen Blick.',
                   'sample.subtitleEnergy',
                 )
-              : page.subtitle,
+              : page.id === 'surveillance'
+                ? sample(
+                    page.subtitle ?? '',
+                    'Kameras · Live-Ansichten bei Bedarf.',
+                    'sample.subtitleSurveillance',
+                  )
+                : page.subtitle,
       name:
         page.id === 'eg'
           ? sample(page.name, 'EG', 'sample.navEG')
@@ -264,11 +275,13 @@ export function localizeSampleDocument(document: Dashboard, language: Language):
             ? sample(page.name, 'OG', 'sample.navOG')
             : page.id === 'energy'
               ? sample(page.name, 'Energie', 'sample.energy')
-              : page.id === 'overview'
-                ? sample(page.name, 'Zuhause', 'sample.home')
-                : page.id === 'favorites'
-                  ? sample(page.name, 'Favoriten', 'sample.favourites')
-                  : page.name,
+              : page.id === 'surveillance'
+                ? sample(page.name, 'Überwachung', 'sample.surveillance')
+                : page.id === 'overview'
+                  ? sample(page.name, 'Zuhause', 'sample.home')
+                  : page.id === 'favorites'
+                    ? sample(page.name, 'Favoriten', 'sample.favourites')
+                    : page.name,
       tiles: page.tiles.map((tile) => {
         let view = localizedSampleTile(tile, language);
         if (tile.id === 'demo_contacts' && tile.contacts) {
@@ -396,6 +409,10 @@ export function applyDemoAction(snapshot: Snapshot, document: Dashboard, action:
   const next = structuredClone(snapshot);
   const entity = next.entities[id];
   if (!entity) throw new UserError('error.demoEntity');
+  if (action.command === 'alarm') {
+    validateAlarmCommand(entity, action.mode!, action.code);
+    entity.state = action.mode!;
+  }
   if (command.service === 'toggle') entity.state = entity.state === 'on' ? 'off' : 'on';
   if (command.service === 'turn_on') {
     entity.state = 'on';

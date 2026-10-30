@@ -66,6 +66,7 @@ const domainKinds: Record<string, TileKind> = {
   cover: 'cover',
   automation: 'automation',
   alarm_control_panel: 'alarm',
+  camera: 'camera',
 };
 
 export default function Editor({

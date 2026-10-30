@@ -19,6 +19,7 @@ import {
   ChevronDown,
   Square,
   Zap,
+  Camera as CameraIcon,
 } from 'lucide-react';
 import {
   geometry,
@@ -33,6 +34,9 @@ import {
 
 import { kindIcons } from './kinds';
 import { AlarmStatus, ContactsSummary } from './Security';
+import { AlarmControls } from './AlarmControls';
+import { documentContacts } from '../../shared/security';
+import { CameraThumbnail, CameraStream } from './CameraView';
 import {
   WeatherGlyph,
   EnergyPanel,
@@ -120,6 +124,8 @@ export function TileView({
   mediaBase = 'api/editor/media/',
   detailsEnabled = true,
   onNavigate,
+  alarmExpanded = false,
+  cameraExpanded = false,
 }: {
   tile: Tile;
   snapshot: Snapshot;
@@ -127,11 +133,15 @@ export function TileView({
   mediaBase?: string;
   detailsEnabled?: boolean;
   onNavigate?: (pageId: string) => void;
+  alarmExpanded?: boolean;
+  cameraExpanded?: boolean;
 }) {
   const { t, language, intlLocale, describeError } = useI18n();
   const [details, setDetails] = useState(false);
   const [actionError, setActionError] = useState('');
   const [metric, setMetric] = useState<{ entityId: string; label: string }>();
+  const [pending, setPending] = useState(false);
+  const inFlight = useRef(false);
 
   const tile = localizedSampleTile(configuredTile, language);
   const entity = snapshot.entities[tile.entityId];
@@ -142,16 +152,21 @@ export function TileView({
     (!entity ||
       entity.state === 'unavailable' ||
       (entity.state === 'unknown' && tile.kind !== 'scene'));
-  const disabled = !onAction || unavailable || snapshot.status === 'reconnecting';
+  const disabled = !onAction || unavailable || snapshot.status === 'reconnecting' || pending;
   const Icon = tile.room ? roomIcons[tile.room.icon] : tile.energy ? Zap : kindIcons[tile.kind];
   const act = async (command: Action['command'], value?: number) => {
-    if (disabled) return;
+    if (disabled || inFlight.current) return;
+    inFlight.current = true;
+    setPending(true);
     try {
       await onAction?.({ tileId: tile.id, command, ...(value !== undefined ? { value } : {}) });
       setActionError('');
       if (command === 'activate') setActivated(true);
     } catch (error) {
       setActionError(describeError(error));
+    } finally {
+      inFlight.current = false;
+      setPending(false);
     }
   };
   const open = () => {
@@ -171,14 +186,27 @@ export function TileView({
     }
   }, [activated]);
   const body = () => {
-    if (tile.contacts) return <ContactsSummary tile={tile} snapshot={snapshot} />;
-    if (tile.kind === 'alarm')
-      return (
-        <AlarmStatus
+    if (tile.kind === 'camera')
+      return cameraExpanded ? (
+        <CameraStream
           tile={tile}
           snapshot={snapshot}
-          allowLink={detailsEnabled || Boolean(onAction)}
+          base={mediaBase.replace(/media\/$/, 'camera/')}
         />
+      ) : (
+        <CameraThumbnail
+          tile={tile}
+          snapshot={snapshot}
+          base={mediaBase.replace(/media\/$/, 'camera/')}
+          onOpen={detailsEnabled ? open : undefined}
+        />
+      );
+    if (tile.contacts) return <ContactsSummary tile={tile} snapshot={snapshot} />;
+    if (tile.kind === 'alarm')
+      return alarmExpanded ? (
+        <AlarmControls tile={tile} snapshot={snapshot} onAction={onAction} />
+      ) : (
+        <AlarmStatus tile={tile} snapshot={snapshot} onChoose={detailsEnabled ? open : undefined} />
       );
     if (tile.room) return <RoomSummary room={tile.room} snapshot={snapshot} />;
     if (tile.energy)
@@ -519,6 +547,7 @@ export function TileView({
   return (
     <>
       <article
+        aria-busy={pending || undefined}
         data-view={
           tile.room ? 'room' : tile.energy ? 'energy' : tile.contacts ? 'contacts' : 'device'
         }
@@ -583,6 +612,8 @@ export function TileView({
               onAction={onAction}
               mediaBase={mediaBase}
               detailsEnabled={false}
+              alarmExpanded
+              cameraExpanded={control.id === tile.id}
             />
           )}
         />
@@ -711,7 +742,7 @@ export function DashboardFrame({
           document={document}
           profile={profile}
           pageId={pageId}
-          snapshot={snapshot}
+          snapshot={{ ...snapshot, contactSources: documentContacts(document, snapshot) }}
           onAction={onAction}
           mediaBase={mediaBase}
           onNavigate={setPageId}
@@ -729,6 +760,8 @@ export function DashboardFrame({
                 <Home size={17} />
               ) : page.id === 'energy' ? (
                 <Zap size={17} />
+              ) : page.id === 'surveillance' ? (
+                <CameraIcon size={17} />
               ) : (
                 <Layers3 size={17} />
               )}

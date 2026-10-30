@@ -9,6 +9,7 @@ import {
 import type { Snapshot, Tile } from '../../shared/model';
 import { alarmStatus, contactValues } from '../../shared/security';
 import { useI18n } from '../i18n';
+import { useState } from 'react';
 
 export function ContactsSummary({ tile, snapshot }: { tile: Tile; snapshot: Snapshot }) {
   const { t } = useI18n();
@@ -52,11 +53,23 @@ export function ContactsSummary({ tile, snapshot }: { tile: Tile; snapshot: Snap
 export function ContactList({ tile, snapshot }: { tile: Tile; snapshot: Snapshot }) {
   const { t } = useI18n();
   const values = contactValues(tile.contacts ?? [], snapshot);
+  const [filter, setFilter] = useState<'all' | 'open' | 'unknown'>('all');
+  const items =
+    filter === 'all' ? [...values.open, ...values.unknown, ...values.closed] : values[filter];
   return (
     <>
       <ContactsSummary tile={tile} snapshot={snapshot} />
+      <div className="contact-filters" role="group" aria-label={t('contacts.filter')}>
+        {(['all', 'open', 'unknown'] as const).map((key) => (
+          <button key={key} aria-pressed={filter === key} onClick={() => setFilter(key)}>
+            {t(('contacts.filter.' + key) as 'contacts.filter.all')}{' '}
+            <span>{key === 'all' ? tile.contacts?.length : values[key].length}</span>
+          </button>
+        ))}
+      </div>
       <div className="contact-list">
-        {[...values.open, ...values.unknown, ...values.closed].map((item) => (
+        {items.length === 0 && <p className="insight-muted">{t('contacts.emptyFilter')}</p>}
+        {items.map((item) => (
           <div className={'contact-row is-' + item.state} key={item.entityId}>
             {item.state === 'unknown' ? <CircleHelp size={19} /> : <DoorOpen size={19} />}
             <span>{item.label}</span>
@@ -79,11 +92,11 @@ export function ContactList({ tile, snapshot }: { tile: Tile; snapshot: Snapshot
 export function AlarmStatus({
   tile,
   snapshot,
-  allowLink = true,
+  onChoose,
 }: {
   tile: Tile;
   snapshot: Snapshot;
-  allowLink?: boolean;
+  onChoose?: () => void;
 }) {
   const { t } = useI18n();
   const status = alarmStatus(snapshot.entities[tile.entityId]);
@@ -97,18 +110,17 @@ export function AlarmStatus({
     <div className={'alarm-status is-' + status.tone}>
       <Icon size={40} strokeWidth={1.4} />
       <strong>{t(status.label)}</strong>
-      {tile.homeAssistantUrl && allowLink ? (
-        <a
-          className="alarm-open"
-          href={tile.homeAssistantUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {t('alarm.openPanel')}
+      {onChoose ? (
+        <button type="button" className="alarm-open" onClick={onChoose}>
+          {t('alarm.selectMode')}
           <ArrowUpRight size={15} />
-        </a>
+        </button>
       ) : (
-        <span className="tile-caption">{t('alarm.manageInHA')}</span>
+        <span className="tile-caption">
+          {t(tile.alarm?.modes.length ? 'alarm.configuredModes' : 'alarm.noModes', {
+            count: tile.alarm?.modes.length ?? 0,
+          })}
+        </span>
       )}
     </div>
   );

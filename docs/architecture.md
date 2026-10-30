@@ -21,10 +21,10 @@ Browserdisplay ──> Display API ──────┘
 | `src/client/ui`      | Gemeinsame Kacheln und Dashboardrahmen                                            |
 | `src/client/editor`  | React Grid Layout, Eigenschaften, History und Veröffentlichungsablauf             |
 | `src/client/display` | Unabhängiger Player und Kopplungsoberfläche                                       |
-| `src/client/demo`    | Rein statische Demo, Browserpersistenz und lazy geladener Editor                  |
+| `src/client/demo`    | Rein statische Vorschau, Browserpersistenz und lazy geladener Editor              |
 | `src/server`         | Fastify, Persistenz, Ingress-/Display-Zugriff, HA-Adapter                         |
 
-Die Vite-Einstiegspunkte für Editor und Player sind getrennt. Der Player lädt den Grid-Editor nicht. Der statische Demo-Build enthält ausschließlich Browsercode und Grafiken; es gibt dort weder einen Backendprozess noch HA-Verbindungsparameter.
+Die Vite-Einstiegspunkte für Editor und Player sind getrennt. Der Player lädt den Grid-Editor nicht. Der statische Vorschau-Build enthält ausschließlich Browsercode und Grafiken; es gibt dort weder einen Backendprozess noch HA-Verbindungsparameter.
 
 ## Persistenz und Veröffentlichungen
 
@@ -38,7 +38,7 @@ Ein HA-WebSocket pro Live-Backend hält `subscribe_entities` für die Vereinigun
 
 Der HA-Adapter verarbeitet initiale Zustände, komprimierte Attributänderungen und entfernte Entitäten. Nach einer Unterbrechung verbindet er sich mit wachsendem Abstand erneut und baut die Abonnements neu auf. Die UI markiert die Verbindung als unterbrochen und sperrt die Gerätebedienung; Aktionen werden nicht für spätere Ausführung zwischengespeichert.
 
-Im Demo-Modus des Add-ons existiert zusätzlich ein reiner HA-Authentifizierungsclient: Beispieldaten kommen aus dem Demo-Hub, die Administratorberechtigung eines Ingress-Benutzers wird weiterhin über HA verifiziert.
+Im Beispielmodus des Add-ons existiert zusätzlich ein reiner HA-Authentifizierungsclient: Beispieldaten kommen aus dem Beispieldaten-Hub, die Administratorberechtigung eines Ingress-Benutzers wird weiterhin über HA verifiziert.
 
 ## Berechtigungen
 
@@ -69,3 +69,9 @@ Hardwareauflösung, Pixelverhältnis, Browserfläche, Raster und reservierte Kop
 Automatisierte Tests prüfen Schema und Rastergrenzen, persistente Revisionen, Konflikte, Veröffentlichungstrennung, Kopplung/Replay/Widerruf, Ingress-Vertrauensgrenzen, Display-Zugriff und den HA-WebSocket-Dialog gegen einen lokalen Simulator.
 
 Zusätzlich erforderlich ist eine Abnahme mit echtem Supervisor, realen Gerätefähigkeiten und Safari auf physischer iPad-Hardware. Der Testsimulator ersetzt diese Abnahme nicht. Die ersten Klima-Steuerelemente sind auf ein einzelnes Temperatursoll ausgelegt; erweiterte HVAC-Modi, Temperaturbereiche und Fahrenheit folgen in einer weiteren Ausbaustufe.
+
+## Alarm und Kamera
+
+Alarmbefehle werden aus einer pro Kachel konfigurierten Liste von Modi auf feste HA-Services abgebildet. Entity-ID und Service bestimmt der Server. Die Laufzeitprüfung berücksichtigt unterstützte Funktionen und erforderliche Codes. Fehler enthalten keine von HA zurückgespiegelten Codes. Pro Administrator sind fünf Alarmversuche pro Minute erlaubt. Die bestehende Ingress-Administratorprüfung gilt für Editor und Player; separat gekoppelte Displays erhalten keine neuen Alarm-/Kamerarechte.
+
+Kamerametadaten werden vor Katalog- und Snapshot-Ausgabe auf Name, unterstützte Funktionen und Streamtyp reduziert. Bilder und HLS-Ressourcen laufen durch einen authentifizierten Proxy. Bilder sind auf 5 MiB, Playlists auf 256 KiB und Segmente auf 12 MiB begrenzt. Playlists werden auf zufällige lokale Ressourcen-IDs umgeschrieben und dürfen den jeweiligen HA-Stream-Pfad nicht verlassen. HA-Streamadressen, Kameratokens und Supervisor-Zugangsdaten bleiben auf dem Server. Vorschaubilder werden kurz zwischengespeichert; Streams starten erst in der Detailansicht. Das Add-on transkodiert selbst keine Videos.

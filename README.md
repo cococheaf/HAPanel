@@ -2,7 +2,7 @@
 <h1 align="center">HAPanel</h1>
 <p align="center">Dein Zuhause. Auf einen Blick.</p>
 <p align="center">Ein eigenständiges Home Assistant Dashboard mit visuellem Editor – für dein Wandtablet und browserfähige Touchdisplays.</p>
-<p align="center"><a href="https://cococheaf.github.io/HAPanel/">Interaktive iPad-Demo</a> · <a href="DOCS.md">Installation</a> · <a href="docs/architecture.md">Architektur</a> · <a href="CONTRIBUTING.md">Mitmachen</a></p>
+<p align="center"><a href="https://cococheaf.github.io/HAPanel/">Interaktive iPad-Vorschau</a> · <a href="DOCS.md">Installation</a> · <a href="docs/architecture.md">Architektur</a> · <a href="CONTRIBUTING.md">Mitmachen</a></p>
 
 **Deutsch · [English](README.en.md)**
 
@@ -22,17 +22,18 @@
 
 HAPanel verbindet großzügige, abgerundete Kacheln, ruhige Farben und direkte Touch-Bedienung mit einem visuellen Layout-Editor. Es läuft als eigene Home Assistant App (Add-on) oder als lokaler Node.js-Prozess. Bestehende Lovelace-Dashboards und HA-Konfigurationsdateien bleiben unverändert.
 
-**Version: 1.0.0.** Die Demo, der Editor und die API sind implementiert. Die HA-Anbindung ist gegen einen simulierten WebSocket-Server geprüft. Installation, Update, Ingress und Live-Daten sind auf HA OS 18.4 / Core 2026.10.4 (amd64) geprüft. Tests auf physischer iPad-Hardware stehen noch aus.
+**Version: 1.1.0.** Die Vorschau, der Editor und die API sind implementiert. Die HA-Anbindung ist gegen einen simulierten WebSocket-Server geprüft. Installation, Update, Ingress und Live-Daten sind auf HA OS 18.4 / Core 2026.10.4 (amd64) geprüft. Tests auf physischer iPad-Hardware stehen noch aus.
 
 ## Ausprobieren
 
-Öffne die [Demo](https://cococheaf.github.io/HAPanel/) in Safari auf dem iPad. Raumdetails, Licht, Dimmer, Temperatur, Beschattung, Wetter und Energiecockpit sind mit Beispieldaten bedienbar. Über **Designer öffnen** kannst du das Layout bearbeiten. Änderungen bleiben in deinem Browser; **Veröffentlichen** übernimmt den Entwurf in die Demo-Ansicht.
+Öffne die [Vorschau](https://cococheaf.github.io/HAPanel/) in Safari auf dem iPad. Raumdetails, Licht, Dimmer, Temperatur, Beschattung, Wetter und Energiecockpit sind mit Beispieldaten bedienbar. Über **Designer öffnen** kannst du das Layout bearbeiten. Änderungen bleiben in deinem Browser; **Veröffentlichen** übernimmt den Entwurf in die Vorschau-Ansicht.
 
-Für eine eigenständige Ansicht: **Teilen → Zum Home-Bildschirm**. Wähle bei Bedarf das Querformat- oder Hochformatprofil. Die öffentliche Demo hat keine Verbindung zu einem echten Home Assistant und enthält keine Zugangsdaten. Mediensteuerung simuliert Zustände; die Demo spielt kein Audio ab.
+Für eine eigenständige Ansicht: **Teilen → Zum Home-Bildschirm**. Wähle bei Bedarf das Querformat- oder Hochformatprofil. Die öffentliche Vorschau hat keine Verbindung zu einem echten Home Assistant und enthält keine Zugangsdaten. Mediensteuerung simuliert Zustände; die Vorschau spielt kein Audio ab.
 
 ## Bereits enthalten
 
-- General-Lichtgruppen, Automationen, Alarmstatus mit Zugang zum HA-Alarmpanel sowie eine Übersicht offener Türen und Fenster.
+- General-Lichtgruppen, Automationen, direkte Alarmbedienung mit konfigurierbaren Modi sowie eine filterbare Übersicht offener Türen und Fenster.
+- Kamerakacheln mit Vorschaubildern und HLS-Livestreams bei Bedarf, inklusive Bildfolge für Kameras ohne Stream-Unterstützung.
 - Raumübersicht mit getrennten Etagen, antippbaren Details und eigener Geräteansicht pro Raum.
 - Licht, Klima, Beschattung, Medien mit Album-Art, Wetter mit Stundenprognose, Szenen und Sensoren.
 - Energiecockpit für Solar, Netz, Speicher und erfasste Verbraucher; Messwerte mit 24-Stunden-Verlauf.
@@ -45,7 +46,7 @@ Für eine eigenständige Ansicht: **Teilen → Zum Home-Bildschirm**. Wähle bei
 - JSON/YAML-Import und Export.
 - Serververbindung zu HA mit gefilterten Entitätsabonnements, Wiederverbindung und serverseitigen Aktionen.
 - Ingress-Zugang für HA-Administratoren und separater, optionaler Display-Port mit widerrufbarer Kopplung.
-- Dockerfile und GitHub Actions für Validierung, statische Demo und Container-Builds auf amd64/aarch64.
+- Dockerfile und GitHub Actions für Validierung, statische Vorschau und Container-Builds auf amd64/aarch64.
 
 ## Lokal entwickeln
 
@@ -57,15 +58,15 @@ npm run dev
 ```
 
 - Studio: <http://127.0.0.1:5173/>
-- Eigenständige Browserdemo: <http://127.0.0.1:5173/demo.html>
+- Eigenständige Browservorschau: <http://127.0.0.1:5173/preview.html>
 - API: <http://127.0.0.1:4310/api/health>
 
-Der Standardmodus verwendet ausschließlich Beispieldaten. Serverseitige Layouts liegen im ignorierten Verzeichnis `.data/`. Die eigenständige Browserdemo speichert ihre Layouts dagegen im Browser.
+Der Standardmodus verwendet ausschließlich Beispieldaten. Serverseitige Layouts liegen im ignorierten Verzeichnis `.data/`. Die eigenständige Browservorschau speichert ihre Layouts dagegen im Browser.
 
 ```sh
 npm test
 npm run build
-npm run build:demo
+npm run build:preview
 npm start
 ```
 

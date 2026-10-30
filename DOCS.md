@@ -8,19 +8,19 @@ Studio, Dashboard und Kopplungsdialog unterstützen Deutsch und Englisch. Die Sp
 
 Datum, Uhrzeit, Zahlen, Bedienelemente und HAPanel-Fehlermeldungen folgen der Auswahl. Unveränderte Beispielbezeichnungen passen sich ebenfalls an. Eigene Titel, Begrüßungen, Geräte- und Entitätsnamen bleiben als eingegebener Inhalt erhalten; die Auswahl übersetzt keine frei eingegebenen Texte. Sprache und Temperatureinheit sind unabhängig voneinander; HAPanel ändert keine Gerätesollwerte oder Temperatureinheiten beim Sprachwechsel.
 
-## Öffentliche Demo auf dem iPad
+## Öffentliche Vorschau auf dem iPad
 
 1. <https://cococheaf.github.io/HAPanel/> in Safari öffnen.
 2. Für eine passende Anordnung oben das Querformat- oder Hochformatprofil wählen.
 3. Lichtschalter, Dimmer, Temperatur und Mediensteuerung ausprobieren.
-4. **Designer öffnen** öffnet den visuellen Editor. Seiten und Kacheln bearbeiten; **Veröffentlichen** übernimmt die Änderungen in die Dashboard-Demo.
-5. **Teilen → Zum Home-Bildschirm** fügt die Demo als eigenständige Web-App hinzu.
+4. **Designer öffnen** öffnet den visuellen Editor. Seiten und Kacheln bearbeiten; **Veröffentlichen** übernimmt die Änderungen in die Dashboard-Vorschau.
+5. **Teilen → Zum Home-Bildschirm** fügt die Vorschau als eigenständige Web-App hinzu.
 
-Die Demo besitzt Beispieldaten und speichert Konfigurationen nur im jeweiligen Browser. Safari und eine Home-Screen-Web-App können getrennte Speicherbereiche besitzen. Es wird kein Audio abgespielt. Fullscreen, Gerätesperre und dauerhaftes Wachhalten hängen vom verwendeten Betriebssystem ab.
+Die Vorschau besitzt Beispieldaten und speichert Konfigurationen nur im jeweiligen Browser. Safari und eine Home-Screen-Web-App können getrennte Speicherbereiche besitzen. Es wird kein Audio abgespielt. Fullscreen, Gerätesperre und dauerhaftes Wachhalten hängen vom verwendeten Betriebssystem ab.
 
 ## Home Assistant OS / Supervisor
 
-Diese Version enthält ein aus Quellcode baubares Add-on für `amd64` und `aarch64`. Installation, Updates, Ingress und Live-Daten wurden auf Home Assistant OS 18.4 mit Core 2026.10.4 (amd64) geprüft. Für die erste Inbetriebnahme kann der voreingestellte Demo-Modus verwendet werden.
+Diese Version enthält ein aus Quellcode baubares Add-on für `amd64` und `aarch64`. Installation, Updates, Ingress und Live-Daten wurden auf Home Assistant OS 18.4 mit Core 2026.10.4 (amd64) geprüft. Für die erste Inbetriebnahme kann der voreingestellte Beispielmodus verwendet werden.
 
 1. Unter **Einstellungen → Apps/Add-ons → App-Store → Repositories** dieses Repository hinzufügen:
    `https://github.com/cococheaf/HAPanel`
@@ -51,11 +51,11 @@ Ein geänderter Modus startet nicht automatisch Geräteaktionen. Im Live-Modus s
 
 Kopplungscodes gelten fünf Minuten und können genau einmal verwendet werden. Gerätesitzungen werden als Hash gespeichert, sind 90 Tage gültig und lassen sich unter **Displays verbinden** widerrufen. Das beendet auch aktive Datenstreams. Displays sehen ausschließlich die veröffentlichte Konfiguration und deren freigegebene Entitäten.
 
-Das Add-on richtet selbst keinen Reverse Proxy, DNS-Namen oder TLS-Zertifikate ein. Ingress ist der Editorzugang; für das unabhängige Wandgerät dient die separate Displayadresse. Im reinen Demo-Test kann ein lokaler HTTP-Endpunkt verwendet werden, ohne dass echte HA-Zugangsdaten in den Browser gelangen.
+Das Add-on richtet selbst keinen Reverse Proxy, DNS-Namen oder TLS-Zertifikate ein. Ingress ist der Editorzugang; für das unabhängige Wandgerät dient die separate Displayadresse. Im reinen Vorschautest kann ein lokaler HTTP-Endpunkt verwendet werden, ohne dass echte HA-Zugangsdaten in den Browser gelangen.
 
 ## Ohne Supervisor: Node.js
 
-Der Editor bindet im Demo- und Standalone-Modus ausschließlich an Loopback. Eine LAN-Freigabe des Editors ist bewusst nicht vorgesehen; der Displayserver hat eine eigene Authentifizierung.
+Der Editor bindet im Beispiel- und Standalone-Modus ausschließlich an Loopback. Eine LAN-Freigabe des Editors ist bewusst nicht vorgesehen; der Displayserver hat eine eigene Authentifizierung.
 
 ```sh
 npm ci
@@ -101,7 +101,15 @@ Ein Tipp auf Wetter, Messwert oder Energiequelle öffnet Details. Prognosen hän
 
 Lichtgruppen verwenden die vorhandene HA-Lichtentität. Automationskacheln zeigen, ob die Automatik aktiviert ist; Ein/Aus steuert ihre Trigger. **Jetzt ausführen** ruft die Automation mit ihren bestehenden Bedingungen auf. Auf kleinen Kacheln ist der manuelle Aufruf in der Detailansicht erreichbar.
 
-Das Alarmpanel zeigt den Live-Zustand. Eine optional konfigurierte HA-Paneladresse öffnet die bestehende Bedienung in Home Assistant; dafür gilt die dortige Anmeldung. HAPanel speichert keine Alarmcodes und bietet keine eigene Scharf-/Unscharf-API an.
+Das Alarmpanel zeigt den Live-Zustand und öffnet die Moduswahl direkt in HAPanel. Im Designer unter **Alarmmodi** lassen sich die angebotenen Modi aktivieren und sortieren. Unterstützt werden Unscharf, Zuhause, Abwesend, Nacht, Urlaub und benutzerdefinierter Bypass, soweit die HA-Integration diese unterstützt. Nicht unterstützte Modi sind deaktiviert. Vor jedem Befehl erscheint eine Bestätigung; offene und unbekannte Tür-/Fensterkontakte werden vor dem Scharfschalten angezeigt. Wenn HA einen Code verlangt, fragt HAPanel ihn als Passwort ab. Codes werden weder im Layout noch auf dem Server gespeichert. Ein bestätigter Befehl ersetzt keine Rückmeldung: Der angezeigte Alarmzustand stammt weiterhin aus HA.
+
+Alarmbefehle und Kamerabilder stehen im bestehenden HA-Administratorzugang über Ingress zur Verfügung. Eine separat gekoppelte Displayadresse erhält diese zusätzlichen Rechte nicht. Dort bleibt der Alarmstatus sichtbar. Für die Sicherheitsbedienung auf dem iPad den HAPanel-Eintrag in HA verwenden. Bestehende Displaykopplungen werden nicht erweitert.
+
+## Überwachung
+
+Im Designer eine Seite **Überwachung** und Kacheln vom Typ **Kamera** anlegen, dann die Kameraentitäten aus HA auswählen. Das Intervall der Vorschaubilder (15–120 Sekunden) und das Bildformat lassen sich pro Kachel einstellen. Erst das Antippen öffnet den Stream. Safari verwendet die native HLS-Wiedergabe; andere kompatible Browser laden einen HLS-Player bei Bedarf. Kameras ohne HLS-Unterstützung zeigen alle zwei Sekunden ein neues Bild. Beim Schließen oder Ausblenden der Seite stoppt die Wiedergabe.
+
+Die Kamera wird ausschließlich über die bereits eingerichtete HA-Integration angesprochen. HAPanel speichert keine UniFi-Zugangsdaten, erstellt keine Aufzeichnungen und liefert keine HA-Kameratokens an den Browser aus. Die öffentliche Vorschau zeigt ausdrücklich Beispielplätze für Kameras und keine privaten Kamerabilder.
 
 **Türen & Fenster** enthält eine konfigurierbare Kontaktliste. Offene Kontakte stehen im Detail zuerst, nicht erreichbare Kontakte werden separat ausgewiesen. „Keine offenen gemeldet“ bedeutet nicht, dass unbekannte Kontakte sicher geschlossen sind. Alle neuen Einstellungen sind im Designer bearbeitbar.
 
@@ -111,7 +119,7 @@ Hardwareauflösung und Browserfläche sind verschieden. Das iPad 8 besitzt 2160 
 
 **Proportional einpassen** erhält das Seitenverhältnis. **Exakte CSS-Pixel** rendert ohne Skalierung; auf zu kleinen Viewports entsteht ein scrollbarerer Ausschnitt. Die Zoomanzeige im Studio beschreibt den Faktor relativ zur automatisch eingepassten Arbeitsfläche. Die tatsächliche physische Größe auf dem Editor-Monitor wird nicht aus der Zolldiagonale abgeleitet.
 
-Das Display-Info-Menü zeigt den aktuellen Viewport und DPR. Im Standalone-Modus der Home-Screen-Web-App verschwinden Demo-Leiste und Browsernavigation aus der HAPanel-Oberfläche. Betriebssystemeigene Elemente kontrolliert die Webseite nicht.
+Das Display-Info-Menü zeigt den aktuellen Viewport und DPR. Im Standalone-Modus der Home-Screen-Web-App verschwinden Vorschauleiste und Browsernavigation aus der HAPanel-Oberfläche. Betriebssystemeigene Elemente kontrolliert die Webseite nicht.
 
 ## Sichern und aktualisieren
 

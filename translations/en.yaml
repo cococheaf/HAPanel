@@ -1,6 +1,6 @@
 configuration:
   demo_mode:
-    name: Demo mode
+    name: Use sample data
     description: Use sample data instead of real devices. Ingress access remains restricted to HA administrators.
   display_enabled:
     name: Enable separate display server

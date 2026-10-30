@@ -1,4 +1,4 @@
-name: Publish iPad demo
+name: Publish iPad preview
 on:
   push:
     branches: [main]
@@ -20,7 +20,7 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm test
-      - run: npm run build:demo
+      - run: npm run build:preview
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:

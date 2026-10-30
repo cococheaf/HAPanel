@@ -2,14 +2,14 @@
 
 **Deutsch · [English](CONTRIBUTING.en.md)**
 
-Node.js 24 LTS verwenden und Abhängigkeiten mit `npm ci` installieren. `npm run dev` startet Demo-API und Vite. Die Browserdemo unter `/demo.html` benötigt keine HA-Zugangsdaten.
+Node.js 24 LTS verwenden und Abhängigkeiten mit `npm ci` installieren. `npm run dev` startet Beispieldaten-API und Vite. Die Browservorschau unter `/preview.html` benötigt keine HA-Zugangsdaten.
 
 Vor einem Pull Request:
 
 ```sh
 npm test
 npm run build
-npm run build:demo
+npm run build:preview
 ```
 
 Layout-, Persistenz- und Zugriffskontrolländerungen brauchen gezielte Regressionstests. Reine Text- oder Farbänderungen benötigen keine Tests, die nur die Implementierung wiederholen. Mit `npx prettier --write DATEI` die geänderten Dateien formatieren.

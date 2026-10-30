@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   DoorOpen,
   Sun,
+  Camera,
 } from 'lucide-react';
 export const kindIcons = {
   light: Lightbulb,
@@ -21,6 +22,7 @@ export const kindIcons = {
   automation: Sun,
   alarm: ShieldCheck,
   contacts: DoorOpen,
+  camera: Camera,
 };
 export const kindLabelKeys = {
   light: 'kind.light',
@@ -33,4 +35,5 @@ export const kindLabelKeys = {
   automation: 'kind.automation',
   alarm: 'kind.alarm',
   contacts: 'kind.contacts',
+  camera: 'kind.camera',
 } as const;

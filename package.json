@@ -1,6 +1,6 @@
 {
   "name": "hapanel",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "An independent, touch-first Home Assistant dashboard and visual editor.",
   "license": "MIT",
@@ -17,8 +17,9 @@
     "check": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "build": "npm run check && vite build && tsup src/server/index.ts --format esm --platform node --target node22 --out-dir dist/server --sourcemap",
-    "build:demo": "vite build --mode demo && node scripts/prepare-demo.mjs",
-    "start": "node dist/server/index.js"
+    "build:demo": "npm run build:preview",
+    "start": "node dist/server/index.js",
+    "build:preview": "vite build --mode demo && node scripts/prepare-demo.mjs"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
@@ -26,6 +27,7 @@
     "@fastify/static": "^10.1.8",
     "@fastify/websocket": "^11.2.0",
     "fastify": "^5.12.7",
+    "hls.js": "^1.7.4",
     "lucide-react": "^0.577.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

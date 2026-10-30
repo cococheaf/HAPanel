@@ -1,5 +1,5 @@
 import { useI18n } from '../i18n';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 
 export function Modal({
@@ -22,6 +22,7 @@ export function Modal({
   const { t } = useI18n();
 
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => {
     const dialog = ref.current!;
     dialog.showModal();
@@ -30,6 +31,7 @@ export function Modal({
   return (
     <dialog
       ref={ref}
+      aria-labelledby={titleId}
       className={'modal ' + (wide ? 'wide-modal ' : '') + className}
       onCancel={onClose}
       onClick={(e) => {
@@ -37,7 +39,7 @@ export function Modal({
       }}
     >
       <div className="modal-heading">
-        <h2>{title}</h2>
+        <h2 id={titleId}>{title}</h2>
         <button className="icon-button" aria-label={t('common.close')} onClick={onClose}>
           <X size={20} />
         </button>

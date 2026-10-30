@@ -343,3 +343,122 @@ test('display history exposes only published sources, including declared room de
     403,
   );
 });
+
+test('paired displays retain their existing access and gain no alarm or camera privileges', async (t) => {
+  const { showcaseDocument } = await import('../src/shared/showcase');
+  const { app, store, pairings, hub } = await fixture(t, { surface: 'display' });
+  await store.save(showcaseDocument, 1);
+  await store.publish(2);
+  const { token } = await pairings.pair((await pairings.createCode()).code, 'Wall display');
+  const headers = { cookie: 'hapanel_device=' + token };
+  const act = t.mock.method(hub, 'act', async () => {});
+  const still = t.mock.method(hub, 'cameraStill', async () => ({
+    buffer: Buffer.from('image'),
+    type: 'image/jpeg',
+  }));
+  const data = (await app.inject({ url: '/api/display/bootstrap', headers })).json();
+  assert.equal(data.snapshot.alarmControl, false);
+  assert.equal(data.snapshot.cameraView, false);
+  const alarm = await app.inject({
+    method: 'POST',
+    url: '/api/display/action',
+    headers,
+    payload: { tileId: 'demo_alarm', command: 'alarm', mode: 'armed_away' },
+  });
+  assert.equal(alarm.statusCode, 403);
+  assert.equal(
+    (await app.inject({ url: '/api/display/camera/sample_camera_entrance/still', headers }))
+      .statusCode,
+    403,
+  );
+  assert.equal(act.mock.callCount(), 0);
+  assert.equal(still.mock.callCount(), 0);
+});
+test('authenticated alarm actions sanitise HA errors and throttle repeated attempts without logging PINs', async (t) => {
+  const { showcaseDocument } = await import('../src/shared/showcase');
+  const { app, store, hub } = await fixture(t, {
+    mode: 'ingress',
+    isAdmin: async (id) => id === 'admin-user',
+  });
+  await store.save(showcaseDocument, 1);
+  await store.publish(2);
+  const headers = { 'x-remote-user-id': 'admin-user' };
+  const remoteAddress = '172.30.32.2';
+  t.mock.method(hub, 'act', async () => {
+    throw new Error('HA rejected PIN 0012 and private details');
+  });
+  const request = {
+    method: 'POST' as const,
+    url: '/api/display/action',
+    headers,
+    remoteAddress,
+    payload: { tileId: 'demo_alarm', command: 'alarm', mode: 'armed_away', code: '0012' },
+  };
+  assert.equal(
+    (await app.inject({ ...request, headers: { 'x-remote-user-id': 'normal-user' } })).statusCode,
+    403,
+  );
+  for (let i = 0; i < 5; i++) {
+    const response = await app.inject(request);
+    assert.equal(response.statusCode, 400);
+    assert.equal(response.json().messageKey, 'error.alarmRejected');
+    assert.doesNotMatch(response.body, /0012|private details/);
+  }
+  assert.equal((await app.inject(request)).statusCode, 429);
+  const data = (await app.inject({ url: '/api/display/bootstrap', headers, remoteAddress })).json();
+  assert.equal(data.snapshot.alarmControl, true);
+  assert.equal(data.snapshot.cameraView, true);
+});
+test('camera routes enforce draft versus publication bindings and strip private camera attributes', async (t) => {
+  const { showcaseDocument, showcaseSnapshot } = await import('../src/shared/showcase');
+  const { app, store, hub } = await fixture(t, {
+    mode: 'ingress',
+    isAdmin: async (id) => id === 'admin-user',
+  });
+  const snapshot = showcaseSnapshot();
+  Object.assign(snapshot.entities['camera.sample_entrance'].attributes, {
+    access_token: 'private',
+    entity_picture: 'secret-url',
+  });
+  t.mock.method(hub, 'getSnapshot', (ids?: string[]) => ({
+    ...snapshot,
+    entities: Object.fromEntries(
+      Object.entries(snapshot.entities).filter(([id]) => !ids || ids.includes(id)),
+    ),
+  }));
+  const still = t.mock.method(hub, 'cameraStill', async () => ({
+    buffer: Buffer.from('jpeg'),
+    type: 'image/jpeg',
+  }));
+  const headers = { 'x-remote-user-id': 'admin-user' },
+    remoteAddress = '172.30.32.2';
+  await store.save(showcaseDocument, 1);
+  const url = '/api/display/camera/sample_camera_entrance/still';
+  assert.equal((await app.inject({ url, headers, remoteAddress })).statusCode, 404);
+  const editor = await app.inject({
+    url: '/api/editor/camera/sample_camera_entrance/still',
+    headers,
+    remoteAddress,
+  });
+  assert.equal(editor.statusCode, 200);
+  assert.equal(editor.headers['cache-control'], 'no-store');
+  await store.publish(2);
+  assert.equal((await app.inject({ url, headers, remoteAddress })).statusCode, 200);
+  assert.equal(still.mock.calls[1].arguments[0], 'camera.sample_entrance');
+  assert.equal(
+    (
+      await app.inject({
+        url: '/api/display/camera/arbitrary_camera/still',
+        headers,
+        remoteAddress,
+      })
+    ).statusCode,
+    404,
+  );
+  assert.equal((await app.inject({ url, headers })).statusCode, 403);
+  const data = (await app.inject({ url: '/api/display/bootstrap', headers, remoteAddress })).json();
+  assert.doesNotMatch(
+    JSON.stringify(data.snapshot.entities['camera.sample_entrance']),
+    /access_token|secret-url/,
+  );
+});

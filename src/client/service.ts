@@ -10,7 +10,12 @@ import {
   type Revision,
 } from '../shared/model';
 import { demoDocument, applyDemoAction } from '../shared/demo';
-import { legacyShowcaseDocument, showcaseDocument, showcaseSnapshot } from '../shared/showcase';
+import {
+  legacyShowcaseDocument,
+  legacyV1ShowcaseDocument,
+  showcaseDocument,
+  showcaseSnapshot,
+} from '../shared/showcase';
 import { parse, stringify } from 'yaml';
 
 export type Bootstrap = {
@@ -148,7 +153,7 @@ export class BrowserDemoService implements StudioService {
           this.workspace =
             data.draft.revision === 1 &&
             data.history.length === 0 &&
-            [demoDocument, legacyShowcaseDocument].some(
+            [demoDocument, legacyShowcaseDocument, legacyV1ShowcaseDocument].some(
               (document) =>
                 JSON.stringify(data.draft.document) === JSON.stringify(document) &&
                 JSON.stringify(data.published.document) === JSON.stringify(document),
