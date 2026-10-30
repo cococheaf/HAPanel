@@ -42,6 +42,7 @@ function Display() {
         setData(
           (d) =>
             d && {
+              ...d,
               snapshot: message.snapshot ?? d.snapshot,
               published: message.published ?? d.published,
             },
