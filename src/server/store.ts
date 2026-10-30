@@ -2,16 +2,31 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
+import {
+  isMessageKey,
+  translate,
+  UserError,
+  type MessageKey,
+  type MessageParams,
+} from '../shared/i18n';
 import { z } from 'zod';
 import { dashboardSchema, type Dashboard, type Workspace } from '../shared/model';
 import { demoDocument } from '../shared/demo';
 
 export class HttpError extends Error {
+  public messageKey?: MessageKey;
+  public params?: MessageParams;
   constructor(
     public statusCode: number,
-    message: string,
+    reason: string | UserError,
   ) {
-    super(message);
+    const key =
+      typeof reason === 'string' ? (isMessageKey(reason) ? reason : undefined) : reason.messageKey;
+    super(
+      key ? translate('en', key, typeof reason === 'string' ? {} : reason.params) : String(reason),
+    );
+    this.messageKey = key;
+    this.params = typeof reason === 'string' ? undefined : reason.params;
   }
 }
 export async function atomicJson(path: string, value: unknown) {
@@ -76,11 +91,7 @@ export class DocumentStore extends EventEmitter {
   save(document: Dashboard, expectedRevision: number) {
     const parsed = dashboardSchema.parse(document);
     return this.transact((state) => {
-      if (state.draft.revision !== expectedRevision)
-        throw new HttpError(
-          409,
-          'Der Entwurf wurde inzwischen geändert. Bitte neu laden oder zuerst exportieren.',
-        );
+      if (state.draft.revision !== expectedRevision) throw new HttpError(409, 'error.conflict');
       state.history = [state.draft, ...state.history].slice(0, 30);
       state.draft = {
         revision: state.draft.revision + 1,
@@ -91,17 +102,15 @@ export class DocumentStore extends EventEmitter {
   }
   publish(expectedRevision: number) {
     return this.transact((state) => {
-      if (state.draft.revision !== expectedRevision)
-        throw new HttpError(409, 'Bitte zuerst den aktuellen Entwurf speichern.');
+      if (state.draft.revision !== expectedRevision) throw new HttpError(409, 'error.saveFirst');
       state.published = structuredClone(state.draft);
     });
   }
   restore(revision: number, expectedRevision: number) {
     return this.transact((state) => {
-      if (state.draft.revision !== expectedRevision)
-        throw new HttpError(409, 'Der Entwurf wurde inzwischen geändert.');
+      if (state.draft.revision !== expectedRevision) throw new HttpError(409, 'error.conflict');
       const target = [state.published, ...state.history].find((r) => r.revision === revision);
-      if (!target) throw new HttpError(404, 'Revision nicht gefunden.');
+      if (!target) throw new HttpError(404, 'error.revisionMissing');
       state.history = [state.draft, ...state.history].slice(0, 30);
       state.draft = {
         revision: state.draft.revision + 1,
@@ -169,7 +178,7 @@ export class PairingStore extends EventEmitter {
     return this.update((state) => {
       const digest = hash(code.toUpperCase().replace(/[\s-]/g, ''));
       const index = state.codes.findIndex((c) => c.digest === digest);
-      if (index < 0) throw new HttpError(401, 'Kopplungscode ungültig oder abgelaufen.');
+      if (index < 0) throw new HttpError(401, 'error.pairCode');
       state.codes.splice(index, 1);
       const token = randomBytes(32).toString('base64url');
       const device = {

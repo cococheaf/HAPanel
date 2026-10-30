@@ -1,3 +1,4 @@
+import { UserError } from './i18n';
 import { z } from 'zod';
 
 const id = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/);
@@ -66,7 +67,7 @@ export const dashboardSchema = z
   .superRefine((doc, ctx) => {
     const unique = (values: string[], path: (string | number)[]) => {
       if (new Set(values).size !== values.length)
-        ctx.addIssue({ code: 'custom', message: 'IDs müssen eindeutig sein.', path });
+        ctx.addIssue({ code: 'custom', message: 'error.uniqueIds', path });
     };
     unique(
       doc.profiles.map((p) => p.id),
@@ -84,7 +85,7 @@ export const dashboardSchema = z
       if (geometry(p).cellWidth < 12 || geometry(p).rowHeight < 12) {
         ctx.addIssue({
           code: 'custom',
-          message: 'Für dieses Raster ist die nutzbare Displayfläche zu klein.',
+          message: 'error.gridTooSmall',
           path: ['profiles', pi],
         });
       }
@@ -93,11 +94,11 @@ export const dashboardSchema = z
           const r = tile.layouts[p.id];
           const path = ['pages', pageIndex, 'tiles', ti, 'layouts', p.id];
           if (!r) {
-            ctx.addIssue({ code: 'custom', message: 'Layout für Displayprofil fehlt.', path });
+            ctx.addIssue({ code: 'custom', message: 'error.missingLayout', path });
             continue;
           }
           if (r.x + r.w > p.columns || r.y + r.h > p.rows) {
-            ctx.addIssue({ code: 'custom', message: 'Kachel liegt außerhalb des Rasters.', path });
+            ctx.addIssue({ code: 'custom', message: 'error.outsideGrid', path });
           }
           if (
             page.tiles
@@ -106,7 +107,7 @@ export const dashboardSchema = z
           ) {
             ctx.addIssue({
               code: 'custom',
-              message: 'Kacheln dürfen sich nicht überlagern.',
+              message: 'error.overlap',
               path,
             });
           }
@@ -126,7 +127,7 @@ export const dashboardSchema = z
         if (!domains[tile.kind].includes(tile.entityId.split('.')[0])) {
           ctx.addIssue({
             code: 'custom',
-            message: 'Entität passt nicht zum Kacheltyp.',
+            message: 'error.entityKind',
             path: ['pages', pageIndex, 'tiles', ti, 'entityId'],
           });
         }
@@ -220,7 +221,7 @@ export function stringAttr(entity: EntityState | undefined, key: string, fallbac
 /** Resolve only typed, tile-bound actions. Clients cannot supply HA services or targets. */
 export function resolveAction(document: Dashboard, action: Action) {
   const tile = document.pages.flatMap((p) => p.tiles).find((t) => t.id === action.tileId);
-  if (!tile) throw new Error('Kachel nicht freigegeben.');
+  if (!tile) throw new UserError('error.tileNotAllowed');
   const domain = tile.entityId.split('.')[0];
   const result = (service: string, service_data: Record<string, unknown> = {}) => ({
     domain,
@@ -230,7 +231,7 @@ export function resolveAction(document: Dashboard, action: Action) {
   });
   const value = (min: number, max: number) => {
     if (action.value === undefined || action.value < min || action.value > max)
-      throw new Error('Wert außerhalb des zulässigen Bereichs.');
+      throw new UserError('error.valueRange');
     return action.value;
   };
   if (tile.kind === 'light') {
@@ -255,5 +256,5 @@ export function resolveAction(document: Dashboard, action: Action) {
     if (action.command === 'volume') return result('volume_set', { volume_level: value(0, 1) });
   }
   if (tile.kind === 'scene' && action.command === 'activate') return result('turn_on');
-  throw new Error('Aktion für diese Kachel nicht freigegeben.');
+  throw new UserError('error.actionNotAllowed');
 }

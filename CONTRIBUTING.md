@@ -1,5 +1,7 @@
 # Mit HAPanel arbeiten
 
+**Deutsch · [English](CONTRIBUTING.en.md)**
+
 Node.js 24 LTS verwenden und Abhängigkeiten mit `npm ci` installieren. `npm run dev` startet Demo-API und Vite. Die Browserdemo unter `/demo.html` benötigt keine HA-Zugangsdaten.
 
 Vor einem Pull Request:
@@ -17,3 +19,5 @@ Kachelrenderer gehören in `src/client/ui`, Konfigurationsregeln in `src/shared`
 Keine Zugangsdaten, privaten HA-Exporte oder Bildschirmfotos mit echten Haushaltsdaten committen. `.data/`, `.env` und Buildausgaben sind ignoriert. Neue Beiträge müssen zur MIT-Lizenz passen. Bei Codeübernahmen die Herkunft und Lizenz dokumentieren; insbesondere Tessera-Implementierungen nicht ohne Lizenzprüfung übernehmen.
 
 Fehlerberichte mit Browser-/HA-Version, Displayprofil und reproduzierbaren Schritten helfen am meisten. Für Sicherheitslücken siehe [SECURITY.md](SECURITY.md).
+
+Oberflächentexte, barrierefreie Beschriftungen und HAPanel-Fehlermeldungen gehören in die zentralen deutschen und englischen Kataloge. Weitere Sprachen sind in der [Übersetzungsanleitung](docs/translations.md) beschrieben.

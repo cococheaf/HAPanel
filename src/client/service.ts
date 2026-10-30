@@ -1,3 +1,5 @@
+import { UserError, isMessageKey } from '../shared/i18n';
+import { requestLanguage } from './i18n';
 import {
   dashboardSchema,
   type Action,
@@ -37,19 +39,29 @@ export async function api<T>(path: string, body?: unknown, method = 'POST'): Pro
   const response = await fetch(
     new URL(path, document.baseURI),
     body === undefined
-      ? { credentials: 'same-origin', cache: 'no-store' }
+      ? {
+          credentials: 'same-origin',
+          cache: 'no-store',
+          headers: { 'Accept-Language': requestLanguage() },
+        }
       : {
           method,
           credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Accept-Language': requestLanguage() },
           body: JSON.stringify(body),
         },
-  );
+  ).catch(() => {
+    throw new UserError('error.serverUnreachable');
+  });
   if (!response.ok) {
-    const data = await response.json().catch(() => ({ error: 'Server nicht erreichbar.' }));
-    throw Object.assign(new Error(data.error || 'Anfrage fehlgeschlagen.'), {
-      status: response.status,
-    });
+    const data = await response.json().catch(() => ({ messageKey: 'error.requestFailed' }));
+    const reason =
+      data.messageKey && isMessageKey(data.messageKey)
+        ? new UserError(data.messageKey)
+        : data.error
+          ? new Error(data.error)
+          : new UserError('error.requestFailed');
+    throw Object.assign(reason, { status: response.status });
   }
   return response.json() as Promise<T>;
 }
@@ -99,8 +111,10 @@ export const backendService: StudioService = {
   import: (source, format, expectedRevision) =>
     api('api/editor/import', { source, format, expectedRevision }),
   export: async (format) => {
-    const response = await fetch(new URL(`api/editor/export?format=${format}`, document.baseURI));
-    if (!response.ok) throw new Error('Export fehlgeschlagen.');
+    const response = await fetch(new URL(`api/editor/export?format=${format}`, document.baseURI), {
+      headers: { 'Accept-Language': requestLanguage() },
+    });
+    if (!response.ok) throw new UserError('error.exportFailed');
     return response.text();
   },
   act: async (action, scope) => {
@@ -160,8 +174,7 @@ export class BrowserDemoService implements StudioService {
     };
   }
   async save(document: Dashboard, revision: number) {
-    if (revision !== this.workspace.draft.revision)
-      throw new Error('Der Entwurf wurde inzwischen geändert.');
+    if (revision !== this.workspace.draft.revision) throw new UserError('error.conflict');
     const parsed = dashboardSchema.parse(document);
     this.workspace.history = [
       structuredClone(this.workspace.draft),
@@ -175,7 +188,7 @@ export class BrowserDemoService implements StudioService {
     return this.persist();
   }
   async publish(revision: number) {
-    if (revision !== this.workspace.draft.revision) throw new Error('Bitte zuerst speichern.');
+    if (revision !== this.workspace.draft.revision) throw new UserError('error.saveFirst');
     this.workspace.published = structuredClone(this.workspace.draft);
     return this.persist();
   }
@@ -183,16 +196,17 @@ export class BrowserDemoService implements StudioService {
     const target = [this.workspace.published, ...this.workspace.history].find(
       (r) => r.revision === revision,
     );
-    if (!target) throw new Error('Revision nicht gefunden.');
+    if (!target) throw new UserError('error.revisionMissing');
     return this.save(target.document, expected);
   }
   import(source: string, format: 'json' | 'yaml', revision: number) {
-    return this.save(
-      dashboardSchema.parse(
-        format === 'json' ? JSON.parse(source) : parse(source, { maxAliasCount: 0 }),
-      ),
-      revision,
-    );
+    let value: unknown;
+    try {
+      value = format === 'json' ? JSON.parse(source) : parse(source, { maxAliasCount: 0 });
+    } catch {
+      throw new UserError('error.importParse');
+    }
+    return this.save(dashboardSchema.parse(value), revision);
   }
   async export(format: 'json' | 'yaml') {
     return format === 'json'

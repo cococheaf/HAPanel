@@ -1,0 +1,12 @@
+configuration:
+  demo_mode:
+    name: Demo mode
+    description: Use sample data instead of real devices. Ingress access remains restricted to HA administrators.
+  display_enabled:
+    name: Enable separate display server
+    description: Allow paired wall tablets to connect through the additional network port.
+  public_origin:
+    name: Public display address
+    description: Exact HTTPS origin of the display server, e.g. https://panel.example.net. Enables secure cookies.
+network:
+  8098/tcp: Optional display server for paired devices; use an HTTPS reverse proxy.

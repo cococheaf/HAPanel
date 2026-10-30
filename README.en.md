@@ -1,0 +1,75 @@
+<p align="center"><img src="public/mark.svg" width="64" alt="HAPanel" /></p>
+<h1 align="center">HAPanel</h1>
+<p align="center">Your home, at a glance.</p>
+<p align="center">An independent Home Assistant dashboard and visual editor for wall tablets and browser-based touch displays.</p>
+<p align="center"><a href="https://cococheaf.github.io/HAPanel/">Interactive iPad demo</a> · <a href="DOCS.en.md">Installation</a> · <a href="docs/translations.md">Translations</a> · <a href="CONTRIBUTING.en.md">Contributing</a></p>
+
+**[Deutsch](README.md) · English**
+
+![HAPanel dashboard](docs/images/dashboard-ipad-en.png)
+
+HAPanel combines rounded tiles, calm colours and direct touch controls with a visual layout editor. It runs as a Home Assistant app (add-on) or a local Node.js process. Existing Lovelace dashboards and HA configuration files are preserved.
+
+**Status: 0.1.0-alpha.2 — functional preview.** The demo, editor and API are implemented. The HA adapter is tested against a simulated WebSocket server. Installation on a real Supervisor instance and testing on physical iPad hardware are still pending.
+
+## Try it
+
+Open the [demo](https://cococheaf.github.io/HAPanel/) in Safari on your iPad. Lights, dimming, temperature, media controls and scenes use interactive sample data. Choose **Explore Studio** to edit the layout. Changes stay in your browser; **Publish** applies your draft to the demo dashboard.
+
+For a standalone view, choose **Share → Add to Home Screen**. Landscape, portrait and compact profiles are included. The public demo has no access to a real Home Assistant instance or credentials. Media controls simulate states and do not play audio.
+
+## Included
+
+- **German and English from the start**, with automatic browser-language detection, a manual language selector, localised dates/numbers and translatable errors.
+- Lights, climate, media with album art, hourly weather, scenes and sensors.
+- Drag-and-drop editor, resize handles, numeric positioning and undo/redo.
+- Multiple pages and display profiles, including iPad 8 in both orientations and 800 × 480.
+- Separate physical resolution and browser viewport, configurable grid, margins and spacing.
+- Exact CSS-pixel rendering or proportional fitting, using the same tiles in editor and player.
+- Autosaved drafts, explicit publication and up to 30 previous revisions.
+- JSON/YAML import and export.
+- Server-side HA WebSocket connection with filtered subscriptions and reconnection.
+- Ingress access for HA administrators and an optional paired display endpoint with revocable device sessions.
+- Dockerfile and GitHub Actions for validation, the hosted demo and amd64/aarch64 builds.
+
+UI language is stored per browser, independently of HA settings and saved layouts. Untouched sample labels are localised for the preview. Your own titles, greetings and HA entity names remain as entered. [Adding more languages](docs/translations.md) requires a translation catalog and registry entry.
+
+## Develop locally
+
+Node.js 24 LTS is recommended; minimum version 22.12.
+
+```sh
+npm ci
+npm run dev
+```
+
+- Studio: <http://127.0.0.1:5173/>
+- Standalone browser demo: <http://127.0.0.1:5173/demo.html>
+- API: <http://127.0.0.1:4310/api/health>
+
+The default mode uses sample data only. Server-side layouts are stored in the ignored `.data/` directory. The standalone browser demo stores its layouts in the browser instead.
+
+```sh
+npm test
+npm run build
+npm run build:demo
+npm start
+```
+
+After the production build, `npm start` serves Studio and the player on port 4310. See the [installation guide](DOCS.en.md) for add-on deployment, standalone HA access, pairing and HTTPS reverse proxies.
+
+## Isolation and access
+
+HAPanel needs no HA configuration mount, custom cards, extra integration or hardware permissions. It stores data in its own private app directory. Normal device actions update the shared HA device state.
+
+The Supervisor token stays in the backend and is treated as an administrator credential. Displays submit tile IDs and allowed control commands; the backend derives HA services and entity targets from the published configuration. Pairing codes are valid for five minutes and can be used once. Device sessions expire after 90 days and can be revoked. Use HTTPS and the correct `public_origin` for live displays.
+
+## Development status
+
+Real HA/iPad acceptance, automatic viewport calibration, additional device capabilities and adaptive reflow are the next milestones. German and English are implemented; more languages can follow through the shared catalogs. Unknown stored schema versions are explicitly rejected and their files are preserved. Schema migration will accompany the first format change.
+
+## Credits and licence
+
+The tile concept and visual workflow are inspired by [Tessera](https://github.com/MaxGramser/homeassistant_espscreen). HAPanel is an independent implementation and incorporates no Tessera source code, firmware or assets. It contains no ESPHome, flashing, USB or microcontroller logic.
+
+HAPanel is [MIT licensed](LICENSE). Icons are from [Lucide](https://lucide.dev/license). The sample album artwork and project mark are original SVG graphics. No external fonts, analytics scripts or image services are used. HAPanel is independent of Apple and the Home Assistant project.

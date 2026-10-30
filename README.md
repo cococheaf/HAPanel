@@ -4,6 +4,8 @@
 <p align="center">Ein eigenständiges Home Assistant Dashboard mit visuellem Editor – für dein Wandtablet und browserfähige Touchdisplays.</p>
 <p align="center"><a href="https://cococheaf.github.io/HAPanel/">Interaktive iPad-Demo</a> · <a href="DOCS.md">Installation</a> · <a href="docs/architecture.md">Architektur</a> · <a href="CONTRIBUTING.md">Mitmachen</a></p>
 
+**Deutsch · [English](README.en.md)**
+
 ![HAPanel Dashboard](docs/images/dashboard-ipad.png)
 
 <details><summary>Visuellen Editor ansehen</summary>
@@ -14,7 +16,7 @@
 
 HAPanel verbindet großzügige, abgerundete Kacheln, ruhige Farben und direkte Touch-Bedienung mit einem visuellen Layout-Editor. Es läuft als eigene Home Assistant App (Add-on) oder als lokaler Node.js-Prozess. Bestehende Lovelace-Dashboards und HA-Konfigurationsdateien bleiben unverändert.
 
-**Status: 0.1.0-alpha.1 – erste funktionsfähige Vorschau.** Die Demo, der Editor und die API sind implementiert. Die HA-Anbindung ist gegen einen simulierten WebSocket-Server geprüft. Ein echter Supervisor-Installationslauf und Tests auf physischer iPad-Hardware sind noch ausstehend.
+**Status: 0.1.0-alpha.2 – erste funktionsfähige Vorschau.** Die Demo, der Editor und die API sind implementiert. Die HA-Anbindung ist gegen einen simulierten WebSocket-Server geprüft. Ein echter Supervisor-Installationslauf und Tests auf physischer iPad-Hardware sind noch ausstehend.
 
 ## Ausprobieren
 
@@ -25,6 +27,7 @@ Für eine eigenständige Ansicht: **Teilen → Zum Home-Bildschirm**. Wähle bei
 ## Bereits enthalten
 
 - Licht, Klima, Medien mit Album-Art, Wetter mit Stundenprognose, Szenen und Sensoren.
+- Deutsche und englische Oberfläche mit automatischer Browser-Spracherkennung und manueller Sprachwahl; weitere Sprachen sind über zentrale Übersetzungsdateien ergänzbar.
 - Visueller Editor mit Verschieben, Größenänderung, numerischen Positionen und Undo/Redo.
 - Mehrere Seiten und Displayprofile; Beispielprofile für iPad 8 in beiden Ausrichtungen und 800 × 480.
 - Getrennte Hardwareauflösung und Browserfläche, einstellbares Raster, Außenränder und Abstände.
@@ -67,7 +70,7 @@ Das Supervisor-Token bleibt im Backend und wird als Administratorzugang behandel
 
 ## Nächste Schritte
 
-Die [Roadmap](docs/roadmap.md) benennt die noch offenen Arbeiten: echte HA-/iPad-Abnahme, automatische Viewport-Kalibrierung, weitere Gerätefähigkeiten, vollständig adaptive Layouts und zusätzliche Sprachunterstützung. Die aktuelle Oberfläche ist deutschsprachig. Ältere gespeicherte Schemaversionen werden derzeit ausdrücklich abgelehnt und nicht verändert; Migrationen folgen bei der ersten Schemaänderung.
+Die [Roadmap](docs/roadmap.md) benennt die noch offenen Arbeiten: echte HA-/iPad-Abnahme, automatische Viewport-Kalibrierung, weitere Gerätefähigkeiten und vollständig adaptive Layouts. Deutsch und Englisch sind von Anfang an unterstützt; [weitere Sprachen](docs/translations.md) können folgen. Ältere gespeicherte Schemaversionen werden derzeit ausdrücklich abgelehnt und nicht verändert; Migrationen folgen bei der ersten Schemaänderung.
 
 ## Herkunft und Lizenz
 

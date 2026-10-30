@@ -2582,3 +2582,96 @@ label + label {
   color: var(--active-ink, #a5893f);
   background: #5258360d;
 }
+
+/* Language preference belongs to the browser, independently of dashboard content. */
+.language-picker {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 5px;
+  margin: 0;
+  color: #7c9184;
+}
+.language-picker select {
+  width: 78px;
+  max-width: 78px;
+  padding: 6px 4px;
+  min-height: 32px;
+  font-size: 11px;
+  border-radius: 7px;
+}
+.player-toolbar .language-picker select {
+  width: 78px;
+  max-width: 78px;
+  padding: 6px 2px;
+}
+.pairing-card .language-picker {
+  float: right;
+  color: #a7c3b0;
+}
+.pairing-card .language-picker select {
+  background: #ffffff0b;
+  border-color: #abc9b222;
+  color: #dbe9df;
+}
+.pairing-card .language-picker option {
+  background: #20352e;
+}
+@media (max-width: 1050px) {
+  .player-demo-tag {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .language-picker svg {
+    display: none;
+  }
+  .language-picker {
+    gap: 0;
+  }
+  .language-picker select,
+  .player-toolbar .language-picker select {
+    width: 70px;
+    max-width: 70px;
+    font-size: 10px;
+  }
+}
+@media (max-width: 480px) {
+  .studio-header .demo-badge {
+    display: none;
+  }
+  .studio-header .preview-button {
+    font-size: 0;
+    gap: 0;
+    width: 33px;
+  }
+  .player-brand span {
+    display: none;
+  }
+  .player-toolbar {
+    gap: 4px;
+    padding: 0 8px;
+  }
+  .player-toolbar > select {
+    max-width: 100px;
+  }
+}
+
+.modal-notice {
+  position: sticky;
+  bottom: -12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid #cbdbcf;
+  border-radius: 9px;
+  background: #edf5ef;
+  color: #355746;
+  font-size: 12px;
+  line-height: 1.6;
+  z-index: 1;
+}

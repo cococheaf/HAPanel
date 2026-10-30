@@ -1,3 +1,5 @@
+import { localizeSampleDocument } from '../../shared/demo';
+import { useI18n, LanguageSwitcher } from '../i18n';
 import { useEffect, useState } from 'react';
 import { Expand, Info, Settings2, X } from 'lucide-react';
 import type { Action, Revision, Snapshot } from '../../shared/model';
@@ -16,7 +18,9 @@ export default function Player({
   demo?: boolean;
   onEdit?: () => void;
 }) {
-  const document = published.document;
+  const { t, language } = useI18n();
+
+  const document = localizeSampleDocument(published.document, language);
   const [profileId, setProfileId] = useState(() => {
     let saved: string | null = null;
     try {
@@ -53,14 +57,15 @@ export default function Player({
   return (
     <div className={`player-shell ${demo ? 'demo-player' : ''}`}>
       <div className="player-toolbar">
-        <a className="player-brand" href="./">
+        <a className="player-brand" href="./" aria-label="HAPanel">
           <img src="./mark.svg" alt="" />
-          HAPanel
+          <span>HAPanel</span>
         </a>
-        {demo && <span className="player-demo-tag">INTERAKTIVE DEMO</span>}
+        {demo && <span className="player-demo-tag">{t('player.interactiveDemo')}</span>}
         <div className="header-spacer" />
+        <LanguageSwitcher />
         <select
-          aria-label="Displayprofil"
+          aria-label={t('editor.displayProfile')}
           value={profile.id}
           onChange={(e) => {
             setProfileId(e.target.value);
@@ -79,36 +84,33 @@ export default function Player({
         </select>
         <button
           className="player-icon"
-          aria-label="Displayinformationen"
-          title="Displayinformationen"
+          aria-label={t('player.information')}
+          title={t('player.information')}
           onClick={() => setInfo(!info)}
         >
           <Info size={18} />
         </button>
         <button
           className="player-icon"
-          aria-label="Vollbild"
-          title="Vollbild"
+          aria-label={t('player.fullscreen')}
+          title={t('player.fullscreen')}
           onClick={async () => {
             try {
               if (window.document.fullscreenElement) await window.document.exitFullscreen();
               else if (window.document.documentElement.requestFullscreen)
                 await window.document.documentElement.requestFullscreen();
-              else
-                setMessage(
-                  'Auf dem iPad: Teilen → Zum Home-Bildschirm. Von dort öffnet HAPanel ohne Safari-Leisten.',
-                );
+              else setMessage(t('player.homeScreenHint'));
             } catch {
-              setMessage('Nutze auf dem iPad „Zum Home-Bildschirm“ für die eigenständige Ansicht.');
+              setMessage(t('player.homeScreenFallback'));
             }
           }}
         >
           <Expand size={18} />
         </button>
         {onEdit && (
-          <button className="player-edit" onClick={onEdit}>
+          <button className="player-edit" onClick={onEdit} aria-label={t('player.exploreStudio')}>
             <Settings2 size={15} />
-            <span>Studio erkunden</span>
+            <span>{t('player.exploreStudio')}</span>
           </button>
         )}
       </div>
@@ -116,18 +118,27 @@ export default function Player({
         <div className="display-info">
           <strong>{profile.name}</strong>
           <span>
-            Browser: {viewport.width} × {viewport.height} CSS px · DPR {window.devicePixelRatio}
+            {t('player.browserInfo', {
+              width: viewport.width,
+              height: viewport.height,
+              dpr: window.devicePixelRatio,
+            })}
           </span>
           <span>
-            Layout: {profile.width} × {profile.height} · {profile.columns} × {profile.rows} Raster
+            {t('player.layoutInfo', {
+              width: profile.width,
+              height: profile.height,
+              columns: profile.columns,
+              rows: profile.rows,
+            })}
           </span>
           <span>
             {demo
-              ? 'Beispieldaten · Änderungen bleiben in diesem Browser'
-              : `Veröffentlichte Version ${published.revision}`}
+              ? t('player.sampleData')
+              : t('player.publishedVersion', { number: published.revision })}
           </span>
           {viewport.width < profile.width && profile.mode === 'exact' && (
-            <span>Das exakte Layout ist größer als deine Browserfläche.</span>
+            <span>{t('player.layoutTooLarge')}</span>
           )}
         </div>
       )}
@@ -148,15 +159,15 @@ export default function Player({
         <div className="demo-footnote">
           <span>
             <i />
-            Alles ausprobieren. Dein echtes Zuhause bleibt unberührt.
+            {t('player.demoSafe')}
           </span>
-          <span>Licht dimmen · Temperatur ändern · Musik steuern</span>
+          <span>{t('player.demoActions')}</span>
         </div>
       )}
       {message && (
         <div className="toast" role="status">
           <span>{message}</span>
-          <button aria-label="Meldung schließen" onClick={() => setMessage('')}>
+          <button aria-label={t('common.dismiss')} onClick={() => setMessage('')}>
             <X size={16} />
           </button>
         </div>

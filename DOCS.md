@@ -1,5 +1,13 @@
 # HAPanel installieren und bedienen
 
+**Deutsch · [English](DOCS.en.md)**
+
+## Sprache
+
+Studio, Dashboard und Kopplungsdialog unterstützen Deutsch und Englisch. Die Sprachwahl oben steht zunächst auf **Auto** und folgt den Browsersprachen. Bei nicht unterstützten Sprachen wird Englisch verwendet. **Deutsch** oder **English** wählen, um dies pro Browser bzw. Display zu überschreiben. Die Auswahl wird lokal gespeichert und verändert weder die HA-Sprache noch die Dashboard-Konfiguration.
+
+Datum, Uhrzeit, Zahlen, Bedienelemente und HAPanel-Fehlermeldungen folgen der Auswahl. Unveränderte Beispielbezeichnungen passen sich ebenfalls an. Eigene Titel, Begrüßungen, Geräte- und Entitätsnamen bleiben als eingegebener Inhalt erhalten; die Auswahl übersetzt keine frei eingegebenen Texte. Sprache und Temperatureinheit sind unabhängig voneinander; HAPanel ändert keine Gerätesollwerte oder Temperatureinheiten beim Sprachwechsel.
+
 ## Öffentliche Demo auf dem iPad
 
 1. <https://cococheaf.github.io/HAPanel/> in Safari öffnen.

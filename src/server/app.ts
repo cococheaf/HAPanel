@@ -16,6 +16,7 @@ import {
 } from '../shared/model';
 import { DocumentStore, HttpError, PairingStore } from './store';
 import { HomeAssistantHub } from './hub';
+import { errorMessage, isMessageKey, resolveLanguage, translate, UserError } from '../shared/i18n';
 
 export interface AppOptions {
   mode: 'demo' | 'standalone' | 'ingress';
@@ -38,14 +39,14 @@ export async function createApp(options: AppOptions) {
     try {
       resolveAction(document, action);
     } catch (error) {
-      throw new HttpError(400, (error as Error).message);
+      throw new HttpError(400, error instanceof UserError ? error : (error as Error).message);
     }
     try {
       await hub.act(document, action);
     } catch (error) {
       throw new HttpError(
         hub.getSnapshot([]).status === 'reconnecting' ? 503 : 400,
-        (error as Error).message,
+        error instanceof UserError ? error : (error as Error).message,
       );
     }
   };
@@ -75,28 +76,27 @@ export async function createApp(options: AppOptions) {
     } catch {
       /* reject invalid origins */
     }
-    throw new HttpError(403, 'Anfrage von einer fremden Webseite abgelehnt.');
+    throw new HttpError(403, 'error.crossOrigin');
   };
   const requireEditor = async (request: FastifyRequest) => {
     sameOrigin(request);
-    if (options.surface !== 'editor')
-      throw new HttpError(403, 'Verwaltung ist hier nicht verfügbar.');
+    if (options.surface !== 'editor') throw new HttpError(403, 'error.editorUnavailable');
     if (options.mode === 'ingress') {
       if (!['172.30.32.2', '::ffff:172.30.32.2'].includes(request.ip))
-        throw new HttpError(403, 'Nur Home Assistant Ingress ist zugelassen.');
+        throw new HttpError(403, 'error.ingressOnly');
       const user = request.headers['x-remote-user-id'];
       if (typeof user !== 'string' || !(await (options.isAdmin ?? ((id) => hub.isAdmin(id)))(user)))
-        throw new HttpError(403, 'Ein Home-Assistant-Administratorkonto ist erforderlich.');
+        throw new HttpError(403, 'error.adminRequired');
     } else {
       const host = new URL(`http://${request.headers.host ?? ''}`).hostname;
       if (!isLoopback(request.ip) || !localHosts.has(host))
-        throw new HttpError(403, 'Der lokale Editor ist nur auf diesem Rechner erreichbar.');
+        throw new HttpError(403, 'error.localEditor');
     }
   };
   const requireDisplay = async (request: FastifyRequest) => {
     sameOrigin(request);
     if (!pairings.authenticate(request.cookies.hapanel_device))
-      throw new HttpError(401, 'Bitte dieses Display im Studio koppeln.');
+      throw new HttpError(401, 'error.pairRequired');
   };
 
   app.addHook('onSend', async (_request, reply) => {
@@ -107,22 +107,34 @@ export async function createApp(options: AppOptions) {
       "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss:; font-src 'self'; base-uri 'self'; object-src 'none'",
     );
   });
-  app.setErrorHandler((error: Error & { statusCode?: number }, _request, reply) => {
-    const status = error instanceof ZodError ? 400 : (error.statusCode ?? 500);
-    const message =
-      error instanceof ZodError
-        ? error.issues
-            .map((i) => i.message)
-            .slice(0, 3)
-            .join(' ')
-        : status < 500
-          ? error.message
-          : 'Anfrage fehlgeschlagen. Bitte Verbindung und Konfiguration prüfen.';
-    reply.code(status).send({ error: message });
-  });
+  app.setErrorHandler(
+    (error: Error & { statusCode?: number; messageKey?: string }, request, reply) => {
+      const status = error instanceof ZodError ? 400 : (error.statusCode ?? 500);
+      const language = resolveLanguage(request.headers['accept-language']);
+      const messageKey =
+        error.messageKey && isMessageKey(error.messageKey)
+          ? error.messageKey
+          : status === 429
+            ? 'error.rateLimit'
+            : undefined;
+      const message =
+        error instanceof ZodError || messageKey
+          ? errorMessage(
+              messageKey && !error.messageKey ? new UserError(messageKey) : error,
+              language,
+            )
+          : status < 500
+            ? error.message
+            : translate(language, 'error.requestFailed');
+      reply
+        .code(status)
+        .header('Content-Language', language)
+        .send({ error: message, ...(messageKey ? { messageKey } : {}) });
+    },
+  );
   app.get('/api/health', async () => ({
     ok: true,
-    version: '0.1.0-alpha.1',
+    version: '0.1.0-alpha.2',
     source: hub.getSnapshot([]).status,
   }));
 
@@ -172,7 +184,7 @@ export async function createApp(options: AppOptions) {
                 ? parse(body.source, { maxAliasCount: 0 })
                 : JSON.parse(body.source);
           } catch {
-            throw new HttpError(400, 'Datei kann nicht als JSON oder YAML gelesen werden.');
+            throw new HttpError(400, 'error.importParse');
           }
           return store.save(dashboardSchema.parse(document), body.expectedRevision);
         });
@@ -210,7 +222,7 @@ export async function createApp(options: AppOptions) {
             .draft.document.pages.flatMap((p) => p.tiles)
             .find((t) => t.id === request.params.id && t.kind === 'media');
           const result = tile && (await hub.media(tile.entityId));
-          if (!result) return reply.code(404).send({ error: 'Kein Albumcover verfügbar.' });
+          if (!result) throw new HttpError(404, 'error.noAlbumArt');
           return reply.type(result.type).send(result.buffer);
         });
         admin.get('/stream', { websocket: true }, (socket) => {
@@ -277,7 +289,7 @@ export async function createApp(options: AppOptions) {
           .published.document.pages.flatMap((p) => p.tiles)
           .find((t) => t.id === request.params.id && t.kind === 'media');
         const result = tile && (await hub.media(tile.entityId));
-        if (!result) return reply.code(404).send({ error: 'Kein Albumcover verfügbar.' });
+        if (!result) throw new HttpError(404, 'error.noAlbumArt');
         return reply.type(result.type).send(result.buffer);
       });
       display.get('/stream', { websocket: true }, (socket, request) => {
@@ -285,7 +297,7 @@ export async function createApp(options: AppOptions) {
         let revision = -1;
         const send = () => {
           if (!pairings.authenticate(token)) {
-            socket.close(1008, 'Freigabe widerrufen');
+            socket.close(1008, 'Device access revoked');
             return;
           }
           if (socket.readyState !== 1) return;

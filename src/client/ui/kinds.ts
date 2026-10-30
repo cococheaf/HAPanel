@@ -7,11 +7,11 @@ export const kindIcons = {
   scene: Sparkles,
   sensor: Wind,
 };
-export const kindLabels = {
-  light: 'Licht',
-  climate: 'Klima',
-  media: 'Medien',
-  weather: 'Wetter',
-  scene: 'Szene',
-  sensor: 'Sensor',
-};
+export const kindLabelKeys = {
+  light: 'kind.light',
+  climate: 'kind.climate',
+  media: 'kind.media',
+  weather: 'kind.weather',
+  scene: 'kind.scene',
+  sensor: 'kind.sensor',
+} as const;

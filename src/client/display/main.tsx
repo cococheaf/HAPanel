@@ -1,3 +1,4 @@
+import { I18nProvider, useI18n, LanguageSwitcher } from '../i18n';
 import { StrictMode, useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { X } from 'lucide-react';
@@ -7,21 +8,24 @@ import Player from './Player';
 import '../styles.css';
 
 function Display() {
+  const { t, describeError } = useI18n();
+
   const [data, setData] = useState<{ published: Revision; snapshot: Snapshot }>();
   const [pairing, setPairing] = useState(false),
-    [error, setError] = useState('');
+    [error, setError] = useState<unknown>();
   const [code, setCode] = useState(''),
-    [name, setName] = useState('Wandtablet');
+    [name, setName] = useState<string>();
+  const displayName = name ?? t('pairing.defaultName');
   const load = useCallback(() => {
     api<{ published: Revision; snapshot: Snapshot }>('api/display/bootstrap')
       .then((result) => {
         setData(result);
         setPairing(false);
-        setError('');
+        setError(undefined);
       })
       .catch((e) => {
         if (e.status === 401) setPairing(true);
-        else setError(e.message);
+        else setError(e);
       });
   }, []);
   useEffect(load, [load]);
@@ -44,44 +48,41 @@ function Display() {
     try {
       await api('api/display/action', action);
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
     }
   };
   if (!data)
     return (
       <div className="pairing-screen">
         <div className="pairing-card">
+          <LanguageSwitcher />
           <img src="./mark.svg" width="54" alt="" />
-          <span className="eyebrow">WILLKOMMEN ZU HAPanel</span>
-          <h1>
-            Ein Platz für
-            <br />
-            dein Zuhause.
-          </h1>
+          <span className="eyebrow">{t('pairing.welcome')}</span>
+          <h1>{t('pairing.title')}</h1>
           {pairing ? (
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
                 try {
-                  await api('api/pair', { code, name });
+                  await api('api/pair', { code, name: displayName });
                   load();
                 } catch (e) {
-                  setError((e as Error).message);
+                  setError(e);
                 }
               }}
             >
-              <p>Erstelle im HAPanel Studio unter „Displays verbinden“ einen Kopplungscode.</p>
+              <p>{t('pairing.instructions')}</p>
               <label>
-                Dieses Display
+                {t('pairing.thisDisplay')}
                 <input
-                  value={name}
+                  value={displayName}
                   maxLength={64}
                   required
                   onChange={(e) => setName(e.target.value)}
                 />
               </label>
               <label>
-                Kopplungscode
+                {t('pairing.code')}
                 <input
                   className="code-input"
                   value={code}
@@ -94,15 +95,15 @@ function Display() {
                 />
               </label>
               <button className="button primary full-width" type="submit">
-                Mit Zuhause verbinden
+                {t('pairing.connect')}
               </button>
             </form>
           ) : (
-            <p>Verbindung wird hergestellt …</p>
+            <p>{t('common.connecting')}</p>
           )}
-          {error && (
+          {Boolean(error) && (
             <p role="alert" className="error-text">
-              {error}
+              {describeError(error)}
             </p>
           )}
         </div>
@@ -111,10 +112,10 @@ function Display() {
   return (
     <>
       <Player published={data.published} snapshot={data.snapshot} onAction={act} />
-      {error && (
+      {Boolean(error) && (
         <div className="toast" role="alert">
-          <span>{error}</span>
-          <button aria-label="Meldung schließen" onClick={() => setError('')}>
+          <span>{describeError(error)}</span>
+          <button aria-label={t('common.dismiss')} onClick={() => setError(undefined)}>
             <X size={16} />
           </button>
         </div>
@@ -124,6 +125,8 @@ function Display() {
 }
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <Display />
+    <I18nProvider page="display">
+      <Display />
+    </I18nProvider>
   </StrictMode>,
 );

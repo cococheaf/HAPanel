@@ -1,13 +1,13 @@
+import { localizeSampleDocument, localizedSampleTile } from '../../shared/demo';
+import { useI18n } from '../i18n';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   ArrowUpRight,
   ChevronLeft,
   ChevronRight,
-  Cloud,
   CloudSun,
   Home,
   Layers3,
-  Lightbulb,
   Minus,
   Music2,
   Pause,
@@ -15,9 +15,6 @@ import {
   Plus,
   Power,
   Sparkles,
-  Sun,
-  Thermometer,
-  Wind,
   WifiOff,
 } from 'lucide-react';
 import {
@@ -26,21 +23,29 @@ import {
   stringAttr,
   type Action,
   type Dashboard,
-  type EntityState,
   type Profile,
   type Snapshot,
   type Tile,
 } from '../../shared/model';
 
 import { kindIcons } from './kinds';
-const conditions: Record<string, string> = {
-  partlycloudy: 'Leicht bewölkt',
-  cloudy: 'Bewölkt',
-  sunny: 'Sonnig',
-  rainy: 'Regen',
-  'clear-night': 'Klare Nacht',
-  snowy: 'Schnee',
-};
+const conditionKeys = [
+  'partlycloudy',
+  'cloudy',
+  'sunny',
+  'rainy',
+  'clear-night',
+  'snowy',
+  'exceptional',
+  'fog',
+  'hail',
+  'lightning',
+  'lightning-rainy',
+  'pouring',
+  'snowy-rainy',
+  'windy',
+  'windy-variant',
+] as const;
 
 function Slider({
   label,
@@ -113,7 +118,7 @@ function Slider({
 }
 
 export function TileView({
-  tile,
+  tile: configuredTile,
   snapshot,
   onAction,
   mediaBase = 'api/editor/media/',
@@ -123,6 +128,9 @@ export function TileView({
   onAction?: (action: Action) => void;
   mediaBase?: string;
 }) {
+  const { t, language, intlLocale } = useI18n();
+
+  const tile = localizedSampleTile(configuredTile, language);
   const entity = snapshot.entities[tile.entityId];
   const unavailable =
     !entity ||
@@ -147,7 +155,7 @@ export function TileView({
       return (
         <div className="tile-unavailable">
           <WifiOff size={24} />
-          <span>Nicht verfügbar</span>
+          <span>{t('common.unavailable')}</span>
         </div>
       );
     if (tile.kind === 'weather') {
@@ -158,11 +166,17 @@ export function TileView({
             <span className="big-value">{Math.round(numberAttr(entity, 'temperature'))}°</span>
             <CloudSun size={56} strokeWidth={1.2} />
           </div>
-          <div className="tile-caption">{conditions[entity.state] ?? entity.state}</div>
+          <div className="tile-caption">
+            {conditionKeys.includes(entity.state as (typeof conditionKeys)[number])
+              ? t(`weather.${entity.state as (typeof conditionKeys)[number]}`)
+              : entity.state}
+          </div>
           <div className="weather-forecast">
             {forecasts.slice(0, 4).map((f) => (
               <div key={f.datetime}>
-                <span>{new Date(f.datetime).getHours()} Uhr</span>
+                <span>
+                  {new Date(f.datetime).toLocaleTimeString(intlLocale, { hour: '2-digit' })}
+                </span>
                 <CloudSun size={17} />
                 <strong>{Math.round(f.temperature)}°</strong>
               </div>
@@ -184,26 +198,32 @@ export function TileView({
           <div className="light-main">
             <button
               className="light-power"
-              aria-label={`${tile.title} ${active ? 'ausschalten' : 'einschalten'}`}
+              aria-label={t(active ? 'dashboard.turnOff' : 'dashboard.turnOn', {
+                title: tile.title,
+              })}
               disabled={disabled}
               onClick={() => act('toggle')}
             >
               <Power size={25} />
             </button>
             <span className="light-value">
-              {active ? (dimmable ? `${brightness} %` : 'An') : 'Aus'}
+              {active
+                ? dimmable
+                  ? (brightness / 100).toLocaleString(intlLocale, { style: 'percent' })
+                  : t('common.on')
+                : t('common.off')}
             </span>
           </div>
           {dimmable && (
             <Slider
-              label={`${tile.title} Helligkeit`}
+              label={t('dashboard.brightness', { title: tile.title })}
               value={brightness}
               onCommit={(v) => act('brightness', v)}
               disabled={disabled}
             />
           )}
           <div className="tile-caption light-caption">
-            {active ? 'Warm & gemütlich' : 'Ein Moment Ruhe'}
+            {active ? t('dashboard.lightOnCaption') : t('dashboard.lightOffCaption')}
           </div>
         </>
       );
@@ -217,24 +237,24 @@ export function TileView({
         <>
           <div className="climate-main">
             <span className="big-value">
-              {numberAttr(entity, 'current_temperature').toLocaleString('de-AT', {
+              {numberAttr(entity, 'current_temperature').toLocaleString(intlLocale, {
                 maximumFractionDigits: 1,
               })}
               °
             </span>
-            <span className="climate-label">Raumtemperatur</span>
+            <span className="climate-label">{t('dashboard.roomTemperature')}</span>
           </div>
           <div className="temperature-control">
             <button
-              aria-label="Temperatur senken"
+              aria-label={t('dashboard.decreaseTemperature')}
               disabled={disabled || temperature <= min}
               onClick={() => act('temperature', Math.max(min, temperature - step))}
             >
               <Minus size={18} />
             </button>
-            <span>{temperature.toLocaleString('de-AT')}°</span>
+            <span>{temperature.toLocaleString(intlLocale)}°</span>
             <button
-              aria-label="Temperatur erhöhen"
+              aria-label={t('dashboard.increaseTemperature')}
               disabled={disabled || temperature >= max}
               onClick={() => act('temperature', Math.min(max, temperature + step))}
             >
@@ -244,8 +264,8 @@ export function TileView({
           <div className="tile-caption climate-caption">
             <i />{' '}
             {entity.attributes.hvac_action === 'heating'
-              ? 'Heizt auf deine Wohlfühltemperatur'
-              : 'Wohlfühltemperatur'}
+              ? t('dashboard.heating')
+              : t('dashboard.comfort')}
           </div>
         </>
       );
@@ -257,18 +277,18 @@ export function TileView({
           <img
             className="album-art"
             src={picture}
-            alt="Albumcover"
+            alt={t('dashboard.albumArt')}
             onError={(e) => {
               e.currentTarget.style.visibility = 'hidden';
             }}
           />
           <div className="media-info">
-            <span className="eyebrow">DEIN SOUNDTRACK</span>
-            <h2>{stringAttr(entity, 'media_title', 'Keine Wiedergabe')}</h2>
+            <span className="eyebrow">{t('dashboard.soundtrack')}</span>
+            <h2>{stringAttr(entity, 'media_title', t('dashboard.notPlaying'))}</h2>
             <p>{stringAttr(entity, 'media_artist')}</p>
             <div className="media-controls">
               <button
-                aria-label="Vorheriger Titel"
+                aria-label={t('dashboard.previousTrack')}
                 disabled={disabled}
                 onClick={() => act('previous')}
               >
@@ -276,7 +296,7 @@ export function TileView({
               </button>
               <button
                 className="play-button"
-                aria-label={entity.state === 'playing' ? 'Pausieren' : 'Abspielen'}
+                aria-label={entity.state === 'playing' ? t('dashboard.pause') : t('dashboard.play')}
                 disabled={disabled}
                 onClick={() => act('play_pause')}
               >
@@ -286,14 +306,18 @@ export function TileView({
                   <Play size={22} fill="currentColor" />
                 )}
               </button>
-              <button aria-label="Nächster Titel" disabled={disabled} onClick={() => act('next')}>
+              <button
+                aria-label={t('dashboard.nextTrack')}
+                disabled={disabled}
+                onClick={() => act('next')}
+              >
                 <ChevronRight size={28} />
               </button>
             </div>
             <div className="media-volume">
               <Music2 size={15} />
               <Slider
-                label="Lautstärke"
+                label={t('dashboard.volume')}
                 value={numberAttr(entity, 'volume_level')}
                 max={1}
                 step={0.01}
@@ -313,11 +337,13 @@ export function TileView({
           </div>
           <div className="scene-bottom">
             <div>
-              <strong>{activated ? 'Schönen Feierabend.' : 'Zeit zum Durchatmen.'}</strong>
-              <span>Deine Szene, ein Fingertipp.</span>
+              <strong>
+                {activated ? t('dashboard.sceneActivated') : t('dashboard.sceneCaption')}
+              </strong>
+              <span>{t('dashboard.sceneHint')}</span>
             </div>
             <button
-              aria-label={`${tile.title} aktivieren`}
+              aria-label={t('dashboard.activateScene', { title: tile.title })}
               disabled={disabled}
               onClick={() => {
                 act('activate');
@@ -332,15 +358,23 @@ export function TileView({
     return (
       <>
         <div className="sensor-main">
-          <span className="big-value">{entity.state}</span>
+          <span className="big-value">
+            {/^-?\d+(\.\d+)?$/.test(entity.state)
+              ? Number(entity.state).toLocaleString(intlLocale, { maximumFractionDigits: 3 })
+              : entity.state === 'on'
+                ? t('common.on')
+                : entity.state === 'off'
+                  ? t('common.off')
+                  : entity.state}
+          </span>
           <span>{stringAttr(entity, 'unit_of_measurement')}</span>
         </div>
         <div className="sensor-quality">
           <i />
           <span>
             {tile.entityId.includes('air_quality')
-              ? 'Frische Luft. Gutes Gefühl.'
-              : 'Aktueller Messwert'}
+              ? t('dashboard.airQualityCaption')
+              : t('dashboard.sensorCaption')}
           </span>
         </div>
       </>
@@ -383,6 +417,8 @@ export function StaticGrid({
   onAction?: (action: Action) => void;
   mediaBase?: string;
 }) {
+  const { t } = useI18n();
+
   const g = geometry(profile),
     page = document.pages.find((p) => p.id === pageId) ?? document.pages[0];
   return (
@@ -407,8 +443,8 @@ export function StaticGrid({
       {page.tiles.length === 0 && (
         <div className="empty-dashboard">
           <Layers3 size={34} />
-          <h2>Platz für dein Zuhause.</h2>
-          <p>Füge dieser Seite im Studio deine ersten Kacheln hinzu.</p>
+          <h2>{t('dashboard.emptyTitle')}</h2>
+          <p>{t('dashboard.emptyHint')}</p>
         </div>
       )}
     </div>
@@ -416,7 +452,7 @@ export function StaticGrid({
 }
 
 export function DashboardFrame({
-  document,
+  document: configuredDocument,
   profile,
   pageId,
   setPageId,
@@ -434,6 +470,9 @@ export function DashboardFrame({
   children?: ReactNode;
   mediaBase?: string;
 }) {
+  const { t, language, intlLocale } = useI18n();
+
+  const document = localizeSampleDocument(configuredDocument, language);
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 15_000);
@@ -451,15 +490,15 @@ export function DashboardFrame({
           </div>
           <h1>{document.greeting}</h1>
           <p>
-            {snapshot.status === 'reconnecting'
-              ? 'Verbindung unterbrochen · Werte können veraltet sein'
-              : document.subtitle}
+            {snapshot.status === 'reconnecting' ? t('dashboard.disconnected') : document.subtitle}
           </p>
         </div>
         <div className="dashboard-clock">
-          <strong>{now.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' })}</strong>
+          <strong>
+            {now.toLocaleTimeString(intlLocale, { hour: '2-digit', minute: '2-digit' })}
+          </strong>
           <span>
-            {now.toLocaleDateString('de-AT', { weekday: 'long', day: 'numeric', month: 'long' })}
+            {now.toLocaleDateString(intlLocale, { weekday: 'long', day: 'numeric', month: 'long' })}
           </span>
         </div>
       </header>
@@ -474,7 +513,7 @@ export function DashboardFrame({
         />
       )}
       <footer className="dashboard-footer" style={{ height: profile.footerHeight }}>
-        <nav aria-label="Dashboard-Seiten">
+        <nav aria-label={t('dashboard.pages')}>
           {document.pages.map((page, index) => (
             <button
               key={page.id}

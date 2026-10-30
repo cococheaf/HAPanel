@@ -1,0 +1,12 @@
+configuration:
+  demo_mode:
+    name: Demo-Modus
+    description: Beispieldaten statt echter Geräte verwenden. Ingress-Zugriff bleibt auf HA-Administratoren beschränkt.
+  display_enabled:
+    name: Separaten Displayserver aktivieren
+    description: Ermöglicht den Zugriff gekoppelter Wandtablets über den zusätzlichen Netzwerkport.
+  public_origin:
+    name: Öffentliche Display-Adresse
+    description: Exakte HTTPS-Origin des Displayservers, z. B. https://panel.example.net. Aktiviert sichere Cookies.
+network:
+  8098/tcp: Optionaler Displayserver für gekoppelte Geräte; HTTPS-Reverse-Proxy verwenden.

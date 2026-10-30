@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { BrowserDemoService, type Bootstrap } from '../service';
@@ -6,9 +7,11 @@ import type { Action } from '../../shared/model';
 const Editor = lazy(() => import('../editor/Editor'));
 const service = new BrowserDemoService();
 export default function Demo() {
+  const { t, describeError } = useI18n();
+
   const [studio, setStudio] = useState(false),
     [data, setData] = useState<Bootstrap>(),
-    [error, setError] = useState('');
+    [error, setError] = useState<unknown>();
   useEffect(() => {
     service.load().then(setData);
     return service.subscribe((message) =>
@@ -26,16 +29,16 @@ export default function Demo() {
     try {
       await service.act(action, 'published');
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
     }
   };
   if (studio)
     return (
-      <Suspense fallback={<div className="loading-screen">Studio wird geöffnet …</div>}>
+      <Suspense fallback={<div className="loading-screen">{t('demo.loadingStudio')}</div>}>
         <Editor service={service} onExit={() => setStudio(false)} />
       </Suspense>
     );
-  if (!data) return <div className="loading-screen">Dein Zuhause wird vorbereitet …</div>;
+  if (!data) return <div className="loading-screen">{t('common.loading')}</div>;
   return (
     <>
       <Player
@@ -45,10 +48,10 @@ export default function Demo() {
         demo
         onEdit={() => setStudio(true)}
       />
-      {error && (
+      {Boolean(error) && (
         <div className="toast" role="alert">
-          <span>{error}</span>
-          <button aria-label="Meldung schließen" onClick={() => setError('')}>
+          <span>{describeError(error)}</span>
+          <button aria-label={t('common.dismiss')} onClick={() => setError(undefined)}>
             <X size={16} />
           </button>
         </div>

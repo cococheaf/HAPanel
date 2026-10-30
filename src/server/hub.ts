@@ -1,3 +1,4 @@
+import { UserError } from '../shared/i18n';
 import { EventEmitter } from 'node:events';
 import WebSocket from 'ws';
 import { applyDemoAction, demoSnapshot } from '../shared/demo';
@@ -99,7 +100,9 @@ export class HomeAssistantHub extends EventEmitter {
             this.pending.delete(msg.id);
             if (msg.success === false)
               pending.reject(
-                new Error(msg.error?.message || 'Home Assistant hat die Anfrage abgelehnt.'),
+                msg.error?.message
+                  ? new Error(msg.error.message)
+                  : new UserError('error.haRejected'),
               );
             else pending.resolve(msg.result);
           }
@@ -116,7 +119,7 @@ export class HomeAssistantHub extends EventEmitter {
       clearInterval(this.heartbeat);
       for (const pending of this.pending.values()) {
         clearTimeout(pending.timer);
-        pending.reject(new Error('Home Assistant ist nicht verbunden.'));
+        pending.reject(new UserError('error.haDisconnected'));
       }
       this.pending.clear();
       this.events.clear();
@@ -131,14 +134,14 @@ export class HomeAssistantHub extends EventEmitter {
   }
   private request(message: Record<string, unknown>, event?: (event: any) => void) {
     if (this.snapshot.status !== 'connected' || this.socket?.readyState !== WebSocket.OPEN)
-      return { id: -1, promise: Promise.reject(new Error('Home Assistant ist nicht verbunden.')) };
+      return { id: -1, promise: Promise.reject(new UserError('error.haDisconnected')) };
     const id = ++this.sequence;
     if (event) this.events.set(id, event);
     const promise = new Promise<any>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         this.events.delete(id);
-        reject(new Error('Home Assistant antwortet nicht.'));
+        reject(new UserError('error.haTimeout'));
       }, 10_000);
       this.pending.set(id, { resolve, reject, timer });
       this.socket!.send(JSON.stringify({ ...message, id }));
@@ -253,12 +256,11 @@ export class HomeAssistantHub extends EventEmitter {
       return;
     }
     const entity = this.snapshot.entities[resolved.target.entity_id];
-    if (!entity || entity.state === 'unavailable') throw new Error('Entität ist nicht verfügbar.');
+    if (!entity || entity.state === 'unavailable') throw new UserError('error.entityUnavailable');
     if (action.command === 'temperature') {
       const min = Number(entity.attributes.min_temp ?? 5),
         max = Number(entity.attributes.max_temp ?? 35);
-      if (action.value! < min || action.value! > max)
-        throw new Error('Temperatur außerhalb des Gerätebereichs.');
+      if (action.value! < min || action.value! > max) throw new UserError('error.temperatureRange');
     }
     await this.rpc({ type: 'call_service', ...resolved });
   }
@@ -297,7 +299,7 @@ export class HomeAssistantHub extends EventEmitter {
       bytes += chunk.length;
       if (bytes > 5 * 1024 * 1024) {
         await reader.cancel();
-        throw new Error('Album-Art ist zu groß.');
+        throw new UserError('error.artTooLarge');
       }
       chunks.push(chunk);
     }

@@ -1,3 +1,4 @@
+import { UserError, translate, type Language, type MessageKey } from './i18n';
 import {
   dashboardSchema,
   type Dashboard,
@@ -150,6 +151,75 @@ export const demoDocument: Dashboard = dashboardSchema.parse({
   ],
 });
 
+const sampleTileKeys = {
+  weather: 'sample.weather',
+  light: 'sample.light',
+  climate: 'sample.climate',
+  media: 'sample.media',
+  scene: 'sample.scene',
+  sensor: 'sample.sensor',
+} as const;
+/** Translate untouched sample labels only. Custom text and saved layouts are never rewritten. */
+export function localizedSampleTile<T extends { id: string; title: string }>(
+  tile: T,
+  language: Language,
+): T {
+  const key = sampleTileKeys[tile.id as keyof typeof sampleTileKeys];
+  const original = demoDocument.pages[0].tiles.find((item) => item.id === tile.id);
+  return key && original?.title === tile.title
+    ? { ...tile, title: translate(language, key) }
+    : tile;
+}
+export function localizeSampleDocument(document: Dashboard, language: Language): Dashboard {
+  if (document.id !== demoDocument.id) return document;
+  const sample = (value: string, original: string, key: MessageKey) =>
+    value === original ? translate(language, key) : value;
+  const profileKeys = {
+    ipad: 'sample.profileIpad',
+    portrait: 'sample.profilePortrait',
+    compact: 'sample.profileCompact',
+  } as const;
+  return {
+    ...document,
+    name: sample(document.name, demoDocument.name, 'sample.name'),
+    greeting: sample(document.greeting, demoDocument.greeting, 'sample.greeting'),
+    subtitle: sample(document.subtitle, demoDocument.subtitle, 'sample.subtitle'),
+    profiles: document.profiles.map((profile) => {
+      const original = demoDocument.profiles.find((item) => item.id === profile.id);
+      const key = profileKeys[profile.id as keyof typeof profileKeys];
+      return key && original
+        ? { ...profile, name: sample(profile.name, original.name, key) }
+        : profile;
+    }),
+    pages: document.pages.map((page) => ({
+      ...page,
+      name:
+        page.id === 'overview'
+          ? sample(page.name, 'Zuhause', 'sample.home')
+          : page.id === 'favorites'
+            ? sample(page.name, 'Favoriten', 'sample.favourites')
+            : page.name,
+      tiles: page.tiles.map((tile) => localizedSampleTile(tile, language)),
+    })),
+  };
+}
+export function sampleEntityName(entity: EntityState, language: Language) {
+  const key: MessageKey | undefined = (
+    {
+      'weather.home': 'sample.weather',
+      'light.living_room': 'sample.light',
+      'light.kitchen': 'sample.kitchen',
+      'climate.living_room': 'sample.climate',
+      'media_player.living_room': 'sample.media',
+      'scene.evening': 'sample.scene',
+      'sensor.air_quality': 'sample.sensor',
+      'sensor.temperature': 'sample.temperature',
+    } as Record<string, MessageKey>
+  )[entity.entity_id];
+  const name = String(entity.attributes.friendly_name ?? entity.entity_id);
+  return key && name === translate('de', key) ? translate(language, key) : name;
+}
+
 export function demoSnapshot(): Snapshot {
   const state = (
     entity_id: string,
@@ -225,7 +295,7 @@ export function applyDemoAction(snapshot: Snapshot, document: Dashboard, action:
   const id = command.target.entity_id;
   const next = structuredClone(snapshot);
   const entity = next.entities[id];
-  if (!entity) throw new Error('Demo-Entität nicht vorhanden.');
+  if (!entity) throw new UserError('error.demoEntity');
   if (command.service === 'toggle') entity.state = entity.state === 'on' ? 'off' : 'on';
   if (command.service === 'turn_on') {
     entity.state = 'on';

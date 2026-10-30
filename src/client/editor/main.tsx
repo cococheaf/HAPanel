@@ -1,3 +1,4 @@
+import { I18nProvider } from '../i18n';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import Editor from './Editor';
@@ -6,6 +7,8 @@ import '../styles.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <Editor service={backendService} />
+    <I18nProvider page="studio">
+      <Editor service={backendService} />
+    </I18nProvider>
   </StrictMode>,
 );

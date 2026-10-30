@@ -206,3 +206,33 @@ test('revoking a device closes its active WebSocket immediately', async (t) => {
   await pairings.revoke(device.id);
   assert.equal((await closed)[0], 1008);
 });
+
+test('API errors follow Accept-Language and expose stable error keys', async (t) => {
+  const { app } = await fixture(t);
+  for (const [language, expected] of [
+    ['de-AT', 'koppeln'],
+    ['en-US', 'Pair this display'],
+    ['fr-FR', 'Pair this display'],
+  ]) {
+    const response = await app.inject({
+      url: '/api/display/bootstrap',
+      headers: { 'accept-language': language },
+    });
+    assert.equal(response.statusCode, 401);
+    assert.equal(response.json().messageKey, 'error.pairRequired');
+    assert.ok(response.json().error.includes(expected));
+    assert.equal(response.headers['content-language'], language === 'de-AT' ? 'de' : 'en');
+  }
+  const document = structuredClone(
+    (await app.inject('/api/editor/bootstrap')).json().workspace.draft.document,
+  );
+  document.pages[0].tiles[1].layouts.ipad.x = 0;
+  const invalid = await app.inject({
+    method: 'PUT',
+    url: '/api/editor/draft',
+    headers: { 'accept-language': 'en' },
+    payload: { document, expectedRevision: 1 },
+  });
+  assert.equal(invalid.statusCode, 400);
+  assert.match(invalid.json().error, /Tiles must not overlap/);
+});

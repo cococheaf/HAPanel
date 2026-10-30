@@ -1,3 +1,5 @@
+import { localizeSampleDocument, localizedSampleTile, sampleEntityName } from '../../shared/demo';
+import { useI18n, LanguageSwitcher } from '../i18n';
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import GridLayout, { type Layout } from 'react-grid-layout';
 import { transformStrategy, getCompactor } from 'react-grid-layout/core';
@@ -17,13 +19,11 @@ import {
   LayoutGrid,
   Maximize2,
   Monitor,
-  MoreHorizontal,
   Plus,
   Redo2,
   Search,
   Settings2,
   Smartphone,
-  Sparkles,
   Tablet,
   Trash2,
   Undo2,
@@ -47,7 +47,7 @@ import {
 } from '../../shared/model';
 import { api, serializeDashboard, type Bootstrap, type StudioService } from '../service';
 import { DashboardFrame, ScaledCanvas, TileView } from '../ui/Dashboard';
-import { kindIcons, kindLabels } from '../ui/kinds';
+import { kindIcons, kindLabelKeys } from '../ui/kinds';
 import { Modal } from '../ui/Modal';
 
 const freshId = (prefix: string) => `${prefix}_${crypto.randomUUID().slice(0, 8)}`;
@@ -71,30 +71,33 @@ export default function Editor({
   service: StudioService;
   onExit?: () => void;
 }) {
+  const { t, describeError } = useI18n();
+
   const [bootstrap, setBootstrap] = useState<Bootstrap>();
-  const [loadError, setLoadError] = useState('');
+  const [loadError, setLoadError] = useState<unknown>();
   const load = useCallback(() => {
-    setLoadError('');
+    setLoadError(undefined);
     service
       .load()
       .then(setBootstrap)
-      .catch((e) => setLoadError(e.message));
+      .catch((e) => setLoadError(e));
   }, [service]);
   useEffect(load, [load]);
   if (!bootstrap)
     return (
       <div className="loading-screen">
+        <LanguageSwitcher />
         <img src="./mark.svg" alt="" width="50" />
         <h1>HAPanel Studio</h1>
-        <p>{loadError || 'Dein Zuhause wird vorbereitet …'}</p>
-        {loadError && (
+        <p>{loadError ? describeError(loadError) : t('common.loading')}</p>
+        {Boolean(loadError) && (
           <button className="button primary" onClick={load}>
-            Erneut versuchen
+            {t('common.retry')}
           </button>
         )}
         {onExit && (
           <button className="button" onClick={onExit}>
-            Zur Demo
+            {t('common.backDemo')}
           </button>
         )}
       </div>
@@ -111,6 +114,8 @@ function Studio({
   bootstrap: Bootstrap;
   onExit?: () => void;
 }) {
+  const { t, language, intlLocale, describeError } = useI18n();
+
   const [workspace, setWorkspace] = useState(bootstrap.workspace);
   const [document, setDocument] = useState(bootstrap.workspace.draft.document);
   const documentRef = useRef(document),
@@ -144,6 +149,14 @@ function Studio({
   const profile = document.profiles.find((p) => p.id === profileId) ?? document.profiles[0];
   const page = document.pages.find((p) => p.id === pageId) ?? document.pages[0];
   const selected = page.tiles.find((t) => t.id === selectedId);
+  const viewDocument = localizeSampleDocument(document, language);
+  const viewPage = viewDocument.pages.find((p) => p.id === page.id)!;
+  const viewProfile = viewDocument.profiles.find((p) => p.id === profile.id)!;
+  const viewSelected = selected && localizedSampleTile(selected, language);
+  const entityName = (entity: Bootstrap['catalog'][number]) =>
+    bootstrap.mode === 'demo'
+      ? sampleEntityName(entity, language)
+      : String(entity.attributes.friendly_name ?? entity.entity_id);
   const g = geometry(profile);
   const notify = useCallback((message: string) => setToast(message), []);
   useEffect(() => {
@@ -165,7 +178,7 @@ function Studio({
   const commit = (next: Dashboard) => {
     const result = dashboardSchema.safeParse(next);
     if (!result.success) {
-      notify(result.error.issues[0]?.message ?? 'Ungültiges Layout.');
+      notify(describeError(result.error));
       return false;
     }
     if (JSON.stringify(next) === JSON.stringify(documentRef.current)) return true;
@@ -204,10 +217,10 @@ function Studio({
   }, [service]);
   useEffect(() => {
     const timer = setTimeout(() => {
-      flush().catch((e) => notify(e.message));
+      flush().catch((e) => notify(describeError(e)));
     }, 750);
     return () => clearTimeout(timer);
-  }, [document, flush, notify]);
+  }, [document, flush, notify, describeError]);
   useEffect(() => {
     const handler = (event: BeforeUnloadEvent) => {
       if (JSON.stringify(documentRef.current) !== saved.current) {
@@ -273,9 +286,9 @@ function Studio({
       const result = await service.publish(latest.draft.revision);
       setWorkspace(result);
       workspaceRef.current = result;
-      notify('Veröffentlicht. Deine Displays zeigen jetzt diese Version.');
+      notify(t('editor.publishedNotice'));
     } catch (e) {
-      notify((e as Error).message);
+      notify(describeError(e));
     }
   };
   const addTile = (kind: TileKind, entityId?: string, drop?: { x: number; y: number }) => {
@@ -283,16 +296,14 @@ function Studio({
       bootstrap.catalog.find((e) => e.entity_id === entityId) ??
       bootstrap.catalog.find((e) => domainKinds[e.entity_id.split('.')[0]] === kind);
     if (!entity) {
-      notify('Für diesen Kacheltyp wurde keine passende Entität gefunden.');
+      notify(t('editor.noEntityKind'));
       return;
     }
     const layouts: Tile['layouts'] = {};
     for (const target of document.profiles) {
       const spot = findSpace(target, page.tiles, 4, 2);
       if (!spot) {
-        notify(
-          `Kein Platz auf „${target.name}“. Entferne eine Kachel oder erstelle eine neue Seite.`,
-        );
+        notify(t('editor.noSpace', { name: target.name }));
         return;
       }
       layouts[target.id] = target.id === profile.id && drop ? { ...spot, ...drop } : spot;
@@ -301,7 +312,7 @@ function Studio({
     const tile: Tile = {
       id,
       kind,
-      title: String(entity.attributes.friendly_name ?? kindLabels[kind]),
+      title: entityName(entity),
       entityId: entity.entity_id,
       accent:
         kind === 'light'
@@ -326,7 +337,7 @@ function Studio({
     const id = freshId('page');
     if (
       change((d) => {
-        d.pages.push({ id, name: `Seite ${d.pages.length + 1}`, tiles: [] });
+        d.pages.push({ id, name: t('editor.newPage', { number: d.pages.length + 1 }), tiles: [] });
       })
     ) {
       setPageId(id);
@@ -338,7 +349,7 @@ function Studio({
       actionSchema.parse(action);
       await service.act(action);
     } catch (e) {
-      notify((e as Error).message);
+      notify(describeError(e));
     }
   };
   const exportFile = async () => {
@@ -347,7 +358,7 @@ function Studio({
       setExportText(serializeDashboard(documentRef.current, format));
       setDialog('export');
     } catch (e) {
-      notify((e as Error).message);
+      notify(describeError(e));
     }
   };
   const download = () => {
@@ -360,16 +371,14 @@ function Studio({
   };
   const loadDevices = async () => {
     if (service.local) {
-      notify(
-        'Die gehostete Demo ist direkt auf jedem Gerät aufrufbar. Kopplung ist für dein eigenes Add-on vorgesehen.',
-      );
+      notify(t('editor.demoPairingInfo'));
       return;
     }
     try {
       setDevices(await api('api/editor/devices'));
       setDialog('devices');
     } catch (e) {
-      notify((e as Error).message);
+      notify(describeError(e));
     }
   };
   const profileUpdate = (patch: Partial<Profile>) =>
@@ -389,7 +398,9 @@ function Studio({
   const matchingEntities = bootstrap.catalog.filter(
     (e) =>
       domainKinds[e.entity_id.split('.')[0]] &&
-      `${e.entity_id} ${e.attributes.friendly_name}`.toLowerCase().includes(search.toLowerCase()),
+      `${e.entity_id} ${e.attributes.friendly_name} ${entityName(e)}`
+        .toLowerCase()
+        .includes(search.toLowerCase()),
   );
   const layout = page.tiles.map((t) => ({ i: t.id, ...t.layouts[profile.id], minW: 2, minH: 1 }));
   const isPublished =
@@ -397,12 +408,12 @@ function Studio({
     workspace.draft.revision === workspace.published.revision;
   const statusText =
     status === 'saving'
-      ? 'Wird gespeichert …'
+      ? t('editor.saving')
       : status === 'error'
-        ? 'Speichern fehlgeschlagen'
+        ? t('editor.saveFailed')
         : status === 'dirty'
-          ? 'Ungespeicherte Änderungen'
-          : 'Entwurf gespeichert';
+          ? t('editor.unsaved')
+          : t('editor.saved');
 
   return (
     <div className="studio">
@@ -414,13 +425,15 @@ function Studio({
         </div>
         <span className="header-divider" />
         <div className="project-name">
-          {document.name}
+          {viewDocument.name}
           <ChevronDown size={14} />
         </div>
         <div className="header-spacer" />
+        <LanguageSwitcher />
         {bootstrap.mode === 'demo' && (
           <span className="demo-badge">
-            <i /> Demo
+            <i />
+            {t('common.demo')}
           </span>
         )}
         <span className={`save-status ${status}`}>
@@ -435,42 +448,42 @@ function Studio({
               setDialog('preview');
               setTestMode(false);
             } catch (error) {
-              notify((error as Error).message);
+              notify(describeError(error));
             }
           }}
         >
           <Eye size={16} />
-          Vorschau
+          {t('editor.preview')}
         </button>
         <button className="button primary publish-button" onClick={publish}>
           <CheckCheck size={17} />
-          <span>{isPublished ? 'Veröffentlicht' : 'Veröffentlichen'}</span>
+          <span>{isPublished ? t('editor.published') : t('editor.publish')}</span>
         </button>
       </header>
       <div className="studio-body">
         <aside className={`library-panel ${leftOpen ? 'mobile-open' : ''}`}>
           <div className="panel-heading">
-            <span>Deine Bausteine</span>
+            <span>{t('editor.buildingBlocks')}</span>
             <button
               className="icon-button mobile-only"
               onClick={() => setLeftOpen(false)}
-              aria-label="Bibliothek schließen"
+              aria-label={t('editor.closeLibrary')}
             >
               <X size={18} />
             </button>
           </div>
-          <p className="panel-subtitle">Ein Zuhause, ganz nach deinem Gefühl.</p>
+          <p className="panel-subtitle">{t('editor.librarySubtitle')}</p>
           <label className="search-field">
             <Search size={16} />
             <input
-              aria-label="Entitäten suchen"
-              placeholder="Entitäten suchen …"
+              aria-label={t('editor.searchEntities')}
+              placeholder={t('editor.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
             <kbd>⌕</kbd>
           </label>
-          <div className="library-label">KACHELN</div>
+          <div className="library-label">{t('editor.tilesHeading')}</div>
           <div className="tile-library">
             {tileKinds.map((kind) => {
               const Icon = kindIcons[kind];
@@ -488,14 +501,15 @@ function Studio({
                   <span>
                     <Icon size={21} />
                   </span>
-                  <strong>{kindLabels[kind]}</strong>
+                  <strong>{t(kindLabelKeys[kind])}</strong>
                   <Plus size={15} />
                 </button>
               );
             })}
           </div>
           <div className="library-label entity-heading">
-            ENTITÄTEN <span>{matchingEntities.length}</span>
+            {t('editor.entitiesHeading')}
+            <span>{matchingEntities.length}</span>
           </div>
           <div className="entity-list">
             {matchingEntities.map((entity) => {
@@ -509,40 +523,38 @@ function Studio({
                 >
                   <Icon size={17} />
                   <span>
-                    <strong>{String(entity.attributes.friendly_name ?? entity.entity_id)}</strong>
+                    <strong>{entityName(entity)}</strong>
                     <small>{entity.entity_id}</small>
                   </span>
                   <Plus size={14} />
                 </button>
               );
             })}
-            {matchingEntities.length === 0 && (
-              <p className="muted">Keine passende Entität gefunden.</p>
-            )}
+            {matchingEntities.length === 0 && <p className="muted">{t('editor.noEntity')}</p>}
           </div>
           <div className="library-bottom">
             <span className="connection-dot" />
             {snapshot.status === 'demo'
-              ? 'Beispieldaten · lokal bedienbar'
+              ? t('editor.demoConnected')
               : snapshot.status === 'connected'
-                ? 'Home Assistant verbunden'
-                : 'Verbindung wird hergestellt …'}
-            <small>Verschieben am Griff · Alt + Pfeiltasten</small>
+                ? t('editor.haConnected')
+                : t('common.connecting')}
+            <small>{t('editor.dragHint')}</small>
           </div>
         </aside>
         <main className="workspace">
           <div className="workspace-toolbar">
             <div className="breadcrumb">
               <House size={16} />
-              <span>{document.name}</span>
+              <span>{viewDocument.name}</span>
               <span>/</span>
-              <strong>{page.name}</strong>
+              <strong>{viewPage.name}</strong>
             </div>
             <div className="toolbar-actions">
               <button
                 className="icon-button"
-                aria-label="Rückgängig"
-                title="Rückgängig"
+                aria-label={t('editor.undo')}
+                title={t('editor.undo')}
                 disabled={!past.length}
                 onClick={undo}
               >
@@ -550,8 +562,8 @@ function Studio({
               </button>
               <button
                 className="icon-button"
-                aria-label="Wiederholen"
-                title="Wiederholen"
+                aria-label={t('editor.redo')}
+                title={t('editor.redo')}
                 disabled={!future.length}
                 onClick={redo}
               >
@@ -560,24 +572,24 @@ function Studio({
               <span className="toolbar-divider" />
               <button
                 className="icon-button"
-                aria-label="Versionsverlauf"
-                title="Versionsverlauf"
+                aria-label={t('editor.history')}
+                title={t('editor.history')}
                 onClick={() => setDialog('history')}
               >
                 <History size={17} />
               </button>
               <button
                 className="icon-button"
-                aria-label="Konfiguration importieren"
-                title="Importieren"
+                aria-label={t('editor.importConfiguration')}
+                title={t('editor.import')}
                 onClick={() => setDialog('import')}
               >
                 <ArrowUpFromLine size={17} />
               </button>
               <button
                 className="icon-button"
-                aria-label="Konfiguration exportieren"
-                title="Exportieren"
+                aria-label={t('editor.exportConfiguration')}
+                title={t('editor.export')}
                 onClick={exportFile}
               >
                 <ArrowDownToLine size={17} />
@@ -587,15 +599,15 @@ function Studio({
           <div className="device-toolbar">
             <button className="button mobile-only" onClick={() => setLeftOpen(true)}>
               <Plus size={16} />
-              Kacheln
+              {t('editor.tiles')}
             </button>
             <Tablet size={17} />
             <select
-              aria-label="Displayprofil"
+              aria-label={t('editor.displayProfile')}
               value={profile.id}
               onChange={(e) => setProfileId(e.target.value)}
             >
-              {document.profiles.map((p) => (
+              {viewDocument.profiles.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
@@ -606,8 +618,8 @@ function Studio({
             </span>
             <button
               className="icon-button"
-              title="Display konfigurieren"
-              aria-label="Display konfigurieren"
+              title={t('editor.configureDisplay')}
+              aria-label={t('editor.configureDisplay')}
               onClick={() => {
                 setInspector('display');
                 setRightOpen(true);
@@ -618,8 +630,8 @@ function Studio({
             <span className="toolbar-divider" />
             <button
               className={`icon-button ${grid ? 'selected' : ''}`}
-              aria-label="Raster anzeigen"
-              title="Raster anzeigen"
+              aria-label={t('editor.showGrid')}
+              title={t('editor.showGrid')}
               aria-pressed={grid}
               onClick={() => setGrid(!grid)}
             >
@@ -632,7 +644,7 @@ function Studio({
                 setRightOpen(true);
               }}
             >
-              Eigenschaften
+              {t('editor.properties')}
             </button>
           </div>
           <div className="canvas-workspace">
@@ -703,13 +715,20 @@ function Studio({
                           <TileView tile={tile} snapshot={snapshot} />
                           <button
                             className="tile-select-area"
-                            aria-label={`${tile.title} auswählen`}
+                            aria-label={t('editor.selectTile', {
+                              title: localizedSampleTile(tile, language).title,
+                            })}
                             onClick={() => {
                               setSelectedId(tile.id);
                               setInspector('tile');
                             }}
                           />
-                          <button className="tile-drag" aria-label={`${tile.title} verschieben`}>
+                          <button
+                            className="tile-drag"
+                            aria-label={t('editor.moveTile', {
+                              title: localizedSampleTile(tile, language).title,
+                            })}
+                          >
                             <Grip size={18} />
                           </button>
                           {selectedId === tile.id && (
@@ -723,8 +742,8 @@ function Studio({
                     {page.tiles.length === 0 && (
                       <div className="empty-dashboard">
                         <Plus size={32} />
-                        <h2>Was macht dein Zuhause aus?</h2>
-                        <p>Füge links deine erste Kachel hinzu.</p>
+                        <h2>{t('editor.emptyTitle')}</h2>
+                        <p>{t('editor.emptyHint')}</p>
                       </div>
                     )}
                   </div>
@@ -733,9 +752,9 @@ function Studio({
             </ScaledCanvas>
           </div>
           <footer className="workspace-footer">
-            <span className="pages-label">SEITEN</span>
+            <span className="pages-label">{t('editor.pagesHeading')}</span>
             <div className="page-tabs">
-              {document.pages.map((p, index) => (
+              {viewDocument.pages.map((p, index) => (
                 <button
                   key={p.id}
                   className={page.id === p.id ? 'active' : ''}
@@ -750,8 +769,8 @@ function Studio({
               ))}
               <button
                 className="add-page"
-                aria-label="Seite hinzufügen"
-                title="Seite hinzufügen"
+                aria-label={t('editor.addPage')}
+                title={t('editor.addPage')}
                 onClick={addPage}
               >
                 <Plus size={17} />
@@ -761,14 +780,14 @@ function Studio({
             <button
               className="zoom-reset"
               onClick={() => setZoom(1)}
-              title="An Arbeitsfläche anpassen"
+              title={t('editor.fitWorkspace')}
             >
               <Maximize2 size={14} />
               {Math.round(zoom * 100)} %
             </button>
             <input
               className="zoom-slider"
-              aria-label="Vorschau-Zoom"
+              aria-label={t('editor.previewZoom')}
               type="range"
               min="0.6"
               max="1.5"
@@ -784,18 +803,18 @@ function Studio({
               className={inspector === 'tile' ? 'active' : ''}
               onClick={() => setInspector('tile')}
             >
-              Kachel
+              {t('editor.tile')}
             </button>
             <button
               className={inspector === 'display' ? 'active' : ''}
               onClick={() => setInspector('display')}
             >
-              Display
+              {t('common.display')}
             </button>
             <button
               className="icon-button mobile-only"
               onClick={() => setRightOpen(false)}
-              aria-label="Eigenschaften schließen"
+              aria-label={t('editor.closeProperties')}
             >
               <X size={18} />
             </button>
@@ -812,17 +831,17 @@ function Studio({
                       })()}
                     </span>
                     <div>
-                      <h2>{selected.title}</h2>
+                      <h2>{viewSelected!.title}</h2>
                       <p>
-                        {kindLabels[selected.kind]} · {selected.layouts[profile.id].w} ×{' '}
+                        {t(kindLabelKeys[selected.kind])} · {selected.layouts[profile.id].w} ×{' '}
                         {selected.layouts[profile.id].h}
                       </p>
                     </div>
                   </div>
                   <div className="form-section">
-                    <h3>VERBINDUNG</h3>
+                    <h3>{t('editor.connectionHeading')}</h3>
                     <label>
-                      Entität
+                      {t('editor.entity')}
                       <select
                         value={selected.entityId}
                         onChange={(e) => updateTile({ entityId: e.target.value })}
@@ -831,7 +850,7 @@ function Studio({
                           .filter((e) => domainKinds[e.entity_id.split('.')[0]] === selected.kind)
                           .map((e) => (
                             <option key={e.entity_id} value={e.entity_id}>
-                              {String(e.attributes.friendly_name ?? e.entity_id)}
+                              {entityName(e)}
                             </option>
                           ))}
                       </select>
@@ -839,24 +858,24 @@ function Studio({
                     <span className="field-hint">{selected.entityId}</span>
                   </div>
                   <div className="form-section">
-                    <h3>DARSTELLUNG</h3>
+                    <h3>{t('editor.appearanceHeading')}</h3>
                     <label>
-                      Titel
+                      {t('common.title')}
                       <input
-                        value={selected.title}
+                        value={viewSelected!.title}
                         maxLength={64}
                         onChange={(e) => {
                           if (e.target.value.trim()) updateTile({ title: e.target.value });
                         }}
                       />
                     </label>
-                    <label>Akzentfarbe</label>
+                    <label>{t('editor.accent')}</label>
                     <div className="color-options">
                       {(['amber', 'mint', 'blue', 'rose'] as const).map((color) => (
                         <button
                           key={color}
                           className={`swatch swatch-${color} ${selected.accent === color ? 'active' : ''}`}
-                          aria-label={`Farbe ${color}`}
+                          aria-label={t('editor.color', { color: t(`color.${color}`) })}
                           aria-pressed={selected.accent === color}
                           onClick={() => updateTile({ accent: color })}
                         >
@@ -866,12 +885,19 @@ function Studio({
                     </div>
                   </div>
                   <div className="form-section">
-                    <h3>POSITION IM RASTER</h3>
+                    <h3>{t('editor.positionHeading')}</h3>
                     <div className="number-grid">
                       {(['x', 'y', 'w', 'h'] as const).map((key) => (
                         <NumberField
                           key={key}
-                          label={{ x: 'Spalte', y: 'Zeile', w: 'Breite', h: 'Höhe' }[key]}
+                          label={
+                            {
+                              x: t('editor.column'),
+                              y: t('editor.row'),
+                              w: t('editor.width'),
+                              h: t('editor.height'),
+                            }[key]
+                          }
                           value={selected.layouts[profile.id][key]}
                           min={key === 'x' || key === 'y' ? 0 : 1}
                           max={key === 'x' || key === 'w' ? profile.columns : profile.rows}
@@ -886,7 +912,9 @@ function Studio({
                         />
                       ))}
                     </div>
-                    <span className="field-hint">Gilt für „{profile.name}“.</span>
+                    <span className="field-hint">
+                      {t('editor.profileHint', { name: viewProfile.name })}
+                    </span>
                   </div>
                   <div className="tile-inspector-actions">
                     <button
@@ -894,7 +922,9 @@ function Studio({
                       onClick={() => {
                         const copy = structuredClone(selected);
                         copy.id = freshId(copy.kind);
-                        copy.title += ' Kopie';
+                        copy.title = t('editor.copyTitle', {
+                          title: localizedSampleTile(selected, language).title,
+                        });
                         for (const p of document.profiles) {
                           const spot = findSpace(
                             p,
@@ -903,7 +933,7 @@ function Studio({
                             copy.layouts[p.id].h,
                           );
                           if (!spot) {
-                            notify('Für die Kopie ist auf mindestens einem Display kein Platz.');
+                            notify(t('editor.copyNoSpace'));
                             return;
                           }
                           copy.layouts[p.id] = spot;
@@ -917,7 +947,7 @@ function Studio({
                       }}
                     >
                       <Copy size={15} />
-                      Duplizieren
+                      {t('editor.duplicate')}
                     </button>
                     <button
                       className="button danger"
@@ -931,19 +961,19 @@ function Studio({
                       }}
                     >
                       <Trash2 size={15} />
-                      Entfernen
+                      {t('editor.remove')}
                     </button>
                   </div>
                 </>
               ) : (
                 <div className="no-selection">
                   <Layers3 size={30} />
-                  <h2>Dein Layout, dein Gefühl.</h2>
-                  <p>Wähle eine Kachel aus, um sie anzupassen.</p>
+                  <h2>{t('editor.noSelectionTitle')}</h2>
+                  <p>{t('editor.noSelectionHint')}</p>
                   <label>
-                    Seitenname
+                    {t('editor.pageName')}
                     <input
-                      value={page.name}
+                      value={viewPage.name}
                       onChange={(e) => {
                         if (e.target.value.trim())
                           change((d) => {
@@ -957,7 +987,7 @@ function Studio({
                       className="button danger"
                       onClick={() => {
                         if (page.tiles.length) {
-                          notify('Entferne zuerst die Kacheln dieser Seite.');
+                          notify(t('editor.removeTilesFirst'));
                           return;
                         }
                         change((d) => {
@@ -967,7 +997,7 @@ function Studio({
                       }}
                     >
                       <Trash2 size={15} />
-                      Leere Seite entfernen
+                      {t('editor.removeEmptyPage')}
                     </button>
                   )}
                 </div>
@@ -979,17 +1009,17 @@ function Studio({
                     <Tablet size={24} />
                   </span>
                   <div>
-                    <h2>Dein Display</h2>
-                    <p>Präzise bis ins Detail.</p>
+                    <h2>{t('editor.yourDisplay')}</h2>
+                    <p>{t('editor.displaySubtitle')}</p>
                   </div>
                 </div>
-                <DisplayFields profile={profile} onChange={profileUpdate} />
+                <DisplayFields profile={viewProfile} onChange={profileUpdate} />
                 <button
                   className="button full-width"
                   onClick={() => {
                     const copy = structuredClone(profile);
                     copy.id = freshId('display');
-                    copy.name = `${profile.name} Kopie`;
+                    copy.name = t('editor.copyTitle', { title: profile.name });
                     if (
                       change((d) => {
                         d.profiles.push(copy);
@@ -1002,16 +1032,16 @@ function Studio({
                   }}
                 >
                   <Plus size={15} />
-                  Displayprofil duplizieren
+                  {t('editor.duplicateProfile')}
                 </button>
                 <div className="form-section">
-                  <h3>ATMOSPHÄRE</h3>
+                  <h3>{t('editor.atmosphereHeading')}</h3>
                   <div className="theme-options">
                     {(['dusk', 'ocean', 'sand'] as const).map((theme) => (
                       <button
                         key={theme}
-                        title={theme}
-                        aria-label={`Theme ${theme}`}
+                        title={t(`theme.${theme}`)}
+                        aria-label={t('editor.theme', { theme: t(`theme.${theme}`) })}
                         className={`theme-swatch theme-${theme} ${document.theme === theme ? 'active' : ''}`}
                         onClick={() =>
                           change((d) => {
@@ -1024,9 +1054,9 @@ function Studio({
                     ))}
                   </div>
                   <label>
-                    Begrüßung
+                    {t('editor.greeting')}
                     <input
-                      value={document.greeting}
+                      value={viewDocument.greeting}
                       maxLength={80}
                       onChange={(e) => {
                         if (e.target.value.trim())
@@ -1037,9 +1067,9 @@ function Studio({
                     />
                   </label>
                   <label>
-                    Unterzeile
+                    {t('editor.subtitle')}
                     <input
-                      value={document.subtitle}
+                      value={viewDocument.subtitle}
                       maxLength={100}
                       onChange={(e) =>
                         change((d) => {
@@ -1055,7 +1085,7 @@ function Studio({
           <div className="inspector-bottom">
             <button className="button full-width" onClick={loadDevices}>
               <Monitor size={16} />
-              Displays verbinden
+              {t('editor.connectDisplays')}
             </button>
             {onExit && (
               <button
@@ -1065,40 +1095,42 @@ function Studio({
                     await flush();
                     onExit();
                   } catch (e) {
-                    notify((e as Error).message);
+                    notify(describeError(e));
                   }
                 }}
               >
                 <ArrowLeft size={15} />
-                Zur Dashboard-Demo
+                {t('editor.backDashboard')}
               </button>
             )}
           </div>
         </aside>
       </div>
-      {toast && (
+      {toast && !dialog && (
         <div className="toast" role="status">
           <span>{toast}</span>
-          <button aria-label="Meldung schließen" onClick={() => setToast('')}>
+          <button aria-label={t('common.dismiss')} onClick={() => setToast('')}>
             <X size={16} />
           </button>
         </div>
       )}
       {dialog === 'preview' && (
-        <Modal title="So fühlt sich dein Zuhause an." onClose={() => setDialog(null)} wide>
+        <Modal
+          message={toast}
+          onDismissMessage={() => setToast('')}
+          title={t('editor.previewTitle')}
+          onClose={() => setDialog(null)}
+          wide
+        >
           <div className="preview-controls">
-            <span>
-              {testMode
-                ? 'Bedienung aktiv – Aktionen werden ausgeführt.'
-                : 'Vorschau · Gerätebedienung gesperrt'}
-            </span>
+            <span>{testMode ? t('editor.testActive') : t('editor.testInactive')}</span>
             <label className="switch-label">
               <input
                 type="checkbox"
                 checked={testMode}
                 onChange={(e) => setTestMode(e.target.checked)}
               />
-              Testmodus
+              {t('editor.testMode')}
             </label>
           </div>
           <div className="preview-canvas">
@@ -1116,11 +1148,13 @@ function Studio({
         </Modal>
       )}
       {dialog === 'history' && (
-        <Modal title="Versionsverlauf" onClose={() => setDialog(null)}>
-          <p className="muted">
-            Eine Wiederherstellung erzeugt einen neuen Entwurf. Deine Displays behalten ihre
-            veröffentlichte Version.
-          </p>
+        <Modal
+          message={toast}
+          onDismissMessage={() => setToast('')}
+          title={t('editor.history')}
+          onClose={() => setDialog(null)}
+        >
+          <p className="muted">{t('editor.historyHint')}</p>
           <div className="revision-list">
             {[workspace.published, ...workspace.history]
               .filter((r, i, all) => all.findIndex((x) => x.revision === r.revision) === i)
@@ -1128,11 +1162,11 @@ function Studio({
               .map((revision) => (
                 <div key={revision.revision}>
                   <span>
-                    <strong>Version {revision.revision}</strong>
+                    <strong>{t('editor.version', { number: revision.revision })}</strong>
                     <small>
-                      {new Date(revision.savedAt).toLocaleString('de-AT')}
+                      {new Date(revision.savedAt).toLocaleString(intlLocale)}
                       {revision.revision === workspace.published.revision
-                        ? ' · Veröffentlicht'
+                        ? t('editor.publishedSuffix')
                         : ''}
                     </small>
                   </span>
@@ -1153,13 +1187,13 @@ function Studio({
                         setWorkspace(result);
                         setStatus('saved');
                         setDialog(null);
-                        notify('Version als Entwurf wiederhergestellt.');
+                        notify(t('editor.restored'));
                       } catch (e) {
-                        notify((e as Error).message);
+                        notify(describeError(e));
                       }
                     }}
                   >
-                    Wiederherstellen
+                    {t('editor.restore')}
                   </button>
                 </div>
               ))}
@@ -1167,17 +1201,14 @@ function Studio({
         </Modal>
       )}
       {dialog === 'devices' && (
-        <Modal title="Ein Display für dein Zuhause." onClose={() => setDialog(null)}>
-          <p className="muted">
-            Öffne die Display-Adresse deines Add-ons auf dem Tablet und gib den Kopplungscode ein.
-            Codes sind fünf Minuten gültig.
-          </p>
-          {!bootstrap.displayEnabled && (
-            <p className="notice">
-              Der separate Display-Port ist noch deaktiviert. Lokal lässt er sich mit
-              HAPANEL_DISPLAY_PORT aktivieren; im Add-on über die Option display_enabled.
-            </p>
-          )}
+        <Modal
+          message={toast}
+          onDismissMessage={() => setToast('')}
+          title={t('editor.devicesTitle')}
+          onClose={() => setDialog(null)}
+        >
+          <p className="muted">{t('editor.pairingHint')}</p>
+          {!bootstrap.displayEnabled && <p className="notice">{t('editor.displayPortDisabled')}</p>}
           <button
             className="button primary"
             onClick={async () => {
@@ -1185,11 +1216,11 @@ function Studio({
                 const result = await api<{ code: string }>('api/editor/pair-code', {});
                 setCode(result.code);
               } catch (e) {
-                notify((e as Error).message);
+                notify(describeError(e));
               }
             }}
           >
-            Kopplungscode erstellen
+            {t('editor.createCode')}
           </button>
           {code && (
             <div className="pair-code">
@@ -1207,11 +1238,11 @@ function Studio({
                       await api(`api/editor/devices/${device.id}`, {}, 'DELETE');
                       setDevices(devices.filter((d) => d.id !== device.id));
                     } catch (e) {
-                      notify((e as Error).message);
+                      notify(describeError(e));
                     }
                   }}
                 >
-                  Freigabe widerrufen
+                  {t('editor.revoke')}
                 </button>
               </div>
             ))}
@@ -1219,13 +1250,15 @@ function Studio({
         </Modal>
       )}
       {dialog === 'import' && (
-        <Modal title="Dein Layout mitbringen." onClose={() => setDialog(null)}>
-          <p className="muted">
-            Importiert eine HAPanel-Konfiguration als Entwurf. Der aktuelle Stand bleibt im
-            Versionsverlauf.
-          </p>
+        <Modal
+          message={toast}
+          onDismissMessage={() => setToast('')}
+          title={t('editor.importTitle')}
+          onClose={() => setDialog(null)}
+        >
+          <p className="muted">{t('editor.importHint')}</p>
           <select
-            aria-label="Importformat"
+            aria-label={t('editor.importFormat')}
             value={format}
             onChange={(e) => setFormat(e.target.value as 'json' | 'yaml')}
           >
@@ -1246,14 +1279,14 @@ function Studio({
             }}
           />
           <button className="button" onClick={() => fileRef.current?.click()}>
-            Datei auswählen
+            {t('editor.chooseFile')}
           </button>
           <textarea
-            aria-label="Konfiguration"
+            aria-label={t('editor.configuration')}
             className="config-text"
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
-            placeholder="Konfiguration hier einfügen …"
+            placeholder={t('editor.pasteConfiguration')}
           />
           <button
             className="button primary"
@@ -1270,24 +1303,26 @@ function Studio({
                 setStatus('saved');
                 setSelectedId('');
                 setDialog(null);
-                notify('Konfiguration als Entwurf importiert.');
+                notify(t('editor.imported'));
               } catch (e) {
-                notify((e as Error).message);
+                notify(describeError(e));
               }
             }}
           >
-            Als Entwurf importieren
+            {t('editor.importDraft')}
           </button>
         </Modal>
       )}
       {dialog === 'export' && (
-        <Modal title="Dein Zuhause zum Mitnehmen." onClose={() => setDialog(null)}>
-          <p className="muted">
-            Enthält Layouts und Entitätsnamen. Zugangsdaten und Gerätesitzungen sind separat
-            gespeichert.
-          </p>
+        <Modal
+          message={toast}
+          onDismissMessage={() => setToast('')}
+          title={t('editor.exportTitle')}
+          onClose={() => setDialog(null)}
+        >
+          <p className="muted">{t('editor.exportHint')}</p>
           <select
-            aria-label="Exportformat"
+            aria-label={t('editor.exportFormat')}
             value={format}
             onChange={(e) => {
               const next = e.target.value as 'json' | 'yaml';
@@ -1300,13 +1335,13 @@ function Studio({
           </select>
           <textarea
             className="config-text"
-            aria-label="Exportierte Konfiguration"
+            aria-label={t('editor.exportedConfiguration')}
             readOnly
             value={exportText}
           />
           <button className="button primary" onClick={download}>
             <ArrowDownToLine size={16} />
-            Herunterladen
+            {t('common.download')}
           </button>
         </Modal>
       )}
@@ -1360,12 +1395,14 @@ function DisplayFields({
   profile: Profile;
   onChange: (patch: Partial<Profile>) => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <>
       <div className="form-section">
-        <h3>DISPLAYPROFIL</h3>
+        <h3>{t('editor.profileHeading')}</h3>
         <label>
-          Name
+          {t('common.name')}
           <input
             value={p.name}
             onChange={(e) => {
@@ -1375,7 +1412,7 @@ function DisplayFields({
         </label>
         <div className="number-grid">
           <NumberField
-            label="Diagonale (Zoll)"
+            label={t('editor.diagonal')}
             value={p.diagonal}
             min={2}
             max={100}
@@ -1383,7 +1420,7 @@ function DisplayFields({
             onChange={(v) => onChange({ diagonal: v })}
           />
           <NumberField
-            label="Pixelverhältnis"
+            label={t('editor.pixelRatio')}
             value={p.dpr}
             min={0.5}
             max={4}
@@ -1393,14 +1430,14 @@ function DisplayFields({
         </div>
         <div className="number-grid">
           <NumberField
-            label="Hardwarebreite"
+            label={t('editor.hardwareWidth')}
             value={p.physicalWidth}
             min={240}
             max={16384}
             onChange={(v) => onChange({ physicalWidth: v })}
           />
           <NumberField
-            label="Hardwarehöhe"
+            label={t('editor.hardwareHeight')}
             value={p.physicalHeight}
             min={240}
             max={16384}
@@ -1417,37 +1454,34 @@ function DisplayFields({
             })
           }
         >
-          Auflösung und Pixelverhältnis übernehmen
+          {t('editor.deriveViewport')}
         </button>
       </div>
       <div className="form-section">
-        <h3>BROWSERFLÄCHE · CSS-PIXEL</h3>
+        <h3>{t('editor.viewportHeading')}</h3>
         <div className="number-grid">
           <NumberField
-            label="Breite"
+            label={t('editor.width')}
             value={p.width}
             min={320}
             onChange={(v) => onChange({ width: v })}
           />
           <NumberField
-            label="Höhe"
+            label={t('editor.height')}
             value={p.height}
             min={240}
             onChange={(v) => onChange({ height: v })}
           />
         </div>
-        <span className="field-hint">
-          Browserleisten verkleinern die nutzbare Fläche. Hardware-Pixel und CSS-Pixel werden
-          getrennt gespeichert.
-        </span>
+        <span className="field-hint">{t('editor.viewportHint')}</span>
         <label>
-          Darstellung
+          {t('editor.renderMode')}
           <select
             value={p.mode}
             onChange={(e) => onChange({ mode: e.target.value as Profile['mode'] })}
           >
-            <option value="fit">Proportional einpassen</option>
-            <option value="exact">Exakte CSS-Pixel</option>
+            <option value="fit">{t('editor.fit')}</option>
+            <option value="exact">{t('editor.exact')}</option>
           </select>
         </label>
         <button
@@ -1462,56 +1496,54 @@ function DisplayFields({
           }
         >
           <Smartphone size={15} />
-          Ausrichtung wechseln
+          {t('editor.rotate')}
         </button>
       </div>
       <div className="form-section">
-        <h3>RASTER & ABSTÄNDE</h3>
+        <h3>{t('editor.gridHeading')}</h3>
         <div className="number-grid">
           <NumberField
-            label="Spalten"
+            label={t('editor.columns')}
             value={p.columns}
             min={2}
             max={24}
             onChange={(v) => onChange({ columns: v })}
           />
           <NumberField
-            label="Zeilen"
+            label={t('editor.rows')}
             value={p.rows}
             min={2}
             max={20}
             onChange={(v) => onChange({ rows: v })}
           />
           <NumberField
-            label="Abstand"
+            label={t('editor.gap')}
             value={p.gap}
             max={40}
             onChange={(v) => onChange({ gap: v })}
           />
           <NumberField
-            label="Außenrand"
+            label={t('editor.margin')}
             value={p.margin}
             max={96}
             onChange={(v) => onChange({ margin: v })}
           />
           <NumberField
-            label="Kopfbereich"
+            label={t('editor.header')}
             value={p.headerHeight}
             min={48}
             max={180}
             onChange={(v) => onChange({ headerHeight: v })}
           />
           <NumberField
-            label="Navigation"
+            label={t('editor.navigation')}
             value={p.footerHeight}
             min={40}
             max={100}
             onChange={(v) => onChange({ footerHeight: v })}
           />
         </div>
-        <span className="field-hint">
-          Rasteränderungen werden nur übernommen, wenn alle Kacheln weiterhin Platz haben.
-        </span>
+        <span className="field-hint">{t('editor.gridHint')}</span>
       </div>
     </>
   );

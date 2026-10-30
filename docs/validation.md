@@ -1,8 +1,8 @@
-# Prüfstand für 0.1.0-alpha.1
+# Prüfstand für 0.1.0-alpha.2
 
 ## Automatisiert
 
-16 Tests mit Node.js-Test-Runner: Geometrie aller Beispielprofile, Schema- und Domänenvalidierung, Rastergrenzen und Überlappungen, Revisionskonflikte, Entwurf/Veröffentlichung/Wiederherstellung, persistente Sitzungen, einmalige Kopplungscodes, Zugriffsschutz für Ingress und lokale Verwaltung, eingeschränkte Display-API, YAML-Import und aktiver WebSocket-Widerruf.
+21 Tests mit Node.js-Test-Runner: Geometrie aller Beispielprofile, Schema- und Domänenvalidierung, Rastergrenzen und Überlappungen, Revisionskonflikte, Entwurf/Veröffentlichung/Wiederherstellung, persistente Sitzungen, einmalige Kopplungscodes, Zugriffsschutz für Ingress und lokale Verwaltung, eingeschränkte Display-API, YAML-Import und aktiver WebSocket-Widerruf.
 
 Der HA-Adapter wird mit einem lokalen WebSocket-Simulator geprüft: Authentifizierung, gefilterte Abonnements, komprimierte Attribut-Deltas, Prognosen, Administratorprüfung, typisierte Serviceaufrufe und Unterbrechung. Es werden keine echten HA-Geräte angesteuert.
 
@@ -22,3 +22,9 @@ TypeScript-Prüfung, Produktionsbuild, separater Demo-Build und Abhängigkeitspr
 Die Prüfung erfolgt im In-App-Browser auf dem Entwicklungsrechner. Physische Touch-Eingabe, Safari auf dem iPad und die tatsächliche Supervisor-Installation müssen separat abgenommen werden. Siehe [Roadmap](roadmap.md).
 
 Eine im Browser gefundene Abweichung in React Grid Layout 2.3.0 wurde bei der Integration umgangen: Die skalierte Positionierungsstrategie muss den Ursprung relativ zum Grid-Elternelement berechnen. HAPanel übernimmt die Transform-Strategie mit Skalierungsfaktor und verwendet den eingebauten relativen Drag-Ursprung.
+
+## 0.1.0-alpha.2 · Deutsch und Englisch
+
+Zusätzliche Prüfungen decken vollständige Übersetzungskataloge, Platzhalter, Sprachpräferenzen und englischen Fallback, Zahlenformate, API-Sprachwahl und den Erhalt eigener Dashboard-Texte ab. Sprachwechsel speichern keine Dashboard-Revisionen.
+
+Im Browser wurden deutsche und englische Oberflächen, persistente Sprachwahl, Importfehler innerhalb des Dialogs und Kopplungsfehler in beiden Sprachen geprüft. Der vorbelegte Gerätename folgt der Sprachwahl; selbst eingegebene Namen bleiben erhalten. Die englische iPad-Ansicht wurde im Quer- und Hochformat visuell geprüft.

@@ -10,6 +10,7 @@
 - [x] HA-WebSocket-Adapter, Ingress-Administratoren und Displaykopplung.
 - [x] Statische, interaktive iPad-Demo ohne HA-Verbindung.
 - [x] Add-on-Metadaten, Dockerfile und CI.
+- [x] Deutsch und Englisch für Editor, Dashboard, Kopplung und Fehlermeldungen; erweiterbare Übersetzungskataloge.
 
 ## Vor Freigabe für den Dauerbetrieb
 
@@ -30,7 +31,7 @@
 
 ## Danach
 
-- [ ] Mehrsprachige Oberfläche und nutzerabhängige Zahlen-/Einheitenformate.
+- [ ] Weitere Sprachen über die vorhandenen Übersetzungskataloge ergänzen; zusätzliche regionale Einheitenformate ausbauen.
 - [ ] Weitere Kacheltypen und ein dokumentiertes Widget-Modell.
 - [ ] Explizite Schema-Migrationen vor Einführung einer zweiten Schemaversion.
 - [ ] Signierte, vorgebaute Containerimages und automatisierte Releases.
