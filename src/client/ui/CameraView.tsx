@@ -59,7 +59,9 @@ export function CameraThumbnail({
           alt={t('camera.image', { title: tile.title })}
           style={{ objectFit: tile.camera?.fit ?? 'cover', opacity: failed ? 0 : 1 }}
           onError={() => setFailed(true)}
-          onLoad={() => setFailed(false)}
+          onLoad={(event) =>
+            setFailed(event.currentTarget.naturalWidth < 2 || event.currentTarget.naturalHeight < 2)
+          }
         />
       )}
       {sample ? (
@@ -227,10 +229,14 @@ function CameraStillLive({ tile, base }: { tile: Tile; base: string }) {
   const visible = usePageVisible();
   const [tick, setTick] = useState(Date.now()),
     [failed, setFailed] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const schedule = () => {
+    clearTimeout(timer.current);
+    if (!document.hidden) timer.current = setTimeout(() => setTick(Date.now()), 2000);
+  };
   useEffect(() => {
-    if (!visible) return;
-    const timer = setInterval(() => setTick(Date.now()), 2000);
-    return () => clearInterval(timer);
+    if (visible) setTick(Date.now());
+    return () => clearTimeout(timer.current);
   }, [visible]);
   return (
     <div className="camera-live">
@@ -242,9 +248,24 @@ function CameraStillLive({ tile, base }: { tile: Tile; base: string }) {
           <img
             src={base + tile.id + '/still?live=1&t=' + tick}
             alt={t('camera.image', { title: tile.title })}
-            onError={() => setFailed(true)}
-            onLoad={() => setFailed(false)}
+            style={{ opacity: failed ? 0 : 1 }}
+            onError={() => {
+              setFailed(true);
+              schedule();
+            }}
+            onLoad={(event) => {
+              setFailed(
+                event.currentTarget.naturalWidth < 2 || event.currentTarget.naturalHeight < 2,
+              );
+              schedule();
+            }}
           />
+        )}
+        {failed && (
+          <div className="camera-video-overlay" role="status">
+            <VideoOff size={35} />
+            <span>{t('error.cameraUnavailable')}</span>
+          </div>
         )}
       </div>
       <p className="insight-muted">{t(failed ? 'error.cameraUnavailable' : 'camera.stillOnly')}</p>
