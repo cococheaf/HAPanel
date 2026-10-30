@@ -14,19 +14,27 @@
 
 </details>
 
+<details><summary>Energiecockpit ansehen</summary>
+
+![HAPanel Energiecockpit](docs/images/energy.png)
+
+</details>
+
 HAPanel verbindet großzügige, abgerundete Kacheln, ruhige Farben und direkte Touch-Bedienung mit einem visuellen Layout-Editor. Es läuft als eigene Home Assistant App (Add-on) oder als lokaler Node.js-Prozess. Bestehende Lovelace-Dashboards und HA-Konfigurationsdateien bleiben unverändert.
 
-**Status: 0.1.0-alpha.5 – erste funktionsfähige Vorschau.** Die Demo, der Editor und die API sind implementiert. Die HA-Anbindung ist gegen einen simulierten WebSocket-Server geprüft. Installation, Update, Ingress und Live-Daten sind auf HA OS 18.4 / Core 2026.10.4 (amd64) geprüft. Tests auf physischer iPad-Hardware stehen noch aus.
+**Status: 0.2.0-alpha.1 – erste funktionsfähige Vorschau.** Die Demo, der Editor und die API sind implementiert. Die HA-Anbindung ist gegen einen simulierten WebSocket-Server geprüft. Installation, Update, Ingress und Live-Daten sind auf HA OS 18.4 / Core 2026.10.4 (amd64) geprüft. Tests auf physischer iPad-Hardware stehen noch aus.
 
 ## Ausprobieren
 
-Öffne die [Demo](https://cococheaf.github.io/HAPanel/) in Safari auf dem iPad. Licht, Dimmer, Temperatur, Mediensteuerung und Szene sind mit Beispieldaten bedienbar. Über **Studio erkunden** kannst du das Layout bearbeiten. Änderungen bleiben in deinem Browser; **Veröffentlichen** übernimmt den Entwurf in die Demo-Ansicht.
+Öffne die [Demo](https://cococheaf.github.io/HAPanel/) in Safari auf dem iPad. Raumdetails, Licht, Dimmer, Temperatur, Beschattung, Wetter und Energiecockpit sind mit Beispieldaten bedienbar. Über **Studio erkunden** kannst du das Layout bearbeiten. Änderungen bleiben in deinem Browser; **Veröffentlichen** übernimmt den Entwurf in die Demo-Ansicht.
 
 Für eine eigenständige Ansicht: **Teilen → Zum Home-Bildschirm**. Wähle bei Bedarf das Querformat- oder Hochformatprofil. Die öffentliche Demo hat keine Verbindung zu einem echten Home Assistant und enthält keine Zugangsdaten. Mediensteuerung simuliert Zustände; die Demo spielt kein Audio ab.
 
 ## Bereits enthalten
 
-- Licht, Klima, Medien mit Album-Art, Wetter mit Stundenprognose, Szenen und Sensoren.
+- Raumübersicht mit getrennten Etagen, antippbaren Details und eigener Geräteansicht pro Raum.
+- Licht, Klima, Beschattung, Medien mit Album-Art, Wetter mit Stundenprognose, Szenen und Sensoren.
+- Energiecockpit für Solar, Netz, Speicher und erfasste Verbraucher; Messwerte mit 24-Stunden-Verlauf.
 - Deutsche und englische Oberfläche mit automatischer Browser-Spracherkennung und manueller Sprachwahl; weitere Sprachen sind über zentrale Übersetzungsdateien ergänzbar.
 - Visueller Editor mit Verschieben, Größenänderung, numerischen Positionen und Undo/Redo.
 - Mehrere Seiten und Displayprofile; Beispielprofile für iPad 8 in beiden Ausrichtungen und 800 × 480.

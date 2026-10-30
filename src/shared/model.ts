@@ -2,8 +2,67 @@ import { UserError } from './i18n';
 import { z } from 'zod';
 
 const id = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/);
-export const tileKinds = ['light', 'climate', 'media', 'weather', 'scene', 'sensor'] as const;
+export const tileKinds = [
+  'light',
+  'climate',
+  'media',
+  'weather',
+  'scene',
+  'sensor',
+  'cover',
+] as const;
 export type TileKind = (typeof tileKinds)[number];
+const entityId = z.string().regex(/^[a-z_]+\.[a-z0-9_]+$/);
+const sensorId = z.string().regex(/^sensor\.[a-z0-9_]+$/);
+export const controlSchema = z
+  .object({
+    id,
+    kind: z.enum(tileKinds),
+    title: z.string().trim().min(1).max(64),
+    entityId,
+    accent: z.enum(['amber', 'mint', 'blue', 'rose']),
+  })
+  .strict();
+export const roomSchema = z
+  .object({
+    icon: z.enum(['home', 'sofa', 'kitchen', 'bed', 'bath', 'door', 'hall']).default('home'),
+    temperature: entityId.optional(),
+    humidity: sensorId.optional(),
+    presence: z.array(entityId).max(8).default([]),
+    windows: z.array(entityId).max(8).default([]),
+    controls: z.array(controlSchema).max(24),
+  })
+  .strict();
+export const energySchema = z
+  .object({
+    solarPower: z.array(sensorId).min(1).max(4),
+    gridImport: sensorId.optional(),
+    gridExport: sensorId.optional(),
+    batteryPower: sensorId.optional(),
+    batteryLevel: sensorId.optional(),
+    batteryPositive: z.enum(['charge', 'discharge']).default('charge'),
+    consumers: z
+      .array(z.object({ label: z.string().min(1).max(64), entityId: sensorId }).strict())
+      .max(12)
+      .default([]),
+    metrics: z
+      .array(z.object({ label: z.string().min(1).max(64), entityId: sensorId }).strict())
+      .max(12)
+      .default([]),
+  })
+  .strict()
+  .superRefine((energy, ctx) => {
+    for (const [path, values] of [
+      ['solarPower', energy.solarPower],
+      ['consumers', energy.consumers.map((item) => item.entityId)],
+      ['metrics', energy.metrics.map((item) => item.entityId)],
+    ] as const) {
+      if (new Set(values).size !== values.length)
+        ctx.addIssue({ code: 'custom', message: 'error.uniqueIds', path: [path] });
+    }
+    if (energy.gridImport && energy.gridImport === energy.gridExport)
+      ctx.addIssue({ code: 'custom', message: 'error.uniqueIds', path: ['gridExport'] });
+  });
 export const rectSchema = z
   .object({
     x: z.number().int().min(0),
@@ -36,9 +95,12 @@ export const tileSchema = z
     id,
     kind: z.enum(tileKinds),
     title: z.string().trim().min(1).max(64),
-    entityId: z.string().regex(/^[a-z_]+\.[a-z0-9_]+$/),
+    entityId,
     accent: z.enum(['amber', 'mint', 'blue', 'rose']),
     layouts: z.record(id, rectSchema),
+    room: roomSchema.optional(),
+    energy: energySchema.optional(),
+    navigateTo: id.optional(),
   })
   .strict();
 export const dashboardSchema = z
@@ -56,6 +118,8 @@ export const dashboardSchema = z
           .object({
             id,
             name: z.string().trim().min(1).max(40),
+            heading: z.string().trim().min(1).max(80).optional(),
+            subtitle: z.string().max(100).optional(),
             tiles: z.array(tileSchema).max(64),
           })
           .strict(),
@@ -78,7 +142,7 @@ export const dashboardSchema = z
       ['pages'],
     );
     unique(
-      doc.pages.flatMap((p) => p.tiles.map((t) => t.id)),
+      allControls(doc).map((t) => t.id),
       ['pages'],
     );
     for (const [pi, p] of doc.profiles.entries()) {
@@ -121,9 +185,32 @@ export const dashboardSchema = z
       weather: ['weather'],
       scene: ['scene', 'script'],
       sensor: ['sensor', 'binary_sensor'],
+      cover: ['cover'],
     };
     for (const [pageIndex, page] of doc.pages.entries())
       for (const [ti, tile] of page.tiles.entries()) {
+        if ((tile.room && tile.energy) || (tile.energy && tile.kind !== 'sensor')) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'error.entityKind',
+            path: ['pages', pageIndex, 'tiles', ti],
+          });
+        }
+        if (tile.navigateTo && !doc.pages.some((target) => target.id === tile.navigateTo)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'error.invalidPage',
+            path: ['pages', pageIndex, 'tiles', ti, 'navigateTo'],
+          });
+        }
+        for (const control of tile.room?.controls ?? []) {
+          if (!domains[control.kind].includes(control.entityId.split('.')[0]))
+            ctx.addIssue({
+              code: 'custom',
+              message: 'error.entityKind',
+              path: ['pages', pageIndex, 'tiles', ti, 'room'],
+            });
+        }
         if (!domains[tile.kind].includes(tile.entityId.split('.')[0])) {
           ctx.addIssue({
             code: 'custom',
@@ -137,6 +224,10 @@ export const dashboardSchema = z
 export type Rect = z.infer<typeof rectSchema>;
 export type Profile = z.infer<typeof profileSchema>;
 export type Tile = z.infer<typeof tileSchema>;
+export type Control = z.infer<typeof controlSchema>;
+export type Room = z.infer<typeof roomSchema>;
+export type Energy = z.infer<typeof energySchema>;
+export type HistoryPoint = { time: string; value: number };
 export type Dashboard = z.infer<typeof dashboardSchema>;
 export type Revision = { revision: number; savedAt: string; document: Dashboard };
 export type Workspace = { draft: Revision; published: Revision; history: Revision[] };
@@ -161,6 +252,10 @@ export type Action = {
     | 'play_pause'
     | 'next'
     | 'previous'
+    | 'open'
+    | 'close'
+    | 'stop'
+    | 'position'
     | 'volume'
     | 'activate';
   value?: number;
@@ -175,6 +270,10 @@ export const actionSchema = z
       'play_pause',
       'next',
       'previous',
+      'open',
+      'close',
+      'stop',
+      'position',
       'volume',
       'activate',
     ]),
@@ -205,8 +304,47 @@ export function findSpace(profile: Profile, tiles: Tile[], w = 4, h = 2): Rect |
         return rect;
     }
 }
+export function allControls(document: {
+  pages: {
+    tiles: { id: string; kind: TileKind; entityId: string; room?: { controls: Control[] } }[];
+  }[];
+}) {
+  return document.pages.flatMap((page) =>
+    page.tiles.flatMap((tile) => [tile, ...(tile.room?.controls ?? [])]),
+  );
+}
 export function entityIds(document: Dashboard) {
-  return [...new Set(document.pages.flatMap((p) => p.tiles.map((t) => t.entityId)))];
+  return [
+    ...new Set(
+      document.pages.flatMap((page) =>
+        page.tiles
+          .flatMap((tile) => [
+            tile.entityId,
+            ...(tile.room
+              ? [
+                  tile.room.temperature,
+                  tile.room.humidity,
+                  ...tile.room.presence,
+                  ...tile.room.windows,
+                  ...tile.room.controls.map((control) => control.entityId),
+                ]
+              : []),
+            ...(tile.energy
+              ? [
+                  ...tile.energy.solarPower,
+                  tile.energy.gridImport,
+                  tile.energy.gridExport,
+                  tile.energy.batteryPower,
+                  tile.energy.batteryLevel,
+                  ...tile.energy.consumers.map((item) => item.entityId),
+                  ...tile.energy.metrics.map((item) => item.entityId),
+                ]
+              : []),
+          ])
+          .filter((value): value is string => Boolean(value)),
+      ),
+    ),
+  ];
 }
 export function numberAttr(entity: EntityState | undefined, key: string, fallback = 0) {
   const value = entity?.attributes[key];
@@ -220,7 +358,7 @@ export function stringAttr(entity: EntityState | undefined, key: string, fallbac
 
 /** Resolve only typed, tile-bound actions. Clients cannot supply HA services or targets. */
 export function resolveAction(document: Dashboard, action: Action) {
-  const tile = document.pages.flatMap((p) => p.tiles).find((t) => t.id === action.tileId);
+  const tile = allControls(document).find((t) => t.id === action.tileId);
   if (!tile) throw new UserError('error.tileNotAllowed');
   const domain = tile.entityId.split('.')[0];
   const result = (service: string, service_data: Record<string, unknown> = {}) => ({
@@ -256,5 +394,12 @@ export function resolveAction(document: Dashboard, action: Action) {
     if (action.command === 'volume') return result('volume_set', { volume_level: value(0, 1) });
   }
   if (tile.kind === 'scene' && action.command === 'activate') return result('turn_on');
+  if (tile.kind === 'cover') {
+    if (action.command === 'open') return result('open_cover');
+    if (action.command === 'close') return result('close_cover');
+    if (action.command === 'stop') return result('stop_cover');
+    if (action.command === 'position')
+      return result('set_cover_position', { position: Math.round(value(0, 100)) });
+  }
   throw new UserError('error.actionNotAllowed');
 }

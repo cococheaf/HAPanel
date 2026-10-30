@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0-alpha.1
+
+Raumkacheln mit eigener Geräteansicht, Etagen-Navigation und individuellen Seitentiteln. Wetterdetails mit Stundenprognose und 24-Stunden-Verläufen. Energiecockpit für Solarleistung, Netzbezug/-einspeisung, Speicher und ausdrücklich gekennzeichnete erfasste Verbraucher; Tageswerte und Zählerstände bleiben getrennt. Beschattung mit Öffnen, Stoppen, Schließen und Position. Alle neuen Einstellungen sind im Studio auf Deutsch und Englisch bearbeitbar. Abwärtskompatible Erweiterung von Schema 1; vorhandene Veröffentlichungen werden nicht automatisch ersetzt.
+
+Room cards with device details, floor navigation and page headings. Weather forecasts and scoped, cached 24-hour history. Energy cockpit with solar, grid, battery, monitored loads and individually labelled meter values. Cover controls and bilingual Studio settings. Existing dashboards remain unchanged until explicitly published.
+
 ## 0.1.0-alpha.5
 
 Ingress-Startpfad relativ zum Supervisor-Präfix korrigiert. / Use the relative player entry path required by Supervisor URL concatenation.

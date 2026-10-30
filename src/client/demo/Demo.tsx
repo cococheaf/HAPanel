@@ -13,7 +13,7 @@ export default function Demo() {
     [data, setData] = useState<Bootstrap>(),
     [error, setError] = useState<unknown>();
   useEffect(() => {
-    service.load().then(setData);
+    service.load().then(setData).catch(setError);
     return service.subscribe((message) =>
       setData(
         (d) =>
@@ -26,11 +26,7 @@ export default function Demo() {
     );
   }, []);
   const act = async (action: Action) => {
-    try {
-      await service.act(action, 'published');
-    } catch (e) {
-      setError(e);
-    }
+    await service.act(action, 'published');
   };
   if (studio)
     return (

@@ -11,6 +11,7 @@ import {
   dashboardSchema,
   entityIds,
   resolveAction,
+  allControls,
   type Action,
   type Dashboard,
 } from '../shared/model';
@@ -137,7 +138,7 @@ export async function createApp(options: AppOptions) {
   );
   app.get('/api/health', async () => ({
     ok: true,
-    version: '0.1.0-alpha.5',
+    version: '0.2.0-alpha.1',
     source: hub.getSnapshot([]).status,
   }));
 
@@ -220,14 +221,22 @@ export async function createApp(options: AppOptions) {
           return { ok: true };
         });
         admin.get<{ Params: { id: string } }>('/media/:id', async (request, reply) => {
-          const tile = store
-            .get()
-            .draft.document.pages.flatMap((p) => p.tiles)
-            .find((t) => t.id === request.params.id && t.kind === 'media');
+          const tile = allControls(store.get().draft.document).find(
+            (t) => t.id === request.params.id && t.kind === 'media',
+          );
           const result = tile && (await hub.media(tile.entityId));
           if (!result) throw new HttpError(404, 'error.noAlbumArt');
           return reply.type(result.type).send(result.buffer);
         });
+        admin.get<{ Params: { entityId: string } }>(
+          '/history/:entityId',
+          { config: { rateLimit: { max: 60, timeWindow: 60_000 } } },
+          async (request) => {
+            if (!entityIds(store.get().draft.document).includes(request.params.entityId))
+              throw new HttpError(403, 'error.tileNotAllowed');
+            return hub.getHistory(request.params.entityId);
+          },
+        );
         admin.get('/stream', { websocket: true }, (socket) => {
           const send = () => {
             if (socket.readyState === 1)
@@ -288,14 +297,22 @@ export async function createApp(options: AppOptions) {
         },
       );
       display.get<{ Params: { id: string } }>('/media/:id', async (request, reply) => {
-        const tile = store
-          .get()
-          .published.document.pages.flatMap((p) => p.tiles)
-          .find((t) => t.id === request.params.id && t.kind === 'media');
+        const tile = allControls(store.get().published.document).find(
+          (t) => t.id === request.params.id && t.kind === 'media',
+        );
         const result = tile && (await hub.media(tile.entityId));
         if (!result) throw new HttpError(404, 'error.noAlbumArt');
         return reply.type(result.type).send(result.buffer);
       });
+      display.get<{ Params: { entityId: string } }>(
+        '/history/:entityId',
+        { config: { rateLimit: { max: 60, timeWindow: 60_000 } } },
+        async (request) => {
+          if (!entityIds(store.get().published.document).includes(request.params.entityId))
+            throw new HttpError(403, 'error.tileNotAllowed');
+          return hub.getHistory(request.params.entityId);
+        },
+      );
       display.get('/stream', { websocket: true }, (socket, request) => {
         const token = request.cookies.hapanel_device;
         let revision = -1;

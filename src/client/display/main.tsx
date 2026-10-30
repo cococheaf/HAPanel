@@ -50,11 +50,7 @@ function Display() {
     });
   }, [!!data]);
   const act = async (action: Action) => {
-    try {
-      await api('api/display/action', action);
-    } catch (e) {
-      setError(e);
-    }
+    await api('api/display/action', action);
   };
   if (!data)
     return (

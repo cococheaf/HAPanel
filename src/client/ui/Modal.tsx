@@ -9,6 +9,7 @@ export function Modal({
   wide = false,
   message,
   onDismissMessage,
+  className = '',
 }: {
   title: string;
   children: ReactNode;
@@ -16,6 +17,7 @@ export function Modal({
   wide?: boolean;
   message?: string;
   onDismissMessage?: () => void;
+  className?: string;
 }) {
   const { t } = useI18n();
 
@@ -28,7 +30,7 @@ export function Modal({
   return (
     <dialog
       ref={ref}
-      className={`modal ${wide ? 'wide-modal' : ''}`}
+      className={'modal ' + (wide ? 'wide-modal ' : '') + className}
       onCancel={onClose}
       onClick={(e) => {
         if (e.target === ref.current) onClose();

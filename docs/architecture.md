@@ -50,6 +50,14 @@ Der Server bestimmt aus einer Kachel-ID deren Zielentität und den zulässigen H
 
 Album-Art ist auf bildliefernde HA-API-Pfade der konfigurierten Instanz begrenzt; es gibt keinen allgemeinen URL-Proxy. Weiterleitungen werden nicht verfolgt, Anfragen sind zeitlich begrenzt und Bilder dürfen maximal 5 MiB groß sein.
 
+## Räume, Energie und Verläufe
+
+Raum- und Energieansichten ergänzen das bestehende Schema 1 durch optionale Felder. Räume enthalten eigene typisierte Geräte mit eindeutigen IDs; deren Bedienung wird wie bei Hauptkacheln serverseitig geprüft. Navigation verweist ausschließlich auf vorhandene Seiten. Alle Raum- und Energiequellen fließen in dieselbe gefilterte Entitätenliste ein.
+
+Verläufe werden erst beim Öffnen der Details aus der HA-History-API geladen. Der Zugriff ist auf Entitäten im berechtigten Entwurf bzw. in der Veröffentlichung beschränkt. Vier Minuten Cache, begrenzte Antwortgrößen, Zeitlimits und reduzierte Datenpunkte halten die Last klein. Im Live-Modus werden fehlende Messwerte oder Verläufe nicht durch Beispieldaten ersetzt.
+
+Leistung (W/kW) und Energie (Wh/kWh) werden getrennt normalisiert. Solarquellen müssen disjunkt gewählt werden, Netzbezug und Einspeisung werden getrennt gebunden; das Vorzeichen der Batterieleistung ist konfigurierbar. Erfasste Einzelverbraucher sind ausdrücklich kein berechneter Hausgesamtverbrauch. Tageswerte und kumulierte Zählerstände benötigen eindeutige Beschriftungen.
+
 ## Layout
 
 Kachelinhalt und Positionierung sind getrennt. Eine Kachel hat pro Displayprofil einen Rasterbereich. Der Editor verwendet React Grid Layout ohne automatische Verdichtung; der Player berechnet aus denselben Rastermaßen feste Rechtecke. Identische Rundung auf CSS-Pixel hält Vorschau und Player deckungsgleich.

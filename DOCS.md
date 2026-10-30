@@ -89,6 +89,14 @@ Für einen lokalen Live-Test `HAPANEL_MODE=standalone`, `HA_URL` und `HA_TOKEN` 
 - **Versionsverlauf:** Bis zu 30 ältere Entwürfe wiederherstellen. Das erzeugt einen neuen Entwurf; die Veröffentlichung bleibt bestehen.
 - **Import/Export:** Versionierte HAPanel-Dokumente als JSON oder YAML. Ein Import verändert zuerst den Entwurf. Exporte enthalten Entitätsnamen und sollten entsprechend behandelt werden.
 
+## Raum- und Energiekacheln
+
+Im Eigenschaftenbereich unter **Kachelansicht** zwischen Gerät, Raum und Energie wechseln. Räume erhalten ein Symbol, optionale Temperatur-/Feuchtequellen, Kontakte und eigene Geräte. Die Geräte werden im antippbaren Raumdetail angezeigt. **Beim Antippen öffnen** kann stattdessen eine vorhandene Seite auswählen, etwa für eine Etagenübersicht. Seitenüberschrift und Beschreibung lassen sich auf einer nicht ausgewählten Kachel bearbeiten.
+
+Für Energie werden ausschließlich vorhandene Sensoren gebunden. Solarquellen dürfen sich nicht überlappen; keinen Gesamtwert zusammen mit seinen Teilwerten addieren. Netzbezug und Einspeisung sind getrennte Leistungswerte. Das Vorzeichen der Batterieleistung entsprechend der Integration einstellen. Erfasste Verbraucher sind nur die ausgewählten Geräte und kein Hausgesamtverbrauch. Tageswerte und kumulierte Zählerstände individuell und eindeutig benennen. Unbekannte Werte bleiben als Strich sichtbar.
+
+Ein Tipp auf Wetter, Messwert oder Energiequelle öffnet Details. Prognosen hängen von der Wetterintegration ab, 24-Stunden-Verläufe vom HA-Recorder. Es werden keine zusätzlichen History-Daten in HA angelegt. Bereits gespeicherte Layouts bleiben erhalten; die neue Beispielanordnung ersetzt keine eigenen Dashboards.
+
 ## Displaymaße
 
 Hardwareauflösung und Browserfläche sind verschieden. Das iPad 8 besitzt 2160 × 1620 Hardware-Pixel im Querformat und bei DPR 2 rechnerisch 1080 × 810 CSS-Pixel. Browserleisten und geschützte Randbereiche können die verfügbare Fläche reduzieren. Die Schaltfläche **Auflösung und Pixelverhältnis übernehmen** berechnet zunächst die rechnerische CSS-Größe; bei Bedarf anschließend an den tatsächlichen Viewport anpassen.

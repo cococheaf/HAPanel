@@ -14,7 +14,7 @@ export default function Player({
 }: {
   published: Revision;
   snapshot: Snapshot;
-  onAction: (action: Action) => void;
+  onAction: (action: Action) => void | Promise<void>;
   demo?: boolean;
   onEdit?: () => void;
 }) {

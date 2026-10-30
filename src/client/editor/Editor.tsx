@@ -49,6 +49,7 @@ import { api, serializeDashboard, type Bootstrap, type StudioService } from '../
 import { DashboardFrame, ScaledCanvas, TileView } from '../ui/Dashboard';
 import { kindIcons, kindLabelKeys } from '../ui/kinds';
 import { Modal } from '../ui/Modal';
+import { InsightSettings } from './InsightSettings';
 
 const freshId = (prefix: string) => `${prefix}_${crypto.randomUUID().slice(0, 8)}`;
 type Dialog = 'preview' | 'devices' | 'history' | 'import' | 'export' | null;
@@ -62,6 +63,7 @@ const domainKinds: Record<string, TileKind> = {
   script: 'scene',
   sensor: 'sensor',
   binary_sensor: 'sensor',
+  cover: 'cover',
 };
 
 export default function Editor({
@@ -350,6 +352,7 @@ function Studio({
       await service.act(action);
     } catch (e) {
       notify(describeError(e));
+      throw e;
     }
   };
   const exportFile = async () => {
@@ -729,7 +732,7 @@ function Studio({
                             setInspector('tile');
                           }}
                         >
-                          <TileView tile={tile} snapshot={snapshot} />
+                          <TileView tile={tile} snapshot={snapshot} detailsEnabled={false} />
                           <button
                             className="tile-select-area"
                             aria-label={t('editor.selectTile', {
@@ -850,12 +853,21 @@ function Studio({
                     <div>
                       <h2>{viewSelected!.title}</h2>
                       <p>
-                        {t(kindLabelKeys[selected.kind])} · {selected.layouts[profile.id].w} ×{' '}
-                        {selected.layouts[profile.id].h}
+                        {t(
+                          selected.room
+                            ? 'editor.roomView'
+                            : selected.energy
+                              ? 'editor.energyView'
+                              : kindLabelKeys[selected.kind],
+                        )}{' '}
+                        · {selected.layouts[profile.id].w} × {selected.layouts[profile.id].h}
                       </p>
                     </div>
                   </div>
-                  <div className="form-section">
+                  <div
+                    className="form-section"
+                    style={selected.room || selected.energy ? { display: 'none' } : undefined}
+                  >
                     <h3>{t('editor.connectionHeading')}</h3>
                     <label>
                       {t('editor.entity')}
@@ -883,6 +895,12 @@ function Studio({
                     </label>
                     <span className="field-hint">{selected.entityId}</span>
                   </div>
+                  <InsightSettings
+                    tile={selected}
+                    catalog={bootstrap.catalog}
+                    pages={viewDocument.pages}
+                    update={updateTile}
+                  />
                   <div className="form-section">
                     <h3>{t('editor.appearanceHeading')}</h3>
                     <label>
@@ -948,6 +966,8 @@ function Studio({
                       onClick={() => {
                         const copy = structuredClone(selected);
                         copy.id = freshId(copy.kind);
+                        if (copy.room)
+                          for (const control of copy.room.controls) control.id = freshId('control');
                         copy.title = t('editor.copyTitle', {
                           title: localizedSampleTile(selected, language).title,
                         });
@@ -1008,6 +1028,32 @@ function Studio({
                       }}
                     />
                   </label>
+                  <label>
+                    {t('editor.pageHeading')}
+                    <input
+                      value={page.heading ?? ''}
+                      maxLength={80}
+                      onChange={(event) =>
+                        change((d) => {
+                          d.pages.find((item) => item.id === page.id)!.heading =
+                            event.target.value || undefined;
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    {t('editor.pageSubtitle')}
+                    <input
+                      value={page.subtitle ?? ''}
+                      maxLength={100}
+                      onChange={(event) =>
+                        change((d) => {
+                          d.pages.find((item) => item.id === page.id)!.subtitle =
+                            event.target.value || undefined;
+                        })
+                      }
+                    />
+                  </label>
                   {document.pages.length > 1 && (
                     <button
                       className="button danger"
@@ -1018,6 +1064,8 @@ function Studio({
                         }
                         change((d) => {
                           d.pages = d.pages.filter((p) => p.id !== page.id);
+                          for (const tile of d.pages.flatMap((item) => item.tiles))
+                            if (tile.navigateTo === page.id) delete tile.navigateTo;
                         });
                         setPageId(document.pages.find((p) => p.id !== page.id)!.id);
                       }}

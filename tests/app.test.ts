@@ -9,6 +9,7 @@ import WebSocket from 'ws';
 import { createApp, type AppOptions } from '../src/server/app';
 import { DocumentStore, PairingStore } from '../src/server/store';
 import { HomeAssistantHub } from '../src/server/hub';
+import { roomSchema } from '../src/shared/model';
 
 async function fixture(t: { after: (fn: () => unknown) => void }, extra: Partial<AppOptions> = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'hapanel-'));
@@ -306,4 +307,39 @@ test('API errors follow Accept-Language and expose stable error keys', async (t)
   });
   assert.equal(invalid.statusCode, 400);
   assert.match(invalid.json().error, /Tiles must not overlap/);
+});
+test('display history exposes only published sources, including declared room devices', async (t) => {
+  const { app, store, pairings } = await fixture(t);
+  const { token } = await pairings.pair((await pairings.createCode()).code, 'History display');
+  const headers = { cookie: 'hapanel_device=' + token };
+  assert.equal((await app.inject('/api/display/history/light.kitchen')).statusCode, 401);
+  const document = store.get().draft.document;
+  document.pages[0].tiles[1].room = roomSchema.parse({
+    icon: 'kitchen',
+    controls: [
+      {
+        id: 'kitchen_control',
+        title: 'Kitchen',
+        kind: 'light',
+        entityId: 'light.kitchen',
+        accent: 'amber',
+      },
+    ],
+  });
+  await store.save(document, 1);
+  assert.equal(
+    (await app.inject({ url: '/api/display/history/light.kitchen', headers })).statusCode,
+    403,
+  );
+  assert.equal((await app.inject('/api/editor/history/light.kitchen')).statusCode, 200);
+  await store.publish(2);
+  assert.equal(
+    (await app.inject({ url: '/api/display/history/light.kitchen', headers })).statusCode,
+    200,
+  );
+  assert.equal(
+    (await app.inject({ url: '/api/display/history/sensor.private_unpublished', headers }))
+      .statusCode,
+    403,
+  );
 });

@@ -85,6 +85,14 @@ For local live testing, set `HAPANEL_MODE=standalone`, `HA_URL` and `HA_TOKEN` i
 - **History:** Restore up to 30 previous drafts. Restoration creates a new draft and preserves the published version.
 - **Import/export:** JSON or YAML HAPanel documents. Imports first affect the draft. Exports include entity names but no server credentials or device sessions.
 
+## Room and energy cards
+
+In tile properties, choose Device, Room or Energy under **Card view**. Rooms have an icon, optional temperature/humidity sources, contacts and their own devices. Tap a room to open its device controls. A navigation target can instead open another page, such as a floor overview. Page headings and descriptions are editable with no tile selected.
+
+Bind existing sensors for energy. Solar sources must be disjoint; never add a total together with its component meters. Grid import and export are separate power readings. Configure the battery sign convention to match the integration. Monitored loads include only selected devices and are not total home consumption. Clearly distinguish daily energy values from cumulative counters in their labels. Missing values remain unknown.
+
+Tap weather, a meter or an energy source for details. Forecast availability depends on the weather integration; 24-hour history depends on the HA recorder. HAPanel creates no new history records in HA. Existing saved layouts are preserved and are not replaced by the new sample layout.
+
 ## Display dimensions
 
 Physical pixels and browser CSS pixels differ. An iPad 8 has 2160 × 1620 physical pixels in landscape and, at DPR 2, a nominal 1080 × 810 CSS-pixel area. Browser bars and safe areas may reduce the usable area. **Use resolution and pixel ratio** computes nominal dimensions; adjust them to the actual viewport as needed.

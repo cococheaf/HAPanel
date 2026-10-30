@@ -9,7 +9,8 @@ import {
   type Dashboard,
   type Revision,
 } from '../shared/model';
-import { demoDocument, demoSnapshot, applyDemoAction } from '../shared/demo';
+import { demoDocument, applyDemoAction } from '../shared/demo';
+import { showcaseDocument, showcaseSnapshot } from '../shared/showcase';
 import { parse, stringify } from 'yaml';
 
 export type Bootstrap = {
@@ -128,13 +129,13 @@ export const backendService: StudioService = {
 export class BrowserDemoService implements StudioService {
   readonly local = true;
   private workspace: Workspace;
-  private snapshot = demoSnapshot();
+  private snapshot = showcaseSnapshot();
   private listeners = new Set<(message: LiveMessage) => void>();
   constructor() {
     const revision = {
       revision: 1,
       savedAt: new Date().toISOString(),
-      document: structuredClone(demoDocument),
+      document: structuredClone(showcaseDocument),
     };
     this.workspace = structuredClone({ draft: revision, published: revision, history: [] });
     try {
@@ -144,7 +145,12 @@ export class BrowserDemoService implements StudioService {
         dashboardSchema.parse(data.draft.document);
         dashboardSchema.parse(data.published.document);
         if (Number.isInteger(data.draft.revision) && Array.isArray(data.history))
-          this.workspace = data;
+          this.workspace =
+            data.draft.revision === 1 &&
+            data.history.length === 0 &&
+            JSON.stringify(data.draft.document) === JSON.stringify(demoDocument)
+              ? this.workspace
+              : data;
       }
     } catch {
       /* A browser-local demo can always start with the example. */

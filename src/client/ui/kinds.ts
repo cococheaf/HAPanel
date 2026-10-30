@@ -1,4 +1,12 @@
-import { CloudSun, Lightbulb, Music2, Sparkles, Thermometer, Wind } from 'lucide-react';
+import {
+  CloudSun,
+  Lightbulb,
+  Music2,
+  Sparkles,
+  Thermometer,
+  Wind,
+  PanelsTopLeft,
+} from 'lucide-react';
 export const kindIcons = {
   light: Lightbulb,
   climate: Thermometer,
@@ -6,6 +14,7 @@ export const kindIcons = {
   weather: CloudSun,
   scene: Sparkles,
   sensor: Wind,
+  cover: PanelsTopLeft,
 };
 export const kindLabelKeys = {
   light: 'kind.light',
@@ -14,4 +23,5 @@ export const kindLabelKeys = {
   weather: 'kind.weather',
   scene: 'kind.scene',
   sensor: 'kind.sensor',
+  cover: 'kind.cover',
 } as const;

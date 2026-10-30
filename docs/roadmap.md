@@ -14,18 +14,24 @@
 
 ## Vor Freigabe für den Dauerbetrieb
 
-- [ ] Installation, Update und Backup-Restore mit echtem Home Assistant Supervisor prüfen.
+- [x] Installation und Updates mit echtem Home Assistant Supervisor prüfen.
+- [ ] Vollständige Backup-Wiederherstellung mit echtem Supervisor prüfen.
 - [ ] Physisches iPad 8: Safari, Home-Screen-Start, Rotation, Touch-Drag/Resize, Schlafen/Aufwachen und Wiederverbindung abnehmen.
 - [ ] Display-Cookies und WebSockets hinter einem realen HTTPS-Reverse-Proxy abnehmen.
 - [ ] Servicefähigkeiten anhand verschiedener realer Licht-, Klima- und Medienintegrationen prüfen; erweiterte Temperatureinheiten ergänzen.
 - [ ] Langzeittest auf kleinem ARM-Host und mit mehreren Displays.
 
-## 0.2 · Display und Bedienkomfort
+## 0.2 · Räume, Energie und Bedienkomfort
+
+- [x] Raumkacheln mit eigenen Geräten und Etagen-Navigation.
+- [x] Wetterdetails und bei Bedarf geladene 24-Stunden-Verläufe.
+- [x] Energiecockpit mit Solar, Netz, Speicher und erfassten Verbrauchern.
+- [x] Beschattung und bilinguale Studio-Einstellungen.
 
 - [ ] Gemessene Display-Viewports ins Studio übernehmen, sichere Randbereiche pro Gerät kalibrieren.
 - [ ] Mindestgröße von Touchflächen prüfen und kleine Layouts gezielt verbessern.
 - [ ] Optional adaptive Layouts je Größenklasse; Profile bleiben explizit überschreibbar.
-- [ ] Profile entfernen, Seiten umordnen und Räume als Kachelgruppen anlegen.
+- [ ] Profile entfernen und Seiten umordnen.
 - [ ] Details für Lichtfarbe, Farbtemperatur und HVAC-Modi.
 - [ ] Tastaturbedienung und Screenreader-Abnahme vertiefen.
 

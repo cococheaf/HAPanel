@@ -10,6 +10,7 @@ import {
   type EntityState,
   type Snapshot,
   type Forecast,
+  type HistoryPoint,
 } from '../shared/model';
 
 type Pending = {
@@ -40,6 +41,7 @@ export class HomeAssistantHub extends EventEmitter {
   private subscriptionQueue: Promise<unknown> = Promise.resolve();
   private admins?: { until: number; ids: Set<string> };
   private catalog?: { until: number; entities: EntityState[] };
+  private history = new Map<string, { until: number; data: Promise<HistoryPoint[]> }>();
   constructor(private options: HubOptions) {
     super();
     this.setMaxListeners(0); // Each connected display removes its listener on close.
@@ -202,8 +204,14 @@ export class HomeAssistantHub extends EventEmitter {
             { type: 'weather/subscribe_forecast', entity_id: id, forecast_type: 'hourly' },
             (event) => {
               this.snapshot.forecasts[id] = (event.forecast ?? [])
-                .filter((f: Forecast) => typeof f.temperature === 'number')
-                .slice(0, 5);
+                .filter(
+                  (f: Forecast) =>
+                    typeof f.temperature === 'number' &&
+                    Number.isFinite(f.temperature) &&
+                    typeof f.datetime === 'string' &&
+                    Number.isFinite(Date.parse(f.datetime)),
+                )
+                .slice(0, 48);
               this.emitSnapshot();
             },
           );
@@ -227,6 +235,76 @@ export class HomeAssistantHub extends EventEmitter {
         entities: await this.rpc({ type: 'get_states' }),
       };
     return structuredClone(this.catalog.entities);
+  }
+  async getHistory(entityId: string): Promise<HistoryPoint[]> {
+    if (this.options.demo) {
+      const entity = this.snapshot.entities[entityId];
+      const value = Number(
+        entity?.attributes.current_temperature ?? entity?.attributes.temperature ?? entity?.state,
+      );
+      if (!entity || !Number.isFinite(value)) return [];
+      return Array.from({ length: 25 }, (_, index) => ({
+        time: new Date(Date.now() - (24 - index) * 3600_000).toISOString(),
+        value: Math.max(0, value + Math.sin(index / 3) * Math.abs(value) * 0.05),
+      }));
+    }
+    const cached = this.history.get(entityId);
+    if (cached && cached.until > Date.now()) return cached.data;
+    const data = (async () => {
+      const url = new URL(
+        'history/period/' + new Date(Date.now() - 24 * 3600_000).toISOString(),
+        this.options.apiUrl,
+      );
+      url.searchParams.set('filter_entity_id', entityId);
+      const attribute = entityId.startsWith('climate.')
+        ? 'current_temperature'
+        : entityId.startsWith('weather.')
+          ? 'temperature'
+          : undefined;
+      if (!attribute) {
+        url.searchParams.set('minimal_response', '1');
+        url.searchParams.set('no_attributes', '1');
+      }
+      const response = await fetch(url, {
+        headers: { Authorization: 'Bearer ' + this.options.token },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok || !response.body) throw new UserError('error.historyUnavailable');
+      const reader = response.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let size = 0;
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        size += chunk.value.byteLength;
+        if (size > 4 * 1024 * 1024) {
+          await reader.cancel();
+          throw new UserError('error.historyUnavailable');
+        }
+        chunks.push(chunk.value);
+      }
+      const rows = JSON.parse(Buffer.concat(chunks).toString('utf8'))?.[0] ?? [];
+      const points: HistoryPoint[] = rows.flatMap((row: any) => {
+        const raw = attribute ? row.attributes?.[attribute] : row.state;
+        const time = row.last_changed ?? row.last_updated;
+        const value = raw === null || raw === undefined || raw === '' ? NaN : Number(raw);
+        return Number.isFinite(value) &&
+          typeof time === 'string' &&
+          Number.isFinite(Date.parse(time))
+          ? [{ time, value }]
+          : [];
+      });
+      return points.filter(
+        (_, index) =>
+          index === points.length - 1 || index % Math.max(1, Math.ceil(points.length / 160)) === 0,
+      );
+    })().catch((error) => {
+      this.history.delete(entityId);
+      throw error;
+    });
+    if (this.history.size >= 64) this.history.delete(this.history.keys().next().value!);
+    this.history.set(entityId, { until: Date.now() + 240_000, data });
+    return data;
   }
   async isAdmin(userId: string) {
     if (this.options.demo) return false;

@@ -159,11 +159,42 @@ const sampleTileKeys = {
   scene: 'sample.scene',
   sensor: 'sample.sensor',
 } as const;
+const showcaseCopy: Record<string, { title: string; key: MessageKey }> = {
+  demo_home_eg: { title: 'Erdgeschoss', key: 'sample.floorEG' },
+  demo_home_og: { title: 'Obergeschoss', key: 'sample.floorOG' },
+  demo_living: { title: 'Wohnzimmer', key: 'sample.media' },
+  demo_kitchen: { title: 'Küche', key: 'sample.kitchenRoom' },
+  demo_dining: { title: 'Essbereich', key: 'sample.dining' },
+  demo_entry: { title: 'Eingang', key: 'sample.entrance' },
+  demo_bedroom: { title: 'Schlafzimmer', key: 'sample.bedroom' },
+  demo_study: { title: 'Arbeitszimmer', key: 'sample.study' },
+  demo_bath: { title: 'Bad', key: 'sample.bath' },
+  demo_guest: { title: 'Gästezimmer', key: 'sample.guest' },
+  demo_energy: { title: 'Energie', key: 'sample.energy' },
+  demo_energy_home: { title: 'Energie', key: 'sample.energy' },
+};
+const showcaseLabels: Record<string, MessageKey> = {
+  Licht: 'sample.controlLight',
+  Heizung: 'sample.controlHeat',
+  Musik: 'sample.controlMusic',
+  Beschattung: 'kind.cover',
+  Küche: 'sample.kitchenRoom',
+  Arbeitszimmer: 'sample.study',
+  Medien: 'kind.media',
+  'Solarertrag heute': 'sample.solarToday',
+  'Netzbezug heute': 'sample.importToday',
+  'Einspeisung heute': 'sample.exportToday',
+};
 /** Translate untouched sample labels only. Custom text and saved layouts are never rewritten. */
 export function localizedSampleTile<T extends { id: string; title: string }>(
   tile: T,
   language: Language,
 ): T {
+  const example = Object.hasOwn(showcaseCopy, tile.id) ? showcaseCopy[tile.id] : undefined;
+  if (example && tile.title === example.title)
+    return { ...tile, title: translate(language, example.key) };
+  if (tile.id.startsWith('demo_') && Object.hasOwn(showcaseLabels, tile.title))
+    return { ...tile, title: translate(language, showcaseLabels[tile.title]) };
   const key = sampleTileKeys[tile.id as keyof typeof sampleTileKeys];
   const original = demoDocument.pages[0].tiles.find((item) => item.id === tile.id);
   return key && original?.title === tile.title
@@ -193,13 +224,61 @@ export function localizeSampleDocument(document: Dashboard, language: Language):
     }),
     pages: document.pages.map((page) => ({
       ...page,
+      heading: !page.heading
+        ? page.heading
+        : page.id === 'eg'
+          ? sample(page.heading ?? '', 'Zusammen zuhause.', 'sample.headingEG')
+          : page.id === 'og'
+            ? sample(page.heading ?? '', 'Deine Rückzugsorte.', 'sample.headingOG')
+            : page.id === 'energy'
+              ? sample(page.heading ?? '', 'Dein Energiecockpit.', 'sample.headingEnergy')
+              : page.heading,
+      subtitle:
+        page.id === 'eg'
+          ? sample(
+              page.subtitle ?? '',
+              'Erdgeschoss · Wohnen, kochen und ankommen.',
+              'sample.subtitleEG',
+            )
+          : page.id === 'og'
+            ? sample(
+                page.subtitle ?? '',
+                'Obergeschoss · Ruhe, Raum und Wohlbefinden.',
+                'sample.subtitleOG',
+              )
+            : page.id === 'energy'
+              ? sample(
+                  page.subtitle ?? '',
+                  'Erzeugung, Netz und Speicher auf einen Blick.',
+                  'sample.subtitleEnergy',
+                )
+              : page.subtitle,
       name:
-        page.id === 'overview'
-          ? sample(page.name, 'Zuhause', 'sample.home')
-          : page.id === 'favorites'
-            ? sample(page.name, 'Favoriten', 'sample.favourites')
-            : page.name,
-      tiles: page.tiles.map((tile) => localizedSampleTile(tile, language)),
+        page.id === 'eg'
+          ? sample(page.name, 'EG', 'sample.navEG')
+          : page.id === 'og'
+            ? sample(page.name, 'OG', 'sample.navOG')
+            : page.id === 'energy'
+              ? sample(page.name, 'Energie', 'sample.energy')
+              : page.id === 'overview'
+                ? sample(page.name, 'Zuhause', 'sample.home')
+                : page.id === 'favorites'
+                  ? sample(page.name, 'Favoriten', 'sample.favourites')
+                  : page.name,
+      tiles: page.tiles.map((tile) => {
+        const view = localizedSampleTile(tile, language);
+        if (!tile.energy || !tile.id.startsWith('demo_')) return view;
+        const label = (value: string) =>
+          Object.hasOwn(showcaseLabels, value) ? translate(language, showcaseLabels[value]) : value;
+        return {
+          ...view,
+          energy: {
+            ...tile.energy,
+            consumers: tile.energy.consumers.map((item) => ({ ...item, label: label(item.label) })),
+            metrics: tile.energy.metrics.map((item) => ({ ...item, label: label(item.label) })),
+          },
+        };
+      }),
     })),
   };
 }
@@ -305,6 +384,19 @@ export function applyDemoAction(snapshot: Snapshot, document: Dashboard, action:
   if (command.service === 'turn_off') entity.state = 'off';
   if (command.service === 'set_temperature')
     entity.attributes.temperature = command.service_data.temperature;
+  if (
+    command.service === 'open_cover' ||
+    command.service === 'close_cover' ||
+    command.service === 'set_cover_position'
+  ) {
+    entity.attributes.current_position =
+      command.service === 'open_cover'
+        ? 100
+        : command.service === 'close_cover'
+          ? 0
+          : command.service_data.position;
+    entity.state = entity.attributes.current_position === 0 ? 'closed' : 'open';
+  }
   if (command.service === 'media_play_pause')
     entity.state = entity.state === 'playing' ? 'paused' : 'playing';
   if (command.service === 'volume_set')
