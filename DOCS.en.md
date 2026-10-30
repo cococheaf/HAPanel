@@ -8,19 +8,19 @@ Studio, dashboard and pairing support German and English. The language selector 
 
 Dates, times, numbers, controls and HAPanel errors follow the selection. Untouched sample labels are also localised. Custom titles, greetings, device names and HA entity names remain as entered. UI language does not convert temperature units or change device setpoints.
 
-## Public iPad demo
+## Public iPad preview
 
 1. Open <https://cococheaf.github.io/HAPanel/> in Safari.
 2. Select a landscape or portrait profile as appropriate.
 3. Try lights, dimming, temperature and media controls.
-4. **Open Designer** opens the visual editor. Edit tiles/pages and **Publish** to apply the draft to the demo dashboard.
+4. **Open Designer** opens the visual editor. Edit tiles/pages and **Publish** to apply the draft to the preview dashboard.
 5. Use **Share → Add to Home Screen** for a standalone web app.
 
-The demo uses sample data and browser-local configuration. Safari and a Home Screen app may have separate storage. No audio is played. Fullscreen behaviour, screen locking and keeping the screen awake depend on the operating system.
+The preview uses sample data and browser-local configuration. Safari and a Home Screen app may have separate storage. No audio is played. Fullscreen behaviour, screen locking and keeping the screen awake depend on the operating system.
 
 ## Home Assistant OS / Supervisor
 
-This release includes a source-built add-on for `amd64` and `aarch64`. Installation, updates, Ingress and live data have been checked on Home Assistant OS 18.4 with Core 2026.10.4 (amd64). The default demo mode remains available for initial setup.
+This release includes a source-built add-on for `amd64` and `aarch64`. Installation, updates, Ingress and live data have been checked on Home Assistant OS 18.4 with Core 2026.10.4 (amd64). The default preview mode remains available for initial setup.
 
 1. In **Settings → Apps/Add-ons → Store → Repositories**, add `https://github.com/cococheaf/HAPanel`.
 2. Install **HAPanel**. The container image is built from the repository; the first build may take several minutes.
@@ -52,7 +52,7 @@ HAPanel does not configure a reverse proxy, DNS or TLS certificates. Ingress pro
 
 ## Without Supervisor
 
-The demo and standalone editor bind only to loopback. The separate display server has its own pairing authentication.
+The preview and standalone editor bind only to loopback. The separate display server has its own pairing authentication.
 
 ```sh
 npm ci
@@ -97,7 +97,15 @@ Tap weather, a meter or an energy source for details. Forecast availability depe
 
 Light groups use an existing HA light entity. Automation cards show whether triggers are enabled; the power button enables or disables the automation. **Run now** invokes it while retaining its existing conditions. On small cards, open details to reach the manual run action.
 
-The alarm card shows live status. Its optional HA panel URL opens the existing controls in Home Assistant, using HA authentication. HAPanel stores no alarm codes and exposes no arm/disarm API.
+The alarm card shows live status and opens its mode picker directly inside HAPanel. In the Designer, enable and reorder the desired modes: Disarmed, Home, Away, Night, Vacation and Custom bypass. Unsupported integration modes remain disabled. Every command requires confirmation. Open and unavailable configured contacts are listed before arming. When required by HA, enter the code in a password field; it is used only for that request and is never stored in the layout or on the server. The visible alarm state always comes from HA, rather than an optimistic command result.
+
+Alarm commands and camera images are available through the existing HA administrator Ingress access. Separately paired displays retain their previous permissions and show alarm status only. Use the HAPanel entry in HA for security controls on the iPad.
+
+## Surveillance
+
+Create a **Surveillance** page and **Camera** tiles in the Designer, then select your existing HA camera entities. Set the thumbnail refresh interval (15–120 seconds) and image fit per tile. Tapping opens video on demand. Safari plays HLS natively; compatible browsers load the HLS player as needed. Cameras without streaming show an updated image every two seconds. Playback stops when the detail view closes or the page is hidden.
+
+The add-on uses the existing HA camera integration, stores no UniFi credentials and creates no recordings. Camera tokens and upstream stream URLs remain on the backend. The public preview shows labelled sample camera placeholders and no private footage.
 
 **Doors & windows** uses a configurable contact list. Open contacts appear first in details, with unavailable contacts shown separately. “None reported open” does not mean unknown contacts are safely closed. These settings are editable in the Designer.
 
@@ -107,7 +115,7 @@ Physical pixels and browser CSS pixels differ. An iPad 8 has 2160 × 1620 physic
 
 **Fit proportionally** preserves the aspect ratio. **Exact CSS pixels** renders without scaling; a smaller viewport shows a scrollable portion. Studio zoom is relative to its fitted preview. The configured diagonal does not imply a physical-size preview on the editor’s monitor.
 
-The display information menu shows viewport size and DPR. In Home Screen standalone mode, HAPanel hides its demo toolbar. The webpage does not control operating-system chrome.
+The display information menu shows viewport size and DPR. In Home Screen standalone mode, HAPanel hides its preview toolbar. The webpage does not control operating-system chrome.
 
 ## Backup and updates
 

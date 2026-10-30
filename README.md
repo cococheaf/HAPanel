@@ -87,3 +87,11 @@ Die [Roadmap](docs/roadmap.md) benennt die noch offenen Arbeiten: echte HA-/iPad
 Die Kachelidee und der visuelle Arbeitsablauf sind von [Tessera](https://github.com/MaxGramser/homeassistant_espscreen) inspiriert. HAPanel ist eine eigenständige Implementierung; Tessera-Code, Firmware und Assets wurden nicht übernommen. HAPanel enthält keine ESPHome-, Flashing-, USB- oder Mikrocontroller-Logik.
 
 HAPanel: [MIT](LICENSE). Icons: [Lucide](https://lucide.dev/license). Beispiel-Albumcover und Projektlogo sind eigene SVG-Grafiken. Die gesamte Darstellung wird lokal erzeugt; es gibt keine externen Fonts, Analyse-Skripte oder Bilddienste. HAPanel ist ein unabhängiges Projekt und kein Produkt von Apple oder dem Home-Assistant-Projekt.
+
+<details><summary>Alarm direkt bedienen · Überwachung</summary>
+
+![HAPanel alarm](docs/images/alarm.png)
+
+![HAPanel surveillance preview](docs/images/surveillance.png)
+
+</details>

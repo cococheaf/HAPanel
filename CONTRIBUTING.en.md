@@ -2,14 +2,14 @@
 
 **[Deutsch](CONTRIBUTING.md) · English**
 
-Use Node.js 24 LTS and `npm ci`. `npm run dev` starts the sample-data API and Vite. `/demo.html` needs no HA credentials.
+Use Node.js 24 LTS and `npm ci`. `npm run dev` starts the sample-data API and Vite. `/preview.html` needs no HA credentials.
 
 Before a pull request:
 
 ```sh
 npm test
 npm run build
-npm run build:demo
+npm run build:preview
 ```
 
 Add focused regression tests for layout, persistence and access-control changes. Text or colour changes do not need tests that simply mirror their implementation. Format changed files with `npx prettier --write FILE`.
