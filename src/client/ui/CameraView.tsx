@@ -103,13 +103,14 @@ export function CameraStream({
   const sample = snapshot.status === 'demo';
   const allowed = snapshot.cameraView ?? sample;
   const entity = snapshot.entities[tile.entityId];
+  const streamable = Boolean(Number(entity?.attributes.supported_features) & 2);
   const online =
     entity &&
     !['unknown', 'unavailable', 'off'].includes(entity.state) &&
     snapshot.status !== 'reconnecting';
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !visible || sample || !allowed || !online) return;
+    if (!video || !visible || sample || !allowed || !online || !streamable) return;
     let disposed = false;
     let player: import('hls.js').default | undefined;
     setPhase('loading');
@@ -156,7 +157,7 @@ export function CameraStream({
       video.removeAttribute('src');
       video.load();
     };
-  }, [tile.id, base, sample, allowed, online, visible, retry]);
+  }, [tile.id, base, sample, allowed, online, visible, retry, streamable]);
   if (sample)
     return (
       <div className="camera-sample-view">
@@ -171,8 +172,7 @@ export function CameraStream({
         {t(!allowed ? 'error.cameraAdminRequired' : 'error.cameraUnavailable')}
       </p>
     );
-  if (!(Number(entity.attributes.supported_features) & 2))
-    return <CameraStillLive tile={tile} base={base} />;
+  if (!streamable) return <CameraStillLive tile={tile} base={base} />;
   return (
     <div className="camera-live">
       <div className="camera-live-header">
