@@ -1,0 +1,11 @@
+{
+  "id": "./display.html",
+  "name": "HAPanel",
+  "short_name": "HAPanel",
+  "start_url": "./display.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#101b29",
+  "theme_color": "#101b29",
+  "icons": [{ "src": "./mark.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
