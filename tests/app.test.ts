@@ -462,3 +462,53 @@ test('camera routes enforce draft versus publication bindings and strip private 
     /access_token|secret-url/,
   );
 });
+
+test('WebRTC sockets inherit Ingress auth, use only their configured camera and release sessions on publication changes', async (t) => {
+  const { showcaseDocument } = await import('../src/shared/showcase');
+  const { app, store, hub } = await fixture(t, {
+    mode: 'ingress',
+    isAdmin: async (id) => id === 'admin-user',
+  });
+  await store.save(showcaseDocument, 1);
+  await store.publish(2);
+  const calls: string[] = [];
+  let stops = 0;
+  t.mock.method(
+    hub,
+    'cameraWebRtc',
+    (
+      entity: string,
+      offer: string,
+      send: (event: import('../src/shared/camera').CameraSignalEvent) => void,
+    ) => {
+      calls.push(entity);
+      send({ type: 'answer', sdp: 'v=0\r\ntest-answer' });
+      return {
+        ready: Promise.resolve(),
+        candidate: async () => {},
+        stop: () => {
+          stops++;
+        },
+      };
+    },
+  );
+  t.mock.method(hub, 'cameraCapabilities', async () => ({ webrtc: true, hls: true }));
+  const context = {
+    headers: { 'x-remote-user-id': 'admin-user' },
+    socket: { remoteAddress: '172.30.32.2' } as Socket,
+  };
+  await assert.rejects(app.injectWS('/api/display/camera/sample_camera_entrance/webrtc'), /403/);
+  const client = await app.injectWS('/api/display/camera/sample_camera_entrance/webrtc', context);
+  t.after(() => client.terminate());
+  const answer = once(client, 'message');
+  client.send(JSON.stringify({ type: 'offer', sdp: 'v=0\r\ntest-offer-long-enough' }));
+  assert.equal(JSON.parse((await answer)[0].toString()).type, 'answer');
+  assert.deepEqual(calls, ['camera.sample_entrance']);
+  const document = store.get().draft.document;
+  document.pages = document.pages.filter((page) => page.id !== 'surveillance');
+  await store.save(document, 2);
+  const closed = once(client, 'close');
+  await store.publish(3);
+  assert.equal((await closed)[0], 1008);
+  assert.equal(stops, 1);
+});

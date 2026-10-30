@@ -18,6 +18,7 @@ import {
 import { DocumentStore, HttpError, PairingStore } from './store';
 import { HomeAssistantHub } from './hub';
 import { documentContacts } from '../shared/security';
+import { cameraSignalSchema } from '../shared/camera';
 import { publicEntity } from './cameras';
 import { errorMessage, isMessageKey, resolveLanguage, translate, UserError } from '../shared/i18n';
 
@@ -101,7 +102,7 @@ export async function createApp(options: AppOptions) {
   const app = Fastify({ logger: false, bodyLimit: 1024 * 1024, trustProxy: false });
   await app.register(cookie);
   await app.register(rateLimit, { global: false });
-  await app.register(websocket, { options: { maxPayload: 1024 } });
+  await app.register(websocket, { options: { maxPayload: 128 * 1024 } });
 
   const sameOrigin = (request: FastifyRequest) => {
     const origin = request.headers.origin;
@@ -185,7 +186,7 @@ export async function createApp(options: AppOptions) {
   );
   app.get('/api/health', async () => ({
     ok: true,
-    version: '1.1.0',
+    version: '1.2.0',
     source: hub.getSnapshot([]).status,
   }));
 
@@ -198,7 +199,7 @@ export async function createApp(options: AppOptions) {
         });
         admin.get('/bootstrap', async () => ({
           workspace: store.get(),
-          snapshot: snapshotFor(store.get().draft.document, true),
+          snapshot: snapshotFor(store.getRevision('draft').document, true),
           catalog: (await hub.getCatalog()).map(publicEntity),
           mode: hub.getSnapshot([]).status === 'demo' ? 'demo' : 'live',
           displayEnabled: options.displayEnabled ?? false,
@@ -246,8 +247,8 @@ export async function createApp(options: AppOptions) {
           reply.type(query.format === 'yaml' ? 'application/yaml' : 'application/json');
           reply.header('Content-Disposition', `attachment; filename="hapanel.${query.format}"`);
           return query.format === 'yaml'
-            ? stringify(store.get().draft.document)
-            : JSON.stringify(store.get().draft.document, null, 2);
+            ? stringify(store.getRevision('draft').document)
+            : JSON.stringify(store.getRevision('draft').document, null, 2);
         });
         admin.post(
           '/action',
@@ -257,7 +258,12 @@ export async function createApp(options: AppOptions) {
               .object({ enabled: z.literal(true), action: actionSchema })
               .strict()
               .parse(request.body);
-            await performAction(store.get().draft.document, body.action, true, actor(request));
+            await performAction(
+              store.getRevision('draft').document,
+              body.action,
+              true,
+              actor(request),
+            );
             return { ok: true };
           },
         );
@@ -268,7 +274,7 @@ export async function createApp(options: AppOptions) {
           return { ok: true };
         });
         admin.get<{ Params: { id: string } }>('/media/:id', async (request, reply) => {
-          const tile = allControls(store.get().draft.document).find(
+          const tile = allControls(store.getRevision('draft').document).find(
             (t) => t.id === request.params.id && t.kind === 'media',
           );
           const result = tile && (await hub.media(tile.entityId));
@@ -279,7 +285,7 @@ export async function createApp(options: AppOptions) {
           '/history/:entityId',
           { config: { rateLimit: { max: 60, timeWindow: 60_000 } } },
           async (request) => {
-            if (!entityIds(store.get().draft.document).includes(request.params.entityId))
+            if (!entityIds(store.getRevision('draft').document).includes(request.params.entityId))
               throw new HttpError(403, 'error.tileNotAllowed');
             return hub.getHistory(request.params.entityId);
           },
@@ -290,7 +296,7 @@ export async function createApp(options: AppOptions) {
               socket.send(
                 JSON.stringify({
                   type: 'snapshot',
-                  snapshot: snapshotFor(store.get().draft.document, true),
+                  snapshot: snapshotFor(store.getRevision('draft').document, true),
                 }),
               );
           };
@@ -331,8 +337,8 @@ export async function createApp(options: AppOptions) {
         reply.header('Cache-Control', 'no-store');
       });
       display.get('/bootstrap', async () => ({
-        published: store.get().published,
-        snapshot: snapshotFor(store.get().published.document, ingressDisplay),
+        published: store.getRevision('published'),
+        snapshot: snapshotFor(store.getRevision('published').document, ingressDisplay),
         canEdit: ingressDisplay,
       }));
       display.post(
@@ -340,7 +346,7 @@ export async function createApp(options: AppOptions) {
         { config: { rateLimit: { max: 20, timeWindow: 1000 } } },
         async (request) => {
           await performAction(
-            store.get().published.document,
+            store.getRevision('published').document,
             actionSchema.parse(request.body),
             ingressDisplay,
             actor(request),
@@ -349,7 +355,7 @@ export async function createApp(options: AppOptions) {
         },
       );
       display.get<{ Params: { id: string } }>('/media/:id', async (request, reply) => {
-        const tile = allControls(store.get().published.document).find(
+        const tile = allControls(store.getRevision('published').document).find(
           (t) => t.id === request.params.id && t.kind === 'media',
         );
         const result = tile && (await hub.media(tile.entityId));
@@ -360,7 +366,7 @@ export async function createApp(options: AppOptions) {
         '/history/:entityId',
         { config: { rateLimit: { max: 60, timeWindow: 60_000 } } },
         async (request) => {
-          if (!entityIds(store.get().published.document).includes(request.params.entityId))
+          if (!entityIds(store.getRevision('published').document).includes(request.params.entityId))
             throw new HttpError(403, 'error.tileNotAllowed');
           return hub.getHistory(request.params.entityId);
         },
@@ -374,7 +380,7 @@ export async function createApp(options: AppOptions) {
             return;
           }
           if (socket.readyState !== 1) return;
-          const published = store.get().published;
+          const published = store.getRevision('published');
           const changed = published.revision !== revision;
           revision = published.revision;
           socket.send(
@@ -402,7 +408,7 @@ export async function createApp(options: AppOptions) {
   const cameraContexts = [
     {
       prefix: '/api/display/camera',
-      document: () => store.get().published.document,
+      document: () => store.getRevision('published').document,
       authorize: requireDisplay,
       allowed: ingressDisplay,
     },
@@ -410,14 +416,113 @@ export async function createApp(options: AppOptions) {
       ? [
           {
             prefix: '/api/editor/camera',
-            document: () => store.get().draft.document,
+            document: () => store.getRevision('draft').document,
             authorize: requireEditor,
             allowed: true,
           },
         ]
       : []),
   ];
+  const cameraPeers = new Map<object, string>();
   for (const context of cameraContexts) {
+    const boundCamera = (id: string) =>
+      allControls(context.document()).find((tile) => tile.id === id && tile.kind === 'camera');
+    app.get<{ Params: { id: string } }>(
+      context.prefix + '/:id/capabilities',
+      { onRequest: context.authorize, config: { rateLimit: { max: 120, timeWindow: 60_000 } } },
+      async (request, reply) => {
+        if (!context.allowed) throw new HttpError(403, 'error.cameraAdminRequired');
+        reply.header('Cache-Control', 'no-store');
+        const tile = boundCamera(request.params.id);
+        if (!tile) throw new HttpError(404, 'error.tileNotAllowed');
+        try {
+          return await hub.cameraCapabilities(tile.entityId);
+        } catch {
+          throw new HttpError(502, 'error.cameraUnavailable');
+        }
+      },
+    );
+    app.get<{ Params: { id: string } }>(
+      context.prefix + '/:id/webrtc',
+      { websocket: true, onRequest: context.authorize },
+      (socket, request) => {
+        const tile = boundCamera(request.params.id),
+          identity = actor(request);
+        if (
+          !context.allowed ||
+          !tile ||
+          cameraPeers.size >= 32 ||
+          [...cameraPeers.values()].filter((value) => value === identity).length >= 16
+        ) {
+          socket.close(1008);
+          return;
+        }
+        cameraPeers.set(socket, identity);
+        let control: ReturnType<HomeAssistantHub['cameraWebRtc']> | undefined,
+          closed = false,
+          offered = false,
+          messages = 0;
+        const send = (event: unknown) => {
+          if (socket.readyState === 1) socket.send(JSON.stringify(event));
+        };
+        const releaseControl = () => {
+          control?.stop();
+          control = undefined;
+        };
+        let closing: ReturnType<typeof setTimeout> | undefined;
+        const deny = () => {
+          releaseControl();
+          socket.close(1008);
+          closing ??= setTimeout(() => socket.terminate(), 1000);
+          closing.unref();
+        };
+        const timer = setTimeout(deny, 10_000);
+        const check = async () => {
+          try {
+            await context.authorize(request);
+            if (
+              boundCamera(request.params.id)?.entityId !== tile.entityId ||
+              hub.getSnapshot([]).status === 'reconnecting'
+            ) {
+              deny();
+            }
+          } catch {
+            deny();
+          }
+        };
+        const interval = setInterval(() => void check(), 20_000);
+        store.on('change', check);
+        socket.on('message', (raw) => {
+          try {
+            if (++messages > 128) throw new Error();
+            const message = cameraSignalSchema.parse(JSON.parse(raw.toString()));
+            if (message.type === 'offer') {
+              if (offered) throw new Error();
+              offered = true;
+              clearTimeout(timer);
+              control = hub.cameraWebRtc(tile.entityId, message.sdp, send);
+              if (closed) control.stop();
+            } else {
+              if (!control) throw new Error();
+              void control.candidate(message.candidate).catch(() => send({ type: 'error' }));
+            }
+          } catch {
+            send({ type: 'error' });
+            deny();
+          }
+        });
+        socket.once('close', () => {
+          closed = true;
+          clearTimeout(timer);
+          clearTimeout(closing);
+          clearInterval(interval);
+          store.off('change', check);
+          releaseControl();
+          cameraPeers.delete(socket);
+        });
+        socket.on('error', () => socket.close());
+      },
+    );
     for (const suffix of ['still', 'stream.m3u8', 'assets/:asset']) {
       app.get<{ Params: { id: string; asset?: string }; Querystring: Record<string, unknown> }>(
         context.prefix + '/:id/' + suffix,

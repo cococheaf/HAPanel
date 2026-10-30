@@ -116,3 +116,121 @@ test('HA adapter authenticates, filters subscriptions, merges deltas, receives f
   await until(() => hub.getSnapshot().status === 'reconnecting');
   await assert.rejects(hub.act(demoDocument, { tileId: 'light', command: 'toggle' }));
 });
+
+test('WebRTC signalling stays bound to a camera, hides session/config secrets and releases its HA subscription', async (t) => {
+  const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
+  await once(server, 'listening');
+  const calls: any[] = [],
+    events: any[] = [];
+  let client!: WebSocket,
+    offerId = 0;
+  server.on('connection', (socket) => {
+    client = socket;
+    socket.send(JSON.stringify({ type: 'auth_required' }));
+    socket.on('message', (raw) => {
+      const message = JSON.parse(raw.toString());
+      calls.push(message);
+      if (message.type === 'auth') {
+        socket.send(JSON.stringify({ type: 'auth_ok' }));
+        return;
+      }
+      const result =
+        message.type === 'camera/capabilities'
+          ? { frontend_stream_types: ['hls', 'web_rtc'] }
+          : message.type === 'camera/webrtc/get_client_config'
+            ? {
+                configuration: {
+                  iceServers: [{ urls: 'turn:private.example', credential: 'private-secret' }],
+                },
+                dataChannel: 'events',
+              }
+            : null;
+      socket.send(JSON.stringify({ id: message.id, type: 'result', success: true, result }));
+      if (message.type === 'subscribe_entities')
+        socket.send(
+          JSON.stringify({
+            id: message.id,
+            type: 'event',
+            event: { a: { 'camera.entrance': { s: 'idle', a: { supported_features: 2 } } } },
+          }),
+        );
+      if (message.type === 'camera/webrtc/offer') {
+        offerId = message.id;
+        socket.send(
+          JSON.stringify({
+            id: message.id,
+            type: 'event',
+            event: { type: 'session', session_id: 'private-session' },
+          }),
+        );
+        socket.send(
+          JSON.stringify({
+            id: message.id,
+            type: 'event',
+            event: { type: 'answer', answer: 'v=0\r\nanswer' },
+          }),
+        );
+      }
+    });
+  });
+  const hub = new HomeAssistantHub({
+    demo: false,
+    token: 'test-only',
+    websocketUrl: `ws://127.0.0.1:${(server.address() as any).port}`,
+    apiUrl: 'http://ha.example/api/',
+  });
+  t.after(async () => {
+    await hub.stop();
+    for (const socket of server.clients) socket.terminate();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+  const document = structuredClone(demoDocument);
+  document.pages[0].tiles[0] = {
+    ...document.pages[0].tiles[0],
+    kind: 'camera',
+    entityId: 'camera.entrance',
+  };
+  hub.setDocuments([document]);
+  hub.start();
+  await until(() => Boolean(hub.getSnapshot().entities['camera.entrance']));
+  assert.deepEqual(await hub.cameraCapabilities('camera.entrance'), {
+    webrtc: true,
+    hls: true,
+    dataChannel: 'events',
+  });
+  await hub.cameraCapabilities('camera.entrance');
+  assert.equal(calls.filter((call) => call.type === 'camera/capabilities').length, 1);
+  const control = hub.cameraWebRtc('camera.entrance', 'v=0\r\nclient offer', (event) =>
+    events.push(event),
+  );
+  await control.candidate({ candidate: 'candidate:local', sdpMid: '0' });
+  await control.ready;
+  await until(() => calls.some((call) => call.type === 'camera/webrtc/candidate'));
+  assert.equal(
+    calls.find((call) => call.type === 'camera/webrtc/candidate').entity_id,
+    'camera.entrance',
+  );
+  assert.equal(
+    calls.find((call) => call.type === 'camera/webrtc/candidate').session_id,
+    'private-session',
+  );
+  client.send(
+    JSON.stringify({
+      id: offerId,
+      type: 'event',
+      event: { type: 'candidate', candidate: { candidate: 'candidate:remote', sdpMid: '0' } },
+    }),
+  );
+  await until(() => events.some((event) => event.type === 'candidate'));
+  assert.doesNotMatch(JSON.stringify(events), /private-session|private-secret|turn:/);
+  control.stop();
+  await until(() =>
+    calls.some((call) => call.type === 'unsubscribe_events' && call.subscription === offerId),
+  );
+  const count = events.length;
+  client.send(
+    JSON.stringify({ id: offerId, type: 'event', event: { type: 'answer', answer: 'late' } }),
+  );
+  await new Promise((resolve) => setTimeout(resolve, 15));
+  assert.equal(events.length, count);
+});

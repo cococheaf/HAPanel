@@ -124,3 +124,26 @@ Das Display-Info-Menü zeigt den aktuellen Viewport und DPR. Im Standalone-Modus
 ## Sichern und aktualisieren
 
 Im Add-on werden die privaten Daten bei normalen Updates beibehalten. Vor Updates eine HA-Sicherung und einen JSON/YAML-Export erstellen. Eine Neuinstallation kann den privaten Add-on-Speicher entfernen. `dashboard.json` enthält Entwurf, Veröffentlichung und Verlauf; `devices.json` enthält ausschließlich gehashte Kopplungs- und Sitzungsdaten. Ungültige gespeicherte Dashboard-Dateien werden beim Start nicht überschrieben.
+
+## Display-Verwaltung ab 1.2
+
+1. **Designer öffnen** → oben unter **Display bearbeiten** das gewünschte Display wählen. Die Auswahl wird im Browser gemerkt.
+2. **Displays verwalten** → **Display hinzufügen** für ein neues Layout. Bestehende Maße übernehmen und wahlweise alle Ansichten kopieren oder leer starten.
+3. Im selben Dialog bei einer Ansicht auf das Kopiersymbol tippen. Ein vorhandenes oder **Neues Display erstellen …** als Ziel wählen. Die Kopie behält alle Kacheln und wird an das Zielraster angepasst. Navigation zu nicht verfügbaren Ansichten wird entfernt.
+4. Pfeile ändern die Ansichtsreihenfolge. Das Papierkorbsymbol entfernt auch gefüllte Ansichten nach Bestätigung. Die letzte Ansicht und das letzte Display können nicht gelöscht werden.
+5. Der Papierkorb am Display entfernt dessen Layout und Ansichten. **Rückgängig** und der Versionsverlauf können Änderungen am Entwurf wiederherstellen. Erst **Veröffentlichen** übernimmt sie auf den Geräten.
+6. **Geräte verwalten** verwaltet Browserkopplungen. **Zugang widerrufen** meldet genau diesen Browser ab; seine Layouts bleiben erhalten. Layoutauswahl ist keine Berechtigungsgrenze: Die bisherigen Serverberechtigungen gelten weiterhin.
+
+Die früher gemeinsam genutzten Ansichten werden beim ersten Start unabhängig pro Display kopiert. IDs des ersten Displays und bestehende Entitätsbindungen bleiben erhalten. Die unveränderte Originaldatei wird als `dashboard-before-display-views.json` im privaten Add-on-Verzeichnis gespeichert. Entwurf, Veröffentlichung und Verlauf bleiben getrennt. Ein JSON-Export vor dem Update und das HA-App-Backup ermöglichen die Rückkehr zur vorherigen Version. Alte App-Versionen können die erweiterte Datei nicht lesen; für einen Rollback das zugehörige Backup wiederherstellen.
+
+## Kamera-Verbindung und Liveübersicht
+
+Jede Kamerakachel besitzt **Kameraübersicht: Standbild / Livestream** und **Verbindung: Automatisch / WebRTC / HLS**. Automatisch ermittelt die aktuellen HA-Kamerafähigkeiten. WebRTC vermeidet den HLS-Puffer. Ist die direkte Verbindung nicht erreichbar, nutzt HAPanel nach begrenzter Wartezeit HLS. Der Verbindungsweg ist an der Live-Anzeige sichtbar. **Zur Livekante springen** und ein kleinerer Puffer helfen bei HLS; sie garantieren keine bestimmte Verzögerung der Kamera oder des Netzwerks.
+
+Die WebRTC-Signalisierung läuft über das Add-on mit derselben Administratorprüfung wie bisher. Medien nutzen die lokale Verbindung, die HA vermittelt. HAPanel verwendet keine externen STUN-/TURN-Dienste, fragt kein Mikrofon an und installiert keinen weiteren Kameraserver. Über Netzgrenzen oder Fernzugriffe kann deshalb der HLS-Rückfall erforderlich sein. Router, Firewall und HA-Zugriffsrechte werden nicht verändert.
+
+Live-Kacheln starten nur sichtbar und pausieren hinter einem geöffneten Detaildialog. Auf leistungsschwächeren Tablets für mehrere gleichzeitige Livekacheln möglichst einen niedrigeren, bereits in HA verfügbaren Kamerakanal wählen. Kameras ohne Videostream behalten die aktualisierte Bildfolge.
+
+## Icon
+
+`public/mark.svg` ist die skalierbare Quelle des HAPanel-Icons. `npm run icons` erzeugt Browser-, iPad- und Web-App-PNGs sowie `icon.png`/`logo.png` für das Add-on. Die eigenständige Display-Web-App besitzt ein eigenes Apple-Touch-Icon; eine innerhalb der HA-App geöffnete Oberfläche ersetzt nicht das HA-App-Icon.

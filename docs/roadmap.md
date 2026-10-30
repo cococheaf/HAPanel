@@ -31,7 +31,9 @@
 - [ ] Gemessene Display-Viewports ins Studio übernehmen, sichere Randbereiche pro Gerät kalibrieren.
 - [ ] Mindestgröße von Touchflächen prüfen und kleine Layouts gezielt verbessern.
 - [ ] Optional adaptive Layouts je Größenklasse; Profile bleiben explizit überschreibbar.
-- [ ] Profile entfernen und Seiten umordnen.
+- [x] Displays und gefüllte Ansichten entfernen, kopieren und umordnen.
+- [x] Ansichten und Erscheinungsbild pro Display unabhängig bearbeiten.
+- [x] WebRTC und konfigurierbare Live-Kameraübersicht.
 - [ ] Details für Lichtfarbe, Farbtemperatur und HVAC-Modi.
 - [ ] Tastaturbedienung und Screenreader-Abnahme vertiefen.
 
@@ -43,3 +45,10 @@
 - [ ] Signierte, vorgebaute Containerimages und automatisierte Releases.
 
 Firmware, USB-Flashing, ESPHome-Generierung und Mikrocontroller-Protokolle gehören nicht zu HAPanel.
+
+## Nächste sinnvolle Erweiterungen
+
+- [ ] Zeitgesteuerter Nachtmodus und konfigurierbare Bildschirmruhe.
+- [ ] Optionale Kamera-Detailansicht bei Klingel- oder Bewegungsereignissen, ohne dauernde Vollbildwechsel.
+- [ ] Gerätespezifische Zuordnung eines Standardlayouts und Startansicht.
+- [ ] Sichtbare Verbindungsdiagnose mit tatsächlich gemessener Startzeit und Netzwerklast.

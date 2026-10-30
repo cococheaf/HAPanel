@@ -22,6 +22,7 @@ import {
   Camera as CameraIcon,
 } from 'lucide-react';
 import {
+  pagesForProfile,
   geometry,
   numberAttr,
   stringAttr,
@@ -642,7 +643,9 @@ export function StaticGrid({
   const { t } = useI18n();
 
   const g = geometry(profile),
-    page = document.pages.find((p) => p.id === pageId) ?? document.pages[0];
+    page =
+      pagesForProfile(document, profile.id).find((p) => p.id === pageId) ??
+      pagesForProfile(document, profile.id)[0];
   return (
     <div className="static-grid" style={{ width: g.width, height: g.height }}>
       {page.tiles.map((tile) => {
@@ -701,7 +704,8 @@ export function DashboardFrame({
   const { t, language, intlLocale } = useI18n();
 
   const document = localizeSampleDocument(configuredDocument, language);
-  const activePage = document.pages.find((page) => page.id === pageId) ?? document.pages[0];
+  const visiblePages = pagesForProfile(document, profile.id);
+  const activePage = visiblePages.find((page) => page.id === pageId) ?? visiblePages[0];
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 15_000);
@@ -710,7 +714,7 @@ export function DashboardFrame({
   return (
     <section
       data-small={profile.height < 600}
-      className={`dashboard-frame theme-${document.theme} ${profile.width < 900 ? 'compact-dashboard' : ''}`}
+      className={`dashboard-frame theme-${profile.theme ?? document.theme} ${profile.width < 900 ? 'compact-dashboard' : ''}`}
       style={{ width: profile.width, height: profile.height, padding: profile.margin }}
     >
       <header className="dashboard-header" style={{ height: profile.headerHeight }}>
@@ -720,12 +724,14 @@ export function DashboardFrame({
           </div>
           <h1>
             {activePage.heading ??
-              (activePage.id === document.pages[0].id ? document.greeting : activePage.name)}
+              (activePage.id === visiblePages[0].id
+                ? (profile.greeting ?? document.greeting)
+                : activePage.name)}
           </h1>
           <p>
             {snapshot.status === 'reconnecting'
               ? t('dashboard.disconnected')
-              : (activePage.subtitle ?? document.subtitle)}
+              : (activePage.subtitle ?? profile.subtitle ?? document.subtitle)}
           </p>
         </div>
         <div className="dashboard-clock">
@@ -750,7 +756,7 @@ export function DashboardFrame({
       )}
       <footer className="dashboard-footer" style={{ height: profile.footerHeight }}>
         <nav aria-label={t('dashboard.pages')}>
-          {document.pages.map((page, index) => (
+          {visiblePages.map((page, index) => (
             <button
               key={page.id}
               className={pageId === page.id ? 'active' : ''}
@@ -758,9 +764,9 @@ export function DashboardFrame({
             >
               {index === 0 ? (
                 <Home size={17} />
-              ) : page.id === 'energy' ? (
+              ) : (page.originId ?? page.id) === 'energy' ? (
                 <Zap size={17} />
-              ) : page.id === 'surveillance' ? (
+              ) : (page.originId ?? page.id) === 'surveillance' ? (
                 <CameraIcon size={17} />
               ) : (
                 <Layers3 size={17} />

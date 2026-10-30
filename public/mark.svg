@@ -1,1 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="18" fill="#bce6d6"/><path d="M17 29 32 17l15 12v17a2 2 0 0 1-2 2H19a2 2 0 0 1-2-2Z" fill="none" stroke="#183b35" stroke-width="4" stroke-linejoin="round"/><path d="M27 48V34h10v14" fill="none" stroke="#183b35" stroke-width="4" stroke-linejoin="round"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="HAPanel">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#254953"/><stop offset=".54" stop-color="#142e3c"/><stop offset="1" stop-color="#0b1c2b"/></linearGradient>
+    <radialGradient id="glow" cx=".16" cy=".05" r=".95"><stop stop-color="#9be3c3" stop-opacity=".26"/><stop offset="1" stop-color="#8bcbe2" stop-opacity="0"/></radialGradient>
+    <linearGradient id="mint" x1="0" y1="0" x2=".7" y2="1"><stop stop-color="#e1f5d2"/><stop offset=".48" stop-color="#b9e3c7"/><stop offset="1" stop-color="#79bda9"/></linearGradient>
+    <linearGradient id="ice" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#e3f3ed"/><stop offset="1" stop-color="#98c5ca"/></linearGradient>
+    <linearGradient id="bridge" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#edf4d5"/><stop offset="1" stop-color="#c4e4bb"/></linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff" stop-opacity=".7"/><stop offset="1" stop-color="#fff" stop-opacity=".05"/></linearGradient>
+    <filter id="shadow" x="-.5" y="-.5" width="2" height="2"><feDropShadow dx="0" dy="14" stdDeviation="17" flood-color="#020f19" flood-opacity=".4"/></filter>
+  </defs>
+  <rect width="512" height="512" rx="114" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="114" fill="url(#glow)"/>
+  <rect x="5" y="5" width="502" height="502" rx="110" fill="none" stroke="url(#shine)" stroke-opacity=".28" stroke-width="2"/>
+  <g filter="url(#shadow)">
+    <rect x="112" y="112" width="104" height="288" rx="28" fill="url(#mint)"/>
+    <rect x="296" y="112" width="104" height="288" rx="28" fill="url(#ice)"/>
+    <rect x="192" y="224" width="128" height="64" rx="20" fill="url(#bridge)"/>
+  </g>
+  <g fill="none" stroke="url(#shine)" stroke-width="2">
+    <rect x="113" y="113" width="102" height="286" rx="27"/>
+    <rect x="297" y="113" width="102" height="286" rx="27"/>
+    <rect x="193" y="225" width="126" height="62" rx="19"/>
+  </g>
+  <path d="M120 256h66m138-80h68m-68 160h68" stroke="#21464a" stroke-opacity=".18" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="348" cy="144" r="5" fill="#f4ffe7" fill-opacity=".9"/>
+</svg>

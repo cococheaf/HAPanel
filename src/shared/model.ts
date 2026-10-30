@@ -62,6 +62,7 @@ const alarmLink = z
 export const controlSchema = z
   .object({
     id,
+    originId: id.optional(),
     kind: z.enum(tileKinds),
     title: z.string().trim().min(1).max(64),
     entityId,
@@ -121,6 +122,9 @@ export const profileSchema = z
   .object({
     id,
     name: z.string().trim().min(1).max(64),
+    theme: z.enum(['dusk', 'ocean', 'sand']).optional(),
+    greeting: z.string().trim().min(1).max(80).optional(),
+    subtitle: z.string().max(100).optional(),
     physicalWidth: z.number().int().min(240).max(16384),
     physicalHeight: z.number().int().min(240).max(16384),
     diagonal: z.number().min(2).max(100),
@@ -139,6 +143,7 @@ export const profileSchema = z
 export const tileSchema = z
   .object({
     id,
+    originId: id.optional(),
     kind: z.enum(tileKinds),
     title: z.string().trim().min(1).max(64),
     entityId,
@@ -154,6 +159,8 @@ export const tileSchema = z
       .object({
         refreshSeconds: z.number().int().min(15).max(120).default(30),
         fit: z.enum(['cover', 'contain']).default('cover'),
+        overview: z.enum(['snapshot', 'live']).default('snapshot'),
+        transport: z.enum(['auto', 'webrtc', 'hls']).default('auto'),
       })
       .strict()
       .optional(),
@@ -174,6 +181,8 @@ export const dashboardSchema = z
           .object({
             id,
             name: z.string().trim().min(1).max(40),
+            profileIds: z.array(id).min(1).max(8).optional(),
+            originId: id.optional(),
             heading: z.string().trim().min(1).max(80).optional(),
             subtitle: z.string().max(100).optional(),
             tiles: z.array(tileSchema).max(64),
@@ -181,7 +190,7 @@ export const dashboardSchema = z
           .strict(),
       )
       .min(1)
-      .max(12),
+      .max(96),
   })
   .strict()
   .superRefine((doc, ctx) => {
@@ -201,7 +210,23 @@ export const dashboardSchema = z
       allControls(doc).map((t) => t.id),
       ['pages'],
     );
+    for (const [index, page] of doc.pages.entries()) {
+      if (page.profileIds) {
+        unique(page.profileIds, ['pages', index, 'profileIds']);
+        if (page.profileIds.some((id) => !doc.profiles.some((profile) => profile.id === id)))
+          ctx.addIssue({
+            code: 'custom',
+            message: 'error.invalidDisplay',
+            path: ['pages', index, 'profileIds'],
+          });
+      }
+    }
     for (const [pi, p] of doc.profiles.entries()) {
+      const visible = doc.pages.filter(
+        (page) => !page.profileIds || page.profileIds.includes(p.id),
+      );
+      if (visible.length < 1 || visible.length > 12)
+        ctx.addIssue({ code: 'custom', message: 'error.displayPageCount', path: ['profiles', pi] });
       if (geometry(p).cellWidth < 12 || geometry(p).rowHeight < 12) {
         ctx.addIssue({
           code: 'custom',
@@ -210,6 +235,7 @@ export const dashboardSchema = z
         });
       }
       for (const [pageIndex, page] of doc.pages.entries()) {
+        if (page.profileIds && !page.profileIds.includes(p.id)) continue;
         for (const [ti, tile] of page.tiles.entries()) {
           const r = tile.layouts[p.id];
           const path = ['pages', pageIndex, 'tiles', ti, 'layouts', p.id];
@@ -266,7 +292,16 @@ export const dashboardSchema = z
             path: ['pages', pageIndex, 'tiles', ti],
           });
         }
-        if (tile.navigateTo && !doc.pages.some((target) => target.id === tile.navigateTo)) {
+        if (
+          tile.navigateTo &&
+          !doc.pages.some(
+            (target) =>
+              target.id === tile.navigateTo &&
+              doc.profiles
+                .filter((profile) => !page.profileIds || page.profileIds.includes(profile.id))
+                .every((profile) => !target.profileIds || target.profileIds.includes(profile.id)),
+          )
+        ) {
           ctx.addIssue({
             code: 'custom',
             message: 'error.invalidPage',
@@ -520,4 +555,8 @@ export function resolveAction(document: Dashboard, action: Action) {
       return result('set_cover_position', { position: Math.round(value(0, 100)) });
   }
   throw new UserError('error.actionNotAllowed');
+}
+
+export function pagesForProfile(document: Pick<Dashboard, 'pages'>, profileId: string) {
+  return document.pages.filter((page) => !page.profileIds || page.profileIds.includes(profileId));
 }

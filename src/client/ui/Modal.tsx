@@ -26,7 +26,11 @@ export function Modal({
   useEffect(() => {
     const dialog = ref.current!;
     dialog.showModal();
-    return () => dialog.close();
+    window.dispatchEvent(new Event('hapanel:modal'));
+    return () => {
+      dialog.close();
+      window.dispatchEvent(new Event('hapanel:modal'));
+    };
   }, []);
   return (
     <dialog

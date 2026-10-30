@@ -16,7 +16,7 @@
 
 HAPanel combines rounded tiles, calm colours and direct touch controls with a visual layout editor. It runs as a Home Assistant app (add-on) or a local Node.js process. Existing Lovelace dashboards and HA configuration files are preserved.
 
-**Version: 1.1.0.** The preview, editor and API are implemented. The HA adapter is tested against a simulated WebSocket server. Installation, updates, Ingress and live data are verified on HA OS 18.4 / Core 2026.10.4 (amd64). Testing on physical iPad hardware remains pending.
+**Version: 1.2.0.** The preview, editor and API are implemented. The HA adapter is tested against a simulated WebSocket server. Installation, updates, Ingress and live data are verified on HA OS 18.4 / Core 2026.10.4 (amd64). Testing on physical iPad hardware remains pending.
 
 ## Try it
 
@@ -91,3 +91,11 @@ HAPanel is [MIT licensed](LICENSE). Icons are from [Lucide](https://lucide.dev/l
 ![HAPanel surveillance preview](docs/images/surveillance.png)
 
 </details>
+
+## Displays and cameras
+
+At the top of the Designer, **Edit display** selects the layout you are working on. **Manage displays** provides creation, duplication and removal. Views can be reordered, deleted with their tiles or copied to another or a new display. Copies are independent. Colours and greetings belong to the selected display. **Manage devices** handles paired browser access separately.
+
+In a camera tile, choose **Snapshot** or **Live stream** under **Camera overview**. **Automatic** prefers the WebRTC connection offered by HA and falls back to HLS when needed. WebRTC requires a reachable direct media connection in your network; HLS can still introduce delay. **Jump to live edge** is available in HLS details.
+
+![Display management](docs/images/displays-en.png)

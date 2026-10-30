@@ -193,17 +193,18 @@ const showcaseLabels: Record<string, MessageKey> = {
   'Einspeisung heute': 'sample.exportToday',
 };
 /** Translate untouched sample labels only. Custom text and saved layouts are never rewritten. */
-export function localizedSampleTile<T extends { id: string; title: string }>(
+export function localizedSampleTile<T extends { id: string; title: string; originId?: string }>(
   tile: T,
   language: Language,
 ): T {
-  const example = Object.hasOwn(showcaseCopy, tile.id) ? showcaseCopy[tile.id] : undefined;
+  const originalId = tile.originId ?? tile.id;
+  const example = Object.hasOwn(showcaseCopy, originalId) ? showcaseCopy[originalId] : undefined;
   if (example && tile.title === example.title)
     return { ...tile, title: translate(language, example.key) };
-  if (tile.id.startsWith('demo_') && Object.hasOwn(showcaseLabels, tile.title))
+  if ((tile.originId ?? tile.id).startsWith('demo_') && Object.hasOwn(showcaseLabels, tile.title))
     return { ...tile, title: translate(language, showcaseLabels[tile.title]) };
-  const key = sampleTileKeys[tile.id as keyof typeof sampleTileKeys];
-  const original = demoDocument.pages[0].tiles.find((item) => item.id === tile.id);
+  const key = sampleTileKeys[originalId as keyof typeof sampleTileKeys];
+  const original = demoDocument.pages[0].tiles.find((item) => item.id === originalId);
   return key && original?.title === tile.title
     ? { ...tile, title: translate(language, key) }
     : tile;
@@ -233,35 +234,35 @@ export function localizeSampleDocument(document: Dashboard, language: Language):
       ...page,
       heading: !page.heading
         ? page.heading
-        : page.id === 'eg'
+        : (page.originId ?? page.id) === 'eg'
           ? sample(page.heading ?? '', 'Zusammen zuhause.', 'sample.headingEG')
-          : page.id === 'og'
+          : (page.originId ?? page.id) === 'og'
             ? sample(page.heading ?? '', 'Deine Rückzugsorte.', 'sample.headingOG')
-            : page.id === 'energy'
+            : (page.originId ?? page.id) === 'energy'
               ? sample(page.heading ?? '', 'Dein Energiecockpit.', 'sample.headingEnergy')
-              : page.id === 'surveillance'
+              : (page.originId ?? page.id) === 'surveillance'
                 ? sample(page.heading, 'Zuhause im Blick.', 'sample.headingSurveillance')
                 : page.heading,
       subtitle:
-        page.id === 'eg'
+        (page.originId ?? page.id) === 'eg'
           ? sample(
               page.subtitle ?? '',
               'Erdgeschoss · Wohnen, kochen und ankommen.',
               'sample.subtitleEG',
             )
-          : page.id === 'og'
+          : (page.originId ?? page.id) === 'og'
             ? sample(
                 page.subtitle ?? '',
                 'Obergeschoss · Ruhe, Raum und Wohlbefinden.',
                 'sample.subtitleOG',
               )
-            : page.id === 'energy'
+            : (page.originId ?? page.id) === 'energy'
               ? sample(
                   page.subtitle ?? '',
                   'Erzeugung, Netz und Speicher auf einen Blick.',
                   'sample.subtitleEnergy',
                 )
-              : page.id === 'surveillance'
+              : (page.originId ?? page.id) === 'surveillance'
                 ? sample(
                     page.subtitle ?? '',
                     'Kameras · Live-Ansichten bei Bedarf.',
@@ -269,22 +270,22 @@ export function localizeSampleDocument(document: Dashboard, language: Language):
                   )
                 : page.subtitle,
       name:
-        page.id === 'eg'
+        (page.originId ?? page.id) === 'eg'
           ? sample(page.name, 'EG', 'sample.navEG')
-          : page.id === 'og'
+          : (page.originId ?? page.id) === 'og'
             ? sample(page.name, 'OG', 'sample.navOG')
-            : page.id === 'energy'
+            : (page.originId ?? page.id) === 'energy'
               ? sample(page.name, 'Energie', 'sample.energy')
-              : page.id === 'surveillance'
+              : (page.originId ?? page.id) === 'surveillance'
                 ? sample(page.name, 'Überwachung', 'sample.surveillance')
-                : page.id === 'overview'
+                : (page.originId ?? page.id) === 'overview'
                   ? sample(page.name, 'Zuhause', 'sample.home')
-                  : page.id === 'favorites'
+                  : (page.originId ?? page.id) === 'favorites'
                     ? sample(page.name, 'Favoriten', 'sample.favourites')
                     : page.name,
       tiles: page.tiles.map((tile) => {
         let view = localizedSampleTile(tile, language);
-        if (tile.id === 'demo_contacts' && tile.contacts) {
+        if ((tile.originId ?? tile.id) === 'demo_contacts' && tile.contacts) {
           const labels: Record<string, MessageKey> = {
             Terrassentür: 'sample.terraceDoor',
             Küchenfenster: 'sample.kitchenWindow',
@@ -301,7 +302,7 @@ export function localizeSampleDocument(document: Dashboard, language: Language):
             })),
           };
         }
-        if (!tile.energy || !tile.id.startsWith('demo_')) return view;
+        if (!tile.energy || !(tile.originId ?? tile.id).startsWith('demo_')) return view;
         const label = (value: string) =>
           Object.hasOwn(showcaseLabels, value) ? translate(language, showcaseLabels[value]) : value;
         return {

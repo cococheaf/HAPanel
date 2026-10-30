@@ -2,7 +2,7 @@ import { localizeSampleDocument } from '../../shared/demo';
 import { useI18n, LanguageSwitcher } from '../i18n';
 import { useEffect, useState } from 'react';
 import { Expand, Info, Settings2, X } from 'lucide-react';
-import type { Action, Revision, Snapshot } from '../../shared/model';
+import { pagesForProfile, type Action, type Revision, type Snapshot } from '../../shared/model';
 import { DashboardFrame, ScaledCanvas } from '../ui/Dashboard';
 
 export default function Player({
@@ -24,7 +24,9 @@ export default function Player({
   const [profileId, setProfileId] = useState(() => {
     let saved: string | null = null;
     try {
-      saved = localStorage.getItem('hapanel-display-profile');
+      saved =
+        new URL(window.location.href).searchParams.get('display') ??
+        localStorage.getItem('hapanel-display-profile');
     } catch {
       /* storage may be disabled */
     }
@@ -47,7 +49,8 @@ export default function Player({
     return () => window.removeEventListener('resize', resize);
   }, []);
   const profile = document.profiles.find((p) => p.id === profileId) ?? document.profiles[0];
-  const page = document.pages.find((p) => p.id === pageId) ?? document.pages[0];
+  const visiblePages = pagesForProfile(document, profile.id);
+  const page = visiblePages.find((p) => p.id === pageId) ?? visiblePages[0];
   useEffect(() => {
     if (message) {
       const t = setTimeout(() => setMessage(''), 6000);
@@ -108,7 +111,16 @@ export default function Player({
           <Expand size={18} />
         </button>
         {onEdit && (
-          <button className="player-edit" onClick={onEdit} aria-label={t('player.exploreStudio')}>
+          <button
+            className="player-edit"
+            onClick={() => {
+              try {
+                localStorage.setItem('hapanel-editor-display', profile.id);
+              } catch {}
+              onEdit();
+            }}
+            aria-label={t('player.exploreStudio')}
+          >
             <Settings2 size={15} />
             <span>{t('player.exploreStudio')}</span>
           </button>

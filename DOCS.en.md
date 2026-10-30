@@ -120,3 +120,26 @@ The display information menu shows viewport size and DPR. In Home Screen standal
 ## Backup and updates
 
 Normal add-on updates preserve private data. Keep a HA backup and a JSON/YAML export before updating. Reinstallation may remove private add-on data. `dashboard.json` stores draft, publication and history; `devices.json` stores hashed pairing/session data. Invalid stored dashboards are never overwritten at startup.
+
+## Display management in 1.2
+
+1. Open the Designer and choose a layout under **Edit display** at the top. The selection is remembered in this browser.
+2. Choose **Manage displays → Add display**. Reuse existing dimensions and either copy all views or start empty.
+3. Use a view’s copy button to target an existing display or **Create a new display …**. Copies retain all tiles and adapt to the target grid. Unavailable navigation targets are removed.
+4. Arrows reorder views. The trash button deletes populated views after confirmation. At least one view and one display must remain.
+5. A display’s trash button removes its layout and views. Undo and version history can restore draft changes; devices receive changes only after publication.
+6. **Manage devices** manages browser pairings. Revoking access signs out that browser while preserving layouts. Layout selection is not a permission boundary; existing server permissions still apply.
+
+Previously shared views are copied independently per display on first startup. First-display IDs and entity bindings are retained. The unmodified original file is backed up as `dashboard-before-display-views.json` in private add-on storage. Drafts, publications and history remain separate. Export JSON and keep the HA app backup before updating. Older versions cannot read the extended file; restore the matching backup when rolling back.
+
+## Camera connections and live overview
+
+Each camera has **Camera overview: Snapshot / Live stream** and **Connection: Automatic / WebRTC / HLS**. Automatic detects HA capabilities, prefers WebRTC and falls back to HLS after a bounded wait when the direct connection is unavailable. The live indicator identifies the transport. Smaller HLS buffers and **Jump to live edge** reduce additional player delay without guaranteeing camera or network latency.
+
+Signalling uses the existing administrator gate through the add-on. Media uses the local route offered by HA. HAPanel uses no external STUN/TURN service, requests no microphone and installs no additional camera server. HLS fallback may be necessary across network boundaries or remote connections. Router, firewall and HA permissions are preserved.
+
+Live tiles start only while visible and pause behind an open detail view. For multiple streams on weaker tablets, choose a lower-resolution camera channel already available in HA. Cameras without video keep the updated-image fallback.
+
+## Icon
+
+`public/mark.svg` is the scalable source. `npm run icons` generates browser, iPad and Web App PNGs, plus `icon.png`/`logo.png` for the add-on. The standalone display Web App has its own Apple Touch icon; viewing HAPanel inside HA does not replace the HA app icon.

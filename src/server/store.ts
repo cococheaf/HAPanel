@@ -11,6 +11,7 @@ import {
 } from '../shared/i18n';
 import { z } from 'zod';
 import { dashboardSchema, type Dashboard, type Workspace } from '../shared/model';
+import { independentDisplayViews } from '../shared/display-layouts';
 import { demoDocument } from '../shared/demo';
 
 export class HttpError extends Error {
@@ -58,10 +59,10 @@ export class DocumentStore extends EventEmitter {
   }
   async init() {
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
+    let originalSource: string | undefined;
     try {
-      this.state = workspaceSchema.parse(
-        JSON.parse(await readFile(join(this.directory, 'dashboard.json'), 'utf8')),
-      );
+      originalSource = await readFile(join(this.directory, 'dashboard.json'), 'utf8');
+      this.state = workspaceSchema.parse(JSON.parse(originalSource));
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
         throw new Error(
@@ -72,9 +73,27 @@ export class DocumentStore extends EventEmitter {
       this.state = structuredClone({ draft: revision, published: revision, history: [] });
       await atomicJson(join(this.directory, 'dashboard.json'), this.state);
     }
+    const before = this.get(),
+      next = this.get();
+    next.draft.document = independentDisplayViews(next.draft.document);
+    next.published.document = independentDisplayViews(next.published.document);
+    if (JSON.stringify(before) !== JSON.stringify(next)) {
+      await writeFile(
+        join(this.directory, 'dashboard-before-display-views.json'),
+        originalSource ?? JSON.stringify(before, null, 2),
+        { mode: 0o600, flag: 'wx' },
+      ).catch((error) => {
+        if (error.code !== 'EEXIST') throw error;
+      });
+      await atomicJson(join(this.directory, 'dashboard.json'), next);
+      this.state = next;
+    }
   }
   get() {
     return structuredClone(this.state);
+  }
+  getRevision(scope: 'draft' | 'published') {
+    return structuredClone(this.state[scope]);
   }
   private transact(change: (state: Workspace) => void) {
     const operation = this.queue.then(async () => {
@@ -89,7 +108,7 @@ export class DocumentStore extends EventEmitter {
     return operation;
   }
   save(document: Dashboard, expectedRevision: number) {
-    const parsed = dashboardSchema.parse(document);
+    const parsed = independentDisplayViews(dashboardSchema.parse(document));
     return this.transact((state) => {
       if (state.draft.revision !== expectedRevision) throw new HttpError(409, 'error.conflict');
       state.history = [state.draft, ...state.history].slice(0, 30);
@@ -115,7 +134,7 @@ export class DocumentStore extends EventEmitter {
       state.draft = {
         revision: state.draft.revision + 1,
         savedAt: new Date().toISOString(),
-        document: structuredClone(target.document),
+        document: independentDisplayViews(target.document),
       };
     });
   }

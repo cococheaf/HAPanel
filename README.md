@@ -22,7 +22,7 @@
 
 HAPanel verbindet großzügige, abgerundete Kacheln, ruhige Farben und direkte Touch-Bedienung mit einem visuellen Layout-Editor. Es läuft als eigene Home Assistant App (Add-on) oder als lokaler Node.js-Prozess. Bestehende Lovelace-Dashboards und HA-Konfigurationsdateien bleiben unverändert.
 
-**Version: 1.1.0.** Die Vorschau, der Editor und die API sind implementiert. Die HA-Anbindung ist gegen einen simulierten WebSocket-Server geprüft. Installation, Update, Ingress und Live-Daten sind auf HA OS 18.4 / Core 2026.10.4 (amd64) geprüft. Tests auf physischer iPad-Hardware stehen noch aus.
+**Version: 1.2.0.** Die Vorschau, der Editor und die API sind implementiert. Die HA-Anbindung ist gegen einen simulierten WebSocket-Server geprüft. Installation, Update, Ingress und Live-Daten sind auf HA OS 18.4 / Core 2026.10.4 (amd64) geprüft. Tests auf physischer iPad-Hardware stehen noch aus.
 
 ## Ausprobieren
 
@@ -95,3 +95,11 @@ HAPanel: [MIT](LICENSE). Icons: [Lucide](https://lucide.dev/license). Beispiel-A
 ![HAPanel surveillance preview](docs/images/surveillance.png)
 
 </details>
+
+## Displays und Kameras
+
+Im Designer befindet sich oben **Display bearbeiten** mit der Display-Auswahl. **Displays verwalten** öffnet die gemeinsame Übersicht für neue Layouts, Kopien und Löschaktionen. Dort lassen sich Ansichten auch mit gefüllten Kacheln löschen, sortieren oder auf ein anderes beziehungsweise neues Display kopieren. Kopien sind unabhängig. Farben und Begrüßung gelten für das ausgewählte Display. **Geräte verwalten** kümmert sich separat um gekoppelte Browserzugänge.
+
+In einer Kamerakachel unter **Kameraübersicht** zwischen **Standbild** und **Livestream** wählen. **Automatisch** bevorzugt die von HA angebotene WebRTC-Verbindung und fällt bei Bedarf auf HLS zurück. WebRTC benötigt eine erreichbare direkte Medienverbindung im Netzwerk; HLS kann weiterhin verzögert sein. Im HLS-Detail hilft **Zur Livekante springen**.
+
+![Display-Verwaltung](docs/images/displays.png)

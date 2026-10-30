@@ -36,7 +36,8 @@ async function main() {
   await store.init();
   await pairings.init();
   const sync = () => {
-    const { draft, published } = store.get();
+    const draft = store.getRevision('draft'),
+      published = store.getRevision('published');
     hub.setDocuments([draft.document, published.document]);
   };
   store.on('change', sync);

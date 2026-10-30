@@ -1,3 +1,4 @@
+import { independentDisplayViews } from '../shared/display-layouts';
 import { UserError, isMessageKey } from '../shared/i18n';
 import { requestLanguage } from './i18n';
 import {
@@ -164,6 +165,8 @@ export class BrowserDemoService implements StudioService {
     } catch {
       /* A browser-local demo can always start with the example. */
     }
+    this.workspace.draft.document = independentDisplayViews(this.workspace.draft.document);
+    this.workspace.published.document = independentDisplayViews(this.workspace.published.document);
   }
   private persist() {
     try {
@@ -190,7 +193,7 @@ export class BrowserDemoService implements StudioService {
   }
   async save(document: Dashboard, revision: number) {
     if (revision !== this.workspace.draft.revision) throw new UserError('error.conflict');
-    const parsed = dashboardSchema.parse(document);
+    const parsed = independentDisplayViews(dashboardSchema.parse(document));
     this.workspace.history = [
       structuredClone(this.workspace.draft),
       ...this.workspace.history,

@@ -3,6 +3,12 @@ import { EventEmitter } from 'node:events';
 import WebSocket from 'ws';
 import { applyDemoAction, demoSnapshot } from '../shared/demo';
 import { validateAlarmCommand } from '../shared/security';
+import {
+  rtcCandidateSchema,
+  type CameraCandidate,
+  type CameraSignalEvent,
+  type CameraCapabilities,
+} from '../shared/camera';
 import { CameraProxy } from './cameras';
 import {
   entityIds,
@@ -45,6 +51,10 @@ export class HomeAssistantHub extends EventEmitter {
   private catalog?: { until: number; entities: EntityState[] };
   private history = new Map<string, { until: number; data: Promise<HistoryPoint[]> }>();
   private cameras: CameraProxy;
+  private cameraCapabilitiesCache = new Map<
+    string,
+    { until: number; value: Promise<CameraCapabilities> }
+  >();
   constructor(private options: HubOptions) {
     super();
     this.setMaxListeners(0); // Each connected display removes its listener on close.
@@ -133,6 +143,7 @@ export class HomeAssistantHub extends EventEmitter {
       }
       this.pending.clear();
       this.events.clear();
+      this.cameraCapabilitiesCache.clear();
       this.snapshot.status = 'reconnecting';
       this.emitSnapshot();
       if (!this.stopped)
@@ -409,6 +420,92 @@ export class HomeAssistantHub extends EventEmitter {
   cameraLive(entityId: string, asset?: string, query?: Record<string, unknown>, range?: string) {
     this.requireCamera(entityId);
     return this.cameras.live(entityId, asset, query, range);
+  }
+  cameraCapabilities(entityId: string): Promise<CameraCapabilities> {
+    this.requireCamera(entityId);
+    const cached = this.cameraCapabilitiesCache.get(entityId);
+    if (cached && cached.until > Date.now()) return cached.value;
+    const value = this.rpc({ type: 'camera/capabilities', entity_id: entityId })
+      .then(async (result) => {
+        const types = Array.isArray(result?.frontend_stream_types)
+          ? result.frontend_stream_types
+          : [];
+        let dataChannel: string | undefined;
+        if (types.includes('web_rtc')) {
+          const config = await this.rpc({
+            type: 'camera/webrtc/get_client_config',
+            entity_id: entityId,
+          });
+          if (typeof config?.dataChannel === 'string' && config.dataChannel.length <= 64)
+            dataChannel = config.dataChannel;
+        }
+        return {
+          webrtc: types.includes('web_rtc'),
+          hls: types.includes('hls'),
+          ...(dataChannel ? { dataChannel } : {}),
+        };
+      })
+      .catch(() => {
+        this.cameraCapabilitiesCache.delete(entityId);
+        throw new UserError('error.cameraUnavailable');
+      });
+    if (this.cameraCapabilitiesCache.size >= 32)
+      this.cameraCapabilitiesCache.delete(this.cameraCapabilitiesCache.keys().next().value!);
+    this.cameraCapabilitiesCache.set(entityId, { until: Date.now() + 30_000, value });
+    return value;
+  }
+  cameraWebRtc(entityId: string, offer: string, send: (event: CameraSignalEvent) => void) {
+    this.requireCamera(entityId);
+    let session: string | undefined,
+      closed = false;
+    const queued: CameraCandidate[] = [];
+    const addCandidate = async (candidate: CameraCandidate) => {
+      if (closed) return;
+      if (!session) {
+        if (queued.length < 64) queued.push(candidate);
+        return;
+      }
+      await this.rpc({
+        type: 'camera/webrtc/candidate',
+        entity_id: entityId,
+        session_id: session,
+        candidate,
+      });
+    };
+    const request = this.request(
+      { type: 'camera/webrtc/offer', entity_id: entityId, offer },
+      (event) => {
+        if (closed) return;
+        if (event.type === 'session' && typeof event.session_id === 'string') {
+          session = event.session_id;
+          for (const candidate of queued.splice(0))
+            void addCandidate(candidate).catch(() => send({ type: 'error' }));
+        } else if (
+          event.type === 'answer' &&
+          typeof event.answer === 'string' &&
+          event.answer.length <= 131072
+        )
+          send({ type: 'answer', sdp: event.answer });
+        else if (event.type === 'candidate') {
+          const parsed = rtcCandidateSchema.safeParse(event.candidate);
+          if (parsed.success) send({ type: 'candidate', candidate: parsed.data });
+        } else if (event.type === 'error') send({ type: 'error' });
+      },
+    );
+    const stop = () => {
+      if (closed) return;
+      closed = true;
+      queued.length = 0;
+      this.events.delete(request.id);
+      void request.promise
+        .then(() => this.rpc({ type: 'unsubscribe_events', subscription: request.id }))
+        .catch(() => undefined);
+    };
+    void request.promise.catch(() => {
+      if (!closed) send({ type: 'error' });
+      stop();
+    });
+    return { ready: request.promise, candidate: addCandidate, stop };
   }
   async stop() {
     this.stopped = true;

@@ -32,6 +32,7 @@ import {
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import {
+  pagesForProfile,
   actionSchema,
   dashboardSchema,
   findSpace,
@@ -49,10 +50,12 @@ import { api, serializeDashboard, type Bootstrap, type StudioService } from '../
 import { DashboardFrame, ScaledCanvas, TileView } from '../ui/Dashboard';
 import { kindIcons, kindLabelKeys } from '../ui/kinds';
 import { Modal } from '../ui/Modal';
+import { DisplayManager, type DisplayIntent } from './DisplayManager';
+import { createDisplay, resizeDisplay, layoutId } from '../../shared/display-layouts';
 import { InsightSettings } from './InsightSettings';
 
-const freshId = (prefix: string) => `${prefix}_${crypto.randomUUID().slice(0, 8)}`;
-type Dialog = 'preview' | 'devices' | 'history' | 'import' | 'export' | null;
+const freshId = layoutId;
+type Dialog = 'preview' | 'devices' | 'displays' | 'history' | 'import' | 'export' | null;
 const domainKinds: Record<string, TileKind> = {
   light: 'light',
   switch: 'light',
@@ -130,7 +133,15 @@ function Studio({
   const [past, setPast] = useState<Dashboard[]>([]),
     [future, setFuture] = useState<Dashboard[]>([]);
   const [snapshot, setSnapshot] = useState<Snapshot>(bootstrap.snapshot);
-  const [profileId, setProfileId] = useState(document.profiles[0].id),
+  const [profileId, setProfileId] = useState(() => {
+      try {
+        const id =
+          new URL(window.location.href).searchParams.get('display') ??
+          localStorage.getItem('hapanel-editor-display');
+        if (document.profiles.some((profile) => profile.id === id)) return id!;
+      } catch {}
+      return document.profiles[0].id;
+    }),
     [pageId, setPageId] = useState(document.pages[0].id);
   const [selectedId, setSelectedId] = useState('light');
   const [inspector, setInspector] = useState<'tile' | 'display'>('tile');
@@ -140,11 +151,19 @@ function Studio({
   const [status, setStatus] = useState<'saved' | 'saving' | 'dirty' | 'error'>('saved');
   const [toast, setToast] = useState(''),
     [dialog, setDialog] = useState<Dialog>(null);
+  const [displayIntent, setDisplayIntent] = useState<DisplayIntent>();
+  const manageDisplays = (intent?: DisplayIntent) => {
+    setDisplayIntent(intent);
+    setDialog('displays');
+  };
   const [testMode, setTestMode] = useState(false),
     [grid, setGrid] = useState(true),
     [zoom, setZoom] = useState(1);
   const [code, setCode] = useState(''),
-    [devices, setDevices] = useState<{ id: string; name: string }[]>([]);
+    [devices, setDevices] = useState<
+      { id: string; name: string; createdAt?: string; expires?: number }[]
+    >([]);
+  const [revoking, setRevoking] = useState<string>();
   const [importText, setImportText] = useState(''),
     [format, setFormat] = useState<'json' | 'yaml'>('json');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -152,9 +171,15 @@ function Studio({
   documentRef.current = document;
   workspaceRef.current = workspace;
   const profile = document.profiles.find((p) => p.id === profileId) ?? document.profiles[0];
-  const page = document.pages.find((p) => p.id === pageId) ?? document.pages[0];
+  const visiblePages = pagesForProfile(document, profile.id);
+  const page = visiblePages.find((p) => p.id === pageId) ?? visiblePages[0];
   const selected = page.tiles.find((t) => t.id === selectedId);
   const viewDocument = localizeSampleDocument(document, language);
+  useEffect(() => {
+    try {
+      localStorage.setItem('hapanel-editor-display', profile.id);
+    } catch {}
+  }, [profile.id]);
   const viewPage = viewDocument.pages.find((p) => p.id === page.id)!;
   const viewProfile = viewDocument.profiles.find((p) => p.id === profile.id)!;
   const viewSelected = selected && localizedSampleTile(selected, language);
@@ -310,7 +335,9 @@ function Studio({
       return;
     }
     const layouts: Tile['layouts'] = {};
-    for (const target of document.profiles) {
+    for (const target of document.profiles.filter(
+      (profile) => !page.profileIds || page.profileIds.includes(profile.id),
+    )) {
       const spot = findSpace(target, page.tiles, 4, 2);
       if (!spot) {
         notify(t('editor.noSpace', { name: target.name }));
@@ -353,7 +380,12 @@ function Studio({
     const id = freshId('page');
     if (
       change((d) => {
-        d.pages.push({ id, name: t('editor.newPage', { number: d.pages.length + 1 }), tiles: [] });
+        d.pages.push({
+          id,
+          name: t('editor.newPage', { number: visiblePages.length + 1 }),
+          profileIds: [profile.id],
+          tiles: [],
+        });
       })
     ) {
       setPageId(id);
@@ -398,13 +430,13 @@ function Studio({
       notify(describeError(e));
     }
   };
-  const profileUpdate = (patch: Partial<Profile>) =>
-    change((d) => {
-      Object.assign(
-        d.profiles.find((p) => p.id === profile.id)!,
-        patch,
-      );
-    });
+  const profileUpdate = (patch: Partial<Profile>) => {
+    try {
+      commit(resizeDisplay(documentRef.current, profile.id, patch));
+    } catch (error) {
+      notify(describeError(error));
+    }
+  };
   const layoutChanged = (layout: Layout) =>
     change((d) => {
       for (const tile of d.pages.find((p) => p.id === page.id)!.tiles) {
@@ -419,7 +451,7 @@ function Studio({
         .toLowerCase()
         .includes(search.toLowerCase()),
   );
-  const layout = page.tiles.map((t) => ({ i: t.id, ...t.layouts[profile.id], minW: 2, minH: 1 }));
+  const layout = page.tiles.map((t) => ({ i: t.id, ...t.layouts[profile.id], minW: 1, minH: 1 }));
   const isPublished =
     saved.current === JSON.stringify(document) &&
     workspace.draft.revision === workspace.published.revision;
@@ -465,7 +497,9 @@ function Studio({
             onClick={async () => {
               try {
                 await flush();
-                window.location.assign(new URL('./display.html', window.document.baseURI));
+                const url = new URL('./display.html', window.document.baseURI);
+                url.searchParams.set('display', profile.id);
+                window.location.assign(url);
               } catch (error) {
                 notify(describeError(error));
               }
@@ -635,11 +669,19 @@ function Studio({
               <Plus size={16} />
               {t('editor.tiles')}
             </button>
-            <Tablet size={17} />
+            <label className="display-select-label" htmlFor="editor-display-choice">
+              <Tablet size={17} />
+              {t('display.editing')}
+            </label>
             <select
+              id="editor-display-choice"
               aria-label={t('editor.displayProfile')}
               value={profile.id}
-              onChange={(e) => setProfileId(e.target.value)}
+              onChange={(e) => {
+                setProfileId(e.target.value);
+                setPageId(pagesForProfile(document, e.target.value)[0].id);
+                setSelectedId('');
+              }}
             >
               {viewDocument.profiles.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -647,6 +689,10 @@ function Studio({
                 </option>
               ))}
             </select>
+            <button className="button display-manage-button" onClick={() => manageDisplays()}>
+              <Monitor size={16} />
+              {t('display.manage')}
+            </button>
             <span className="device-resolution">
               {profile.width} × {profile.height} CSS px
             </span>
@@ -788,7 +834,7 @@ function Studio({
           <footer className="workspace-footer">
             <span className="pages-label">{t('editor.pagesHeading')}</span>
             <div className="page-tabs">
-              {viewDocument.pages.map((p, index) => (
+              {pagesForProfile(viewDocument, profile.id).map((p, index) => (
                 <button
                   key={p.id}
                   className={page.id === p.id ? 'active' : ''}
@@ -916,7 +962,7 @@ function Studio({
                   <InsightSettings
                     tile={selected}
                     catalog={bootstrap.catalog}
-                    pages={viewDocument.pages}
+                    pages={pagesForProfile(viewDocument, profile.id)}
                     update={updateTile}
                   />
                   <div className="form-section">
@@ -989,7 +1035,9 @@ function Studio({
                         copy.title = t('editor.copyTitle', {
                           title: localizedSampleTile(selected, language).title,
                         });
-                        for (const p of document.profiles) {
+                        for (const p of document.profiles.filter(
+                          (target) => !page.profileIds || page.profileIds.includes(target.id),
+                        )) {
                           const spot = findSpace(
                             p,
                             page.tiles,
@@ -1072,26 +1120,26 @@ function Studio({
                       }
                     />
                   </label>
-                  {document.pages.length > 1 && (
+                  <div className="view-management-actions">
+                    <button
+                      className="button"
+                      onClick={() => manageDisplays({ type: 'copyView', id: page.id })}
+                    >
+                      <Copy size={15} />
+                      {t('display.copyViewNamed', { name: page.name })}
+                    </button>
                     <button
                       className="button danger"
-                      onClick={() => {
-                        if (page.tiles.length) {
-                          notify(t('editor.removeTilesFirst'));
-                          return;
-                        }
-                        change((d) => {
-                          d.pages = d.pages.filter((p) => p.id !== page.id);
-                          for (const tile of d.pages.flatMap((item) => item.tiles))
-                            if (tile.navigateTo === page.id) delete tile.navigateTo;
-                        });
-                        setPageId(document.pages.find((p) => p.id !== page.id)!.id);
-                      }}
+                      disabled={visiblePages.length === 1}
+                      onClick={() => manageDisplays({ type: 'deleteView', id: page.id })}
                     >
                       <Trash2 size={15} />
-                      {t('editor.removeEmptyPage')}
+                      {t('display.removeViewNamed', { name: page.name })}
                     </button>
-                  )}
+                    <button className="button" onClick={() => manageDisplays()}>
+                      {t('display.manageViews')}
+                    </button>
+                  </div>
                 </div>
               )
             ) : (
@@ -1109,18 +1157,22 @@ function Studio({
                 <button
                   className="button full-width"
                   onClick={() => {
-                    const copy = structuredClone(profile);
-                    copy.id = freshId('display');
-                    copy.name = t('editor.copyTitle', { title: profile.name });
-                    if (
-                      change((d) => {
-                        d.profiles.push(copy);
-                        for (const p of d.pages)
-                          for (const t of p.tiles)
-                            t.layouts[copy.id] = { ...t.layouts[profile.id] };
-                      })
-                    )
-                      setProfileId(copy.id);
+                    try {
+                      const result = createDisplay(
+                        documentRef.current,
+                        t('editor.copyTitle', { title: profile.name }),
+                        profile.id,
+                        true,
+                        t('sample.home'),
+                      );
+                      if (commit(result.document)) {
+                        setProfileId(result.profileId);
+                        setPageId(pagesForProfile(result.document, result.profileId)[0].id);
+                        setSelectedId('');
+                      }
+                    } catch (error) {
+                      notify(describeError(error));
+                    }
                   }}
                 >
                   <Plus size={15} />
@@ -1128,46 +1180,36 @@ function Studio({
                 </button>
                 <div className="form-section">
                   <h3>{t('editor.atmosphereHeading')}</h3>
+                  <p className="field-hint">{t('display.appearanceHint')}</p>
                   <div className="theme-options">
                     {(['dusk', 'ocean', 'sand'] as const).map((theme) => (
                       <button
                         key={theme}
                         title={t(`theme.${theme}`)}
                         aria-label={t('editor.theme', { theme: t(`theme.${theme}`) })}
-                        className={`theme-swatch theme-${theme} ${document.theme === theme ? 'active' : ''}`}
-                        onClick={() =>
-                          change((d) => {
-                            d.theme = theme;
-                          })
-                        }
+                        className={`theme-swatch theme-${theme} ${(profile.theme ?? document.theme) === theme ? 'active' : ''}`}
+                        onClick={() => profileUpdate({ theme })}
                       >
-                        {document.theme === theme && <Check size={17} />}
+                        {(profile.theme ?? document.theme) === theme && <Check size={17} />}
                       </button>
                     ))}
                   </div>
                   <label>
                     {t('editor.greeting')}
                     <input
-                      value={viewDocument.greeting}
+                      value={viewProfile.greeting ?? viewDocument.greeting}
                       maxLength={80}
                       onChange={(e) => {
-                        if (e.target.value.trim())
-                          change((d) => {
-                            d.greeting = e.target.value;
-                          });
+                        if (e.target.value.trim()) profileUpdate({ greeting: e.target.value });
                       }}
                     />
                   </label>
                   <label>
                     {t('editor.subtitle')}
                     <input
-                      value={viewDocument.subtitle}
+                      value={viewProfile.subtitle ?? viewDocument.subtitle}
                       maxLength={100}
-                      onChange={(e) =>
-                        change((d) => {
-                          d.subtitle = e.target.value;
-                        })
-                      }
+                      onChange={(e) => profileUpdate({ subtitle: e.target.value })}
                     />
                   </label>
                 </div>
@@ -1185,6 +1227,11 @@ function Studio({
                 onClick={async () => {
                   try {
                     await flush();
+                    try {
+                      localStorage.setItem('hapanel-display-profile', profile.id);
+                    } catch {
+                      /* Keep the current session usable when storage is unavailable. */
+                    }
                     onExit();
                   } catch (e) {
                     notify(describeError(e));
@@ -1292,6 +1339,30 @@ function Studio({
           </div>
         </Modal>
       )}
+      {dialog === 'displays' && (
+        <DisplayManager
+          document={document}
+          profileId={profile.id}
+          initial={displayIntent}
+          onChange={commit}
+          onSelect={(id, pageId, edit) => {
+            setProfileId(id);
+            setPageId(pageId ?? pagesForProfile(documentRef.current, id)[0]?.id ?? '');
+            setSelectedId('');
+            if (edit) {
+              setDialog(null);
+              setInspector(pageId ? 'tile' : 'display');
+              setRightOpen(true);
+            }
+          }}
+          onClose={() => setDialog(null)}
+          local={service.local}
+          onDevices={() => {
+            setDialog(null);
+            void loadDevices();
+          }}
+        />
+      )}
       {dialog === 'devices' && (
         <Modal
           message={toast}
@@ -1319,21 +1390,49 @@ function Studio({
               {code.slice(0, 5)}-{code.slice(5)}
             </div>
           )}
-          <div className="revision-list">
-            {devices.map((device) => (
-              <div key={device.id}>
-                <strong>{device.name}</strong>
+          {revoking && (
+            <div className="device-revoke-confirm">
+              <h3>
+                {t('display.revokeTitle', {
+                  name: devices.find((device) => device.id === revoking)?.name ?? '',
+                })}
+              </h3>
+              <p>{t('display.revokeHint')}</p>
+              <div className="display-manager-form-actions">
+                <button className="button" onClick={() => setRevoking(undefined)}>
+                  {t('common.cancel')}
+                </button>
                 <button
                   className="button danger"
                   onClick={async () => {
                     try {
-                      await api(`api/editor/devices/${device.id}`, {}, 'DELETE');
-                      setDevices(devices.filter((d) => d.id !== device.id));
-                    } catch (e) {
-                      notify(describeError(e));
+                      await api(`api/editor/devices/${revoking}`, {}, 'DELETE');
+                      setDevices((current) => current.filter((device) => device.id !== revoking));
+                      setRevoking(undefined);
+                    } catch (error) {
+                      notify(describeError(error));
                     }
                   }}
                 >
+                  {t('editor.revoke')}
+                </button>
+              </div>
+            </div>
+          )}
+          <div className="revision-list">
+            {devices.map((device) => (
+              <div key={device.id}>
+                <div className="device-pair-details">
+                  <strong>{device.name}</strong>
+                  {device.expires && (
+                    <small>
+                      {t('display.deviceExpiry', {
+                        date: new Date(device.expires).toLocaleDateString(intlLocale),
+                      })}
+                    </small>
+                  )}
+                </div>
+                <button className="button danger" onClick={() => setRevoking(device.id)}>
                   {t('editor.revoke')}
                 </button>
               </div>

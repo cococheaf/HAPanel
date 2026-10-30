@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Camera, Play, RefreshCw, VideoOff, LoaderCircle } from 'lucide-react';
 import type { Snapshot, Tile } from '../../shared/model';
+import { startCameraPlayback, jumpToLive, type PlaybackTransport } from './camera-playback';
 import { useI18n } from '../i18n';
 
 function usePageVisible() {
@@ -35,7 +36,8 @@ export function CameraThumbnail({
     !['unknown', 'unavailable', 'off'].includes(entity.state) &&
     snapshot.status !== 'reconnecting';
   useEffect(() => {
-    if (!visible || !allowed || !online || sample) return;
+    if (!visible || !allowed || !online || sample || (tile.camera?.overview === 'live' && onOpen))
+      return;
     const timer = setInterval(
       () => {
         setFailed(false);
@@ -44,7 +46,27 @@ export function CameraThumbnail({
       (tile.camera?.refreshSeconds ?? 30) * 1000,
     );
     return () => clearInterval(timer);
-  }, [visible, allowed, online, sample, tile.camera?.refreshSeconds]);
+  }, [
+    visible,
+    allowed,
+    online,
+    sample,
+    tile.camera?.refreshSeconds,
+    tile.camera?.overview,
+    onOpen,
+  ]);
+  if (tile.camera?.overview === 'live' && onOpen)
+    return (
+      <div className="camera-frame camera-overview-live">
+        <CameraStream tile={tile} snapshot={snapshot} base={base} inline />
+        <button
+          type="button"
+          className="camera-open-overlay"
+          aria-label={t('camera.open', { title: tile.title })}
+          onClick={onOpen}
+        />
+      </div>
+    );
   return (
     <button
       className="camera-frame"
@@ -90,13 +112,52 @@ export function CameraStream({
   tile,
   snapshot,
   base,
+  inline = false,
 }: {
   tile: Tile;
   snapshot: Snapshot;
   base: string;
+  inline?: boolean;
 }) {
   const { t } = useI18n();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(!inline);
+  const [transport, setTransport] = useState<PlaybackTransport>();
+  const [fallback, setFallback] = useState(false),
+    [lag, setLag] = useState(0);
+  const lastStats = useRef(0),
+    initialSync = useRef(false);
+  const [obscured, setObscured] = useState(false);
+  useEffect(() => {
+    if (!inline) return;
+    const update = () => {
+      const dialogs = window.document.querySelectorAll('dialog[open]');
+      const top = dialogs[dialogs.length - 1];
+      setObscured(Boolean(top && !top.contains(hostRef.current)));
+    };
+    window.addEventListener('hapanel:modal', update);
+    update();
+    return () => window.removeEventListener('hapanel:modal', update);
+  }, [inline]);
+  useEffect(() => {
+    if (!inline) {
+      setInView(true);
+      return;
+    }
+    const host = hostRef.current;
+    if (!host) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setInView(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => setInView(entries.some((entry) => entry.isIntersecting)),
+      { rootMargin: '20px' },
+    );
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, [inline, tile.id]);
   const [retry, setRetry] = useState(0),
     [phase, setPhase] = useState<'loading' | 'playing' | 'paused' | 'error'>('loading');
   const visible = usePageVisible();
@@ -110,123 +171,182 @@ export function CameraStream({
     snapshot.status !== 'reconnecting';
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !visible || sample || !allowed || !online || !streamable) return;
-    let disposed = false;
-    let player: import('hls.js').default | undefined;
+    if (!video || !visible || !inView || obscured || sample || !allowed || !online || !streamable)
+      return;
     setPhase('loading');
-    const source = new URL(base + tile.id + '/stream.m3u8?retry=' + retry, document.baseURI).href;
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = source;
-      void video.play().catch(() => {});
-    } else
-      void import('hls.js')
-        .then(({ default: Hls }) => {
-          if (disposed) return;
-          if (!Hls.isSupported()) {
-            setPhase('error');
-            return;
-          }
-          player = new Hls({
-            enableWorker: true,
-            lowLatencyMode: true,
-            maxBufferLength: 15,
-            backBufferLength: 15,
-            xhrSetup: (xhr) => {
-              xhr.withCredentials = true;
-            },
-          });
-          player.on(Hls.Events.ERROR, (_, data) => {
-            if (!disposed && data.fatal) {
-              setPhase('error');
-              player?.destroy();
-            }
-          });
-          player.on(Hls.Events.MANIFEST_PARSED, () => {
-            if (!disposed) void video.play().catch(() => {});
-          });
-          player.loadSource(source);
-          player.attachMedia(video);
-        })
-        .catch(() => {
-          if (!disposed) setPhase('error');
-        });
-    return () => {
-      disposed = true;
-      player?.destroy();
-      video.pause();
-      video.removeAttribute('src');
-      video.load();
-    };
-  }, [tile.id, base, sample, allowed, online, visible, retry, streamable]);
-  if (sample)
+    setFallback(false);
+    setLag(0);
+    initialSync.current = false;
+    return startCameraPlayback(video, base + tile.id, tile.camera?.transport ?? 'auto', {
+      transport: setTransport,
+      fallback: () => {
+        setFallback(true);
+        setPhase('loading');
+      },
+      failed: () => setPhase('error'),
+      paused: () => setPhase('paused'),
+    });
+  }, [
+    tile.id,
+    base,
+    sample,
+    allowed,
+    online,
+    visible,
+    inView,
+    retry,
+    streamable,
+    tile.camera?.transport,
+    obscured,
+  ]);
+  const body = () => {
+    if (sample)
+      return (
+        <div className="camera-sample-view">
+          <Camera size={55} />
+          <h3>{t('camera.sample')}</h3>
+          <p>{t('camera.sampleHint')}</p>
+        </div>
+      );
+    if (!allowed || !online)
+      return (
+        <p className="insight-muted">
+          {t(!allowed ? 'error.cameraAdminRequired' : 'error.cameraUnavailable')}
+        </p>
+      );
+    if (!streamable)
+      return <CameraStillLive tile={tile} base={base} active={visible && inView && !obscured} />;
     return (
-      <div className="camera-sample-view">
-        <Camera size={55} />
-        <h3>{t('camera.sample')}</h3>
-        <p>{t('camera.sampleHint')}</p>
-      </div>
-    );
-  if (!allowed || !online)
-    return (
-      <p className="insight-muted">
-        {t(!allowed ? 'error.cameraAdminRequired' : 'error.cameraUnavailable')}
-      </p>
-    );
-  if (!streamable) return <CameraStillLive tile={tile} base={base} />;
-  return (
-    <div className="camera-live">
-      <div className="camera-live-header">
-        <span className={'camera-live-state is-' + phase}>
-          <i />
-          {t(
-            phase === 'playing'
-              ? 'camera.live'
-              : phase === 'paused'
-                ? 'camera.paused'
-                : phase === 'error'
-                  ? 'camera.failed'
-                  : 'camera.loading',
+      <div className="camera-live">
+        <div className="camera-live-header">
+          <span className={'camera-live-state is-' + phase}>
+            <i />
+            {t(
+              phase === 'playing'
+                ? 'camera.live'
+                : phase === 'paused'
+                  ? 'camera.paused'
+                  : phase === 'error'
+                    ? 'camera.failed'
+                    : 'camera.loading',
+            )}
+            {phase === 'playing' && transport && (
+              <small>{transport === 'webrtc' ? 'WebRTC' : 'HLS'}</small>
+            )}
+          </span>
+          <button
+            type="button"
+            className="alarm-open"
+            onClick={() => setRetry((value) => value + 1)}
+          >
+            <RefreshCw size={15} />
+            {t('common.retry')}
+          </button>
+        </div>
+        <div className="camera-video-wrap">
+          <video
+            ref={videoRef}
+            controls={!inline}
+            disableRemotePlayback
+            style={{ objectFit: inline ? (tile.camera?.fit ?? 'cover') : 'contain' }}
+            autoPlay
+            muted
+            playsInline
+            preload="none"
+            poster={base + tile.id + '/still'}
+            onPlaying={() => {
+              setPhase('playing');
+              if (transport === 'hls' && !initialSync.current && videoRef.current) {
+                initialSync.current = true;
+                jumpToLive(videoRef.current);
+              }
+            }}
+            onLoadedMetadata={() => {
+              if (transport === 'hls' && videoRef.current?.seekable.length) {
+                initialSync.current = true;
+                jumpToLive(videoRef.current);
+              }
+            }}
+            onTimeUpdate={() => {
+              const video = videoRef.current;
+              if (!video || transport !== 'hls' || Date.now() - lastStats.current < 1000) return;
+              lastStats.current = Date.now();
+              if (video.seekable.length) {
+                const distance = video.seekable.end(video.seekable.length - 1) - video.currentTime;
+                setLag(Math.max(0, Math.round(distance)));
+                if (distance > 8 && !video.paused) jumpToLive(video);
+              }
+            }}
+            onPause={() => setPhase((current) => (current === 'error' ? 'error' : 'paused'))}
+            onError={() => setPhase('error')}
+          />
+          {phase === 'loading' && (
+            <div className="camera-video-overlay">
+              <LoaderCircle className="spin" size={35} />
+              <span>{t('camera.loading')}</span>
+            </div>
           )}
-        </span>
-        <button type="button" className="alarm-open" onClick={() => setRetry((value) => value + 1)}>
-          <RefreshCw size={15} />
-          {t('common.retry')}
-        </button>
-      </div>
-      <div className="camera-video-wrap">
-        <video
-          ref={videoRef}
-          controls
-          autoPlay
-          muted
-          playsInline
-          preload="none"
-          poster={base + tile.id + '/still'}
-          onPlaying={() => setPhase('playing')}
-          onPause={() => setPhase((current) => (current === 'error' ? 'error' : 'paused'))}
-          onError={() => setPhase('error')}
-        />
-        {phase === 'loading' && (
-          <div className="camera-video-overlay">
-            <LoaderCircle className="spin" size={35} />
-            <span>{t('camera.loading')}</span>
-          </div>
+          {phase === 'paused' && (
+            <div className="camera-video-overlay">
+              <button
+                type="button"
+                className="alarm-open"
+                onClick={() => void videoRef.current?.play().catch(() => setPhase('error'))}
+              >
+                <Play size={18} />
+                {t('camera.start')}
+              </button>
+            </div>
+          )}
+          {phase === 'error' && (
+            <div className="camera-video-overlay">
+              <VideoOff size={35} />
+              <span>{t('camera.failed')}</span>
+            </div>
+          )}
+        </div>
+        {!inline && (
+          <>
+            <p className="insight-muted">
+              {transport === 'webrtc'
+                ? t('camera.directConnection')
+                : t(fallback ? 'camera.fallbackHls' : 'camera.onDemand')}
+              {transport === 'hls' && lag > 2
+                ? ' · ' + t('camera.bufferLag', { seconds: lag })
+                : ''}
+            </p>
+            {transport === 'hls' && (
+              <button
+                className="alarm-open"
+                onClick={() => videoRef.current && jumpToLive(videoRef.current)}
+              >
+                {t('camera.jumpLive')}
+              </button>
+            )}
+          </>
         )}
-        {phase === 'error' && (
-          <div className="camera-video-overlay">
-            <VideoOff size={35} />
-            <span>{t('camera.failed')}</span>
-          </div>
-        )}
       </div>
-      <p className="insight-muted">{t('camera.onDemand')}</p>
+    );
+  };
+  return (
+    <div ref={hostRef} className={inline ? 'camera-inline-host' : 'camera-stream-host'}>
+      {body()}
     </div>
   );
 }
 
-function CameraStillLive({ tile, base }: { tile: Tile; base: string }) {
+function CameraStillLive({
+  tile,
+  base,
+  active = true,
+}: {
+  tile: Tile;
+  base: string;
+  active?: boolean;
+}) {
   const { t } = useI18n();
-  const visible = usePageVisible();
+  const tabVisible = usePageVisible();
+  const visible = tabVisible && active;
   const [tick, setTick] = useState(Date.now()),
     [failed, setFailed] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);

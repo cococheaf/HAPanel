@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.0
+
+- Zentrale Display-Verwaltung: Layouts auswählen, anlegen, duplizieren und entfernen; Ansichten kopieren, auch auf neue Displays, sortieren und mit ihren Kacheln löschen.
+- Ansichten, Raster, Farben und Begrüßung lassen sich pro Display unabhängig bearbeiten. Kopien erhalten eigene Kachel-IDs, passende Layouts und angepasste Navigation. Bestehende Konfigurationen werden automatisch überführt; die Originaldatei wird vorher separat gesichert.
+- WebRTC über die vorhandene HA-Kamera-Schnittstelle als bevorzugte Verbindung, mit HLS-Rückfalloption. Kleinere HLS-Puffer und eine Funktion zum Sprung an die Livekante reduzieren den zusätzlichen Player-Versatz.
+- Konfigurierbare Live-Kameraübersicht je Kachel. Wiedergabe pausiert außerhalb des sichtbaren Bereichs, im Hintergrund und hinter einer Detailansicht. WebRTC-Sitzungen werden beim Schließen freigegeben.
+- Neues HAPanel-Icon als SVG, PNG, iPad-Touch-Icon und maskierbares Web-App-Icon.
+- Geräteverwaltung ist klar von Display-Layouts getrennt. Widerruf benötigt eine Bestätigung, das Ablaufdatum des Zugangs ist sichtbar.
+
 ## 1.1.0
 
 - Alarmpanel direkt in HAPanel: konfigurierbare Modi und Reihenfolge, Bestätigung, bedarfsabhängige PIN-Abfrage und Hinweise zu offenen oder unbekannten Kontakten.

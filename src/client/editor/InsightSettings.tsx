@@ -43,6 +43,17 @@ export function InsightSettings({
   const room = (patch: Partial<Room>) => tile.room && update({ room: { ...tile.room, ...patch } });
   const energy = (patch: Partial<Energy>) =>
     tile.energy && update({ energy: { ...tile.energy, ...patch } });
+  const camera = (patch: Partial<NonNullable<Tile['camera']>>) =>
+    update({
+      camera: {
+        refreshSeconds: 30,
+        fit: 'cover',
+        overview: 'snapshot',
+        transport: 'auto',
+        ...tile.camera,
+        ...patch,
+      },
+    });
   const picker = (
     label: string,
     value: string | undefined,
@@ -108,34 +119,43 @@ export function InsightSettings({
               min={15}
               max={120}
               value={tile.camera?.refreshSeconds ?? 30}
-              onChange={(event) =>
-                update({
-                  camera: {
-                    refreshSeconds: Number(event.target.value),
-                    fit: tile.camera?.fit ?? 'cover',
-                  },
-                })
-              }
+              onChange={(event) => camera({ refreshSeconds: Number(event.target.value) })}
             />
           </label>
           <label>
             {t('camera.fit')}
             <select
               value={tile.camera?.fit ?? 'cover'}
-              onChange={(event) =>
-                update({
-                  camera: {
-                    refreshSeconds: tile.camera?.refreshSeconds ?? 30,
-                    fit: event.target.value as 'cover' | 'contain',
-                  },
-                })
-              }
+              onChange={(event) => camera({ fit: event.target.value as 'cover' | 'contain' })}
             >
               <option value="cover">{t('camera.fitCover')}</option>
               <option value="contain">{t('camera.fitContain')}</option>
             </select>
           </label>
-          <p className="field-hint">{t('camera.onDemand')}</p>
+          <label>
+            {t('camera.overview')}
+            <select
+              value={tile.camera?.overview ?? 'snapshot'}
+              onChange={(event) => camera({ overview: event.target.value as 'snapshot' | 'live' })}
+            >
+              <option value="snapshot">{t('camera.overviewSnapshot')}</option>
+              <option value="live">{t('camera.overviewLive')}</option>
+            </select>
+          </label>
+          <label>
+            {t('camera.connection')}
+            <select
+              value={tile.camera?.transport ?? 'auto'}
+              onChange={(event) =>
+                camera({ transport: event.target.value as 'auto' | 'webrtc' | 'hls' })
+              }
+            >
+              <option value="auto">{t('camera.connectionAuto')}</option>
+              <option value="webrtc">WebRTC</option>
+              <option value="hls">HLS</option>
+            </select>
+          </label>
+          <p className="field-hint">{t('camera.liveOverviewHint')}</p>
         </div>
       )}
       {tile.kind === 'alarm' && (
