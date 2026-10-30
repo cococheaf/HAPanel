@@ -8,7 +8,12 @@ async function main() {
   const mode = process.env.HAPANEL_MODE ?? 'demo';
   if (!['demo', 'standalone', 'ingress'].includes(mode))
     throw new Error('HAPANEL_MODE muss demo, standalone oder ingress sein.');
-  let addon: { demo_mode?: boolean; display_enabled?: boolean; public_origin?: string } = {};
+  let addon: {
+    demo_mode?: boolean;
+    display_enabled?: boolean;
+    public_origin?: string;
+    camera_access?: 'admin' | 'authenticated';
+  } = {};
   if (mode === 'ingress') addon = JSON.parse(await readFile('/data/options.json', 'utf8'));
   const demo = mode === 'demo' || (mode === 'ingress' && addon.demo_mode === true);
   const token = mode === 'ingress' ? process.env.SUPERVISOR_TOKEN : process.env.HA_TOKEN;
@@ -54,6 +59,10 @@ async function main() {
     publicOrigin: addon.public_origin || process.env.HAPANEL_PUBLIC_ORIGIN,
     displayEnabled,
     isAdmin: (id: string) => authHub.isAdmin(id),
+    isActiveUser: (id: string) => authHub.isActiveUser(id),
+    cameraAccess:
+      addon.camera_access ??
+      (process.env.HAPANEL_CAMERA_ACCESS === 'authenticated' ? 'authenticated' : 'admin'),
   };
   const editor = await createApp({ ...common, surface: 'editor' });
   const port = Number(process.env.PORT ?? (mode === 'ingress' ? 8099 : 4310));

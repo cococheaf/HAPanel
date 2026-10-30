@@ -454,7 +454,7 @@
   "camera.stillOnly": "Diese HA-Kamera bietet derzeit nur Einzelbilder. Das Bild wird alle zwei Sekunden aktualisiert.",
   "error.cameraUnavailable": "Kamerabild oder Stream derzeit nicht verfügbar.",
   "error.cameraSource": "Ungültige Kamera-Anfrage.",
-  "error.cameraAdminRequired": "Kameraansichten benötigen den bestehenden HA-Administratorzugang.",
+  "error.cameraAdminRequired": "Kameraanzeige ist für diesen Zugang nicht freigegeben.",
   "sample.surveillance": "Überwachung",
   "sample.headingSurveillance": "Zuhause im Blick.",
   "sample.subtitleSurveillance": "Kameras · Live-Ansichten bei Bedarf.",
@@ -541,5 +541,8 @@
   "light.readOnlyNamed": "{title}: nur Anzeige",
   "error.lightNotDimmable": "Dieses Licht oder diese Gruppe ist nicht vollständig dimmbar.",
   "error.requiredText": "Bitte einen Text eingeben.",
-  "editor.requiredTextHint": "Bitte einen Text eingeben. Ein leeres Pflichtfeld wird beim Verlassen auf den gespeicherten Text zurückgesetzt."
+  "editor.requiredTextHint": "Bitte einen Text eingeben. Ein leeres Pflichtfeld wird beim Verlassen auf den gespeicherten Text zurückgesetzt.",
+  "error.displayAccessRequired": "Dieser Zugang ist für HAPanel nicht freigegeben. Die Kameraanzeige für angemeldete Benutzer kann ein Administrator in den HAPanel-App-Optionen aktivieren.",
+  "error.viewerReadOnly": "Dieser Home-Assistant-Zugang darf HAPanel ansehen, aber keine Geräte bedienen.",
+  "player.readOnlyAccess": "Nur Anzeige"
 }

@@ -14,7 +14,7 @@ export default function Player({
 }: {
   published: Revision;
   snapshot: Snapshot;
-  onAction: (action: Action) => void | Promise<void>;
+  onAction?: (action: Action) => void | Promise<void>;
   demo?: boolean;
   onEdit?: () => void;
 }) {
@@ -60,11 +60,12 @@ export default function Player({
   return (
     <div className={`player-shell ${demo ? 'demo-player' : ''}`}>
       <div className="player-toolbar">
-        <a className="player-brand" href="./" aria-label="HAPanel">
+        <a className="player-brand" href={onEdit ? './' : './display.html'} aria-label="HAPanel">
           <img src="./mark.svg" alt="" />
           <span>HAPanel</span>
         </a>
         {demo && <span className="player-demo-tag">{t('player.interactiveDemo')}</span>}
+        {!onAction && <span className="player-demo-tag">{t('player.readOnlyAccess')}</span>}
         <div className="header-spacer" />
         <LanguageSwitcher />
         <select

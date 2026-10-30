@@ -48,7 +48,7 @@ export class HomeAssistantHub extends EventEmitter {
   private desired: string[] = [];
   private subscriptions: number[] = [];
   private subscriptionQueue: Promise<unknown> = Promise.resolve();
-  private admins?: { until: number; ids: Set<string> };
+  private users?: { until: number; roles: Map<string, boolean> };
   private catalog?: { until: number; entities: EntityState[] };
   private catalogStates: Record<string, EntityState> = {};
   private catalogRequest?: Promise<EntityState[]>;
@@ -121,7 +121,7 @@ export class HomeAssistantHub extends EventEmitter {
           this.snapshot.status = 'connected';
           this.snapshot.entities = {};
           this.snapshot.forecasts = {};
-          this.admins = undefined;
+          this.users = undefined;
           this.catalog = undefined;
           this.catalogStates = {};
           this.subscriptions = [];
@@ -358,25 +358,31 @@ export class HomeAssistantHub extends EventEmitter {
     this.history.set(entityId, { until: Date.now() + 240_000, data });
     return data;
   }
-  async isAdmin(userId: string) {
-    if (this.options.demo) return false;
-    if (!this.admins || this.admins.until < Date.now()) {
+  private async userRoles() {
+    if (this.options.demo) return new Map<string, boolean>();
+    if (!this.users || this.users.until < Date.now()) {
       const users = (await this.rpc({ type: 'config/auth/list' })) as {
         id: string;
         is_active: boolean;
         is_owner: boolean;
         group_ids: string[];
       }[];
-      this.admins = {
+      this.users = {
         until: Date.now() + 30_000,
-        ids: new Set(
+        roles: new Map(
           users
-            .filter((u) => u.is_active && (u.is_owner || u.group_ids.includes('system-admin')))
-            .map((u) => u.id),
+            .filter((u) => u.is_active)
+            .map((u) => [u.id, u.is_owner || u.group_ids.includes('system-admin')]),
         ),
       };
     }
-    return this.admins.ids.has(userId);
+    return this.users.roles;
+  }
+  async isAdmin(userId: string) {
+    return (await this.userRoles()).get(userId) === true;
+  }
+  async isActiveUser(userId: string) {
+    return (await this.userRoles()).has(userId);
   }
   async act(document: Dashboard, action: Action) {
     const resolved = resolveAction(document, action);

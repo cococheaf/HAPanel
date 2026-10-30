@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.0
+
+- Explizite Kamerafreigabe für aktive HA-Benutzer ohne Administratorrolle und gültig gekoppelte Tablets über `camera_access: authenticated`. Standard `admin` erhält bestehende Freigaben.
+- Veröffentlichung, Kameraanzeige, Gerätebedienung und Designerrechte sind getrennt. Neue HA-Betrachter erhalten Lesezugriff; Alarm und Designer bleiben auf Administratoren begrenzt.
+- Einheitliche Prüfung für Standbilder, HLS und WebRTC, erneute Kontoprüfung und sofortiges Beenden der Kamera-WebRTC-Sitzung nach Kopplungswiderruf. Keine anonymen Kamerastreams und keine frei wählbaren Kameraentitäten.
+- Nicht administrative Ansichten zeigen „Nur Anzeige“. Sidebar-Sichtbarkeit, deutsche/englische Hinweise und Dokumentation ergänzt.
+
 ## 1.3.0
 
 - Licht-Dimmer nur bei bestätigter Dimmfähigkeit; Gruppen werden rekursiv geprüft. Gemischte oder unvollständig bekannte Gruppen und normale Schalter erhalten keinen Slider. Fehlende Helligkeitswerte bleiben unbekannt.

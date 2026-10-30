@@ -24,7 +24,7 @@
 
 HAPanel verbindet großzügige, abgerundete Kacheln, ruhige Farben und direkte Touch-Bedienung mit einem visuellen Layout-Editor. Es läuft als eigene Home Assistant App (Add-on) oder als lokaler Node.js-Prozess. Bestehende Lovelace-Dashboards und HA-Konfigurationsdateien bleiben unverändert.
 
-**Version: 1.3.0.** Die Vorschau, der Editor und die API sind implementiert. Die HA-Anbindung ist gegen einen simulierten WebSocket-Server geprüft. Installation, Update, Ingress und Live-Daten sind auf HA OS 18.4 / Core 2026.10.4 (amd64) geprüft. Tests auf physischer iPad-Hardware stehen noch aus.
+**Version: 1.4.0.** Die Vorschau, der Editor und die API sind implementiert. Die HA-Anbindung ist gegen einen simulierten WebSocket-Server geprüft. Installation, Update, Ingress und Live-Daten sind auf HA OS 18.4 / Core 2026.10.4 (amd64) geprüft. Tests auf physischer iPad-Hardware stehen noch aus.
 
 ## Ausprobieren
 
@@ -47,7 +47,7 @@ Für eine eigenständige Ansicht: **Teilen → Zum Home-Bildschirm**. Wähle bei
 - Automatisch gespeicherte Entwürfe, explizite Veröffentlichung und bis zu 30 ältere Revisionen.
 - JSON/YAML-Import und Export.
 - Serververbindung zu HA mit gefilterten Entitätsabonnements, Wiederverbindung und serverseitigen Aktionen.
-- Ingress-Zugang für HA-Administratoren und separater, optionaler Display-Port mit widerrufbarer Kopplung.
+- Administratorzugang für den Designer, optionaler Kamera-Lesezugang für aktive HA-Benutzer und widerrufbar gekoppelte Displays.
 - Dockerfile und GitHub Actions für Validierung, statische Vorschau und Container-Builds auf amd64/aarch64.
 
 ## Lokal entwickeln
@@ -124,3 +124,11 @@ Ein Dimmer erscheint nur bei bestätigter Dimmfähigkeit. Bei Gruppen müssen **
 Seitennamen, Seitenüberschriften und eigene Beschriftungen behalten Leerzeichen beim Tippen und Speichern. Pflichtfelder lassen sich zum Umbenennen vorübergehend leeren; beim Verlassen eines noch leeren Feldes wird der letzte gültige Text wiederhergestellt.
 
 ![Schaltverhalten im Designer](docs/images/light-settings.png)
+
+## Kameras ohne Administratorrolle
+
+Unter **Einstellungen → Apps → HAPanel → Konfiguration → Kameraanzeige** die Option `authenticated` wählen, speichern und neu starten. Der Standard `admin` erhält die bisherige Freigabe.
+
+Mit `authenticated` sehen **aktive, angemeldete HA-Benutzer** die veröffentlichte HAPanel-Ansicht einschließlich Kameras als **Nur Anzeige**. **Gültig gekoppelte Tablets** erhalten ebenfalls Kamerabilder und behalten ihre bisherigen Bedienrechte. Designer, Entwürfe, Kopplungsverwaltung und Alarmbefehle bleiben Administratoren vorbehalten. Ohne HA-Anmeldung oder gültige Kopplung gibt es keinen Kamerazugriff.
+
+Die Freigabe gilt für alle Kameras in der veröffentlichten HAPanel-Konfiguration, nicht für beliebige HA-Entitäten. Sie ist eine eigene HAPanel-Freigabe und keine Übernahme individueller HA-Entitätsberechtigungen.

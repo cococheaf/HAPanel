@@ -1,5 +1,5 @@
 name: HAPanel
-version: '1.3.0'
+version: '1.4.0'
 slug: hapanel
 description: Independent iOS-inspired wall dashboards with a visual editor
 url: https://github.com/cococheaf/HAPanel
@@ -14,7 +14,7 @@ ingress_port: 8099
 ingress_entry: display.html
 panel_icon: mdi:view-dashboard-variant
 panel_title: HAPanel
-panel_admin: true
+panel_admin: false
 homeassistant_api: true
 hassio_api: false
 ports:
@@ -25,7 +25,9 @@ options:
   demo_mode: true
   display_enabled: false
   public_origin: ''
+  camera_access: admin
 schema:
   demo_mode: bool
   display_enabled: bool
   public_origin: str
+  camera_access: list(admin|authenticated)

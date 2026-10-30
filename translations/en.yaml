@@ -1,12 +1,15 @@
 configuration:
   demo_mode:
     name: Use sample data
-    description: Use sample data instead of real devices. Ingress access remains restricted to HA administrators.
+    description: Use sample data instead of real devices. The Designer remains restricted to HA administrators.
   display_enabled:
     name: Enable separate display server
     description: Allow paired wall tablets to connect through the additional network port.
   public_origin:
     name: Public display address
     description: Exact HTTPS origin of the display server, e.g. https://panel.example.net. Enables secure cookies.
+  camera_access:
+    name: Camera viewing
+    description: 'admin: Administrators only. authenticated: Published cameras also available to active HA users and all valid paired displays. Designer and alarm remain administrator-only; new HA viewers cannot control devices.'
 network:
   8098/tcp: Optional display server for paired devices; use an HTTPS reverse proxy.

@@ -26,7 +26,13 @@ export type Bootstrap = {
   mode: 'demo' | 'live';
   displayEnabled: boolean;
 };
-export type LiveMessage = { snapshot?: Snapshot; published?: Revision; online?: boolean };
+export type LiveMessage = {
+  snapshot?: Snapshot;
+  published?: Revision;
+  online?: boolean;
+  canEdit?: boolean;
+  canControl?: boolean;
+};
 export function serializeDashboard(document: Dashboard, format: 'json' | 'yaml') {
   return format === 'json' ? JSON.stringify(document, null, 2) : stringify(document);
 }

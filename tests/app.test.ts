@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { once } from 'node:events';
 import type { Socket } from 'node:net';
 import WebSocket from 'ws';
+import type { CameraSignalEvent } from '../src/shared/camera';
 import { createApp, type AppOptions } from '../src/server/app';
 import { DocumentStore, PairingStore } from '../src/server/store';
 import { HomeAssistantHub } from '../src/server/hub';
@@ -373,7 +374,7 @@ test('display history exposes only published sources, including declared room de
   );
 });
 
-test('paired displays retain their existing access and gain no alarm or camera privileges', async (t) => {
+test('camera sharing defaults to disabled for paired displays and never grants alarm privileges', async (t) => {
   const { showcaseDocument } = await import('../src/shared/showcase');
   const { app, store, pairings, hub } = await fixture(t, { surface: 'display' });
   await store.save(showcaseDocument, 1);
@@ -402,6 +403,245 @@ test('paired displays retain their existing access and gain no alarm or camera p
   );
   assert.equal(act.mock.callCount(), 0);
   assert.equal(still.mock.callCount(), 0);
+});
+test('camera sharing allows active non-admin HA viewers only published content and no controls or editor access', async (t) => {
+  const { showcaseDocument } = await import('../src/shared/showcase');
+  const { app, store, hub } = await fixture(t, {
+    mode: 'ingress',
+    cameraAccess: 'authenticated',
+    isAdmin: async (id) => id === 'admin-user',
+    isActiveUser: async (id) => id === 'viewer-user' || id === 'admin-user',
+  });
+  const draft = await store.save(showcaseDocument, 1);
+  await store.publish(draft.draft.revision);
+  const calls: string[] = [];
+  t.mock.method(hub, 'cameraStill', async (id: string) => {
+    calls.push(id);
+    return { buffer: Buffer.from('jpeg'), type: 'image/jpeg' };
+  });
+  t.mock.method(hub, 'cameraCapabilities', async () => ({ webrtc: true, hls: true }));
+  t.mock.method(hub, 'cameraLive', async (id: string) => {
+    calls.push(id);
+    return { buffer: Buffer.from('hls'), type: 'application/vnd.apple.mpegurl' };
+  });
+  const actions = t.mock.method(hub, 'act', async () => {});
+  const context = { headers: { 'x-remote-user-id': 'viewer-user' }, remoteAddress: '172.30.32.2' };
+  const data = (await app.inject({ url: '/api/display/bootstrap', ...context })).json();
+  assert.equal(data.canEdit, false);
+  assert.equal(data.canControl, false);
+  assert.equal(data.snapshot.cameraView, true);
+  assert.equal(data.snapshot.alarmControl, false);
+  for (const suffix of [
+    'still',
+    'capabilities',
+    'stream.m3u8',
+    'assets/' + 'a'.repeat(32) + '.m4s',
+  ]) {
+    const response = await app.inject({
+      url: '/api/display/camera/sample_camera_entrance/' + suffix,
+      ...context,
+    });
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.headers['cache-control'], 'no-store');
+  }
+  assert.deepEqual(new Set(calls), new Set(['camera.sample_entrance']));
+  for (const url of [
+    '/api/display/camera/private_unpublished/still',
+    '/api/display/camera/camera.private/still',
+  ])
+    assert.equal((await app.inject({ url, ...context })).statusCode, 404);
+  for (const url of [
+    '/api/editor/bootstrap',
+    '/api/editor/devices',
+    '/api/editor/camera/sample_camera_entrance/still',
+  ])
+    assert.equal((await app.inject({ url, ...context })).statusCode, 403);
+  assert.equal(
+    (
+      await app.inject({
+        method: 'POST',
+        url: '/api/editor/publish',
+        payload: { expectedRevision: 2 },
+        ...context,
+      })
+    ).statusCode,
+    403,
+  );
+  for (const payload of [
+    { tileId: 'demo_alarm', command: 'alarm', mode: 'armed_away' },
+    { tileId: 'demo_general', command: 'turn_on' },
+  ])
+    assert.equal(
+      (await app.inject({ method: 'POST', url: '/api/display/action', payload, ...context }))
+        .statusCode,
+      403,
+    );
+  assert.equal(actions.mock.callCount(), 0);
+  for (const id of ['inactive-user', 'unknown-user', ''])
+    assert.equal(
+      (
+        await app.inject({
+          url: '/api/display/bootstrap',
+          headers: { 'x-remote-user-id': id },
+          remoteAddress: context.remoteAddress,
+        })
+      ).statusCode,
+      403,
+    );
+  assert.equal(
+    (await app.inject({ url: '/api/display/bootstrap', headers: context.headers })).statusCode,
+    403,
+  );
+  assert.equal(
+    (
+      await app.inject({
+        url: '/api/display/bootstrap',
+        ...context,
+        headers: { ...context.headers, origin: 'https://evil.example' },
+      })
+    ).statusCode,
+    403,
+  );
+  assert.equal(
+    (
+      await app.inject({
+        url: '/api/display/bootstrap',
+        ...context,
+        remoteAddress: '::ffff:172.30.32.2',
+      })
+    ).statusCode,
+    200,
+  );
+});
+test('paired camera viewers retain pairing, publication and alarm boundaries and lose WebRTC on revocation', async (t) => {
+  const { showcaseDocument } = await import('../src/shared/showcase');
+  const { app, store, pairings, hub } = await fixture(t, {
+    surface: 'display',
+    mode: 'ingress',
+    cameraAccess: 'authenticated',
+  });
+  const draft = await store.save(showcaseDocument, 1);
+  await store.publish(draft.draft.revision);
+  const pairing = await pairings.pair((await pairings.createCode()).code, 'Tablet');
+  const headers = { cookie: 'hapanel_device=' + pairing.token };
+  t.mock.method(hub, 'cameraStill', async () => ({
+    buffer: Buffer.from('jpeg'),
+    type: 'image/jpeg',
+  }));
+  let stops = 0;
+  t.mock.method(
+    hub,
+    'cameraWebRtc',
+    (_id: string, _offer: string, send: (event: CameraSignalEvent) => void) => {
+      send({ type: 'answer', sdp: 'v=0\r\ntest' });
+      return {
+        ready: Promise.resolve(),
+        candidate: async () => {},
+        stop: () => {
+          stops++;
+        },
+      };
+    },
+  );
+  const bootstrap = (await app.inject({ url: '/api/display/bootstrap', headers })).json();
+  assert.equal(bootstrap.snapshot.cameraView, true);
+  assert.equal(bootstrap.snapshot.alarmControl, false);
+  assert.equal(bootstrap.canEdit, false);
+  assert.equal(bootstrap.canControl, true);
+  const url = '/api/display/camera/sample_camera_entrance/still';
+  assert.equal((await app.inject({ url })).statusCode, 401);
+  assert.equal(
+    (
+      await app.inject({
+        url,
+        remoteAddress: '172.30.32.2',
+        headers: { 'x-remote-user-id': 'admin-user' },
+      })
+    ).statusCode,
+    401,
+  );
+  assert.equal((await app.inject({ url, headers })).statusCode, 200);
+  assert.equal(
+    (
+      await app.inject({
+        method: 'POST',
+        url: '/api/display/action',
+        headers,
+        payload: { tileId: 'demo_alarm', command: 'alarm', mode: 'disarmed' },
+      })
+    ).statusCode,
+    403,
+  );
+  assert.equal((await app.inject({ url: '/api/editor/bootstrap', headers })).statusCode, 404);
+  await assert.rejects(app.injectWS('/api/display/camera/sample_camera_entrance/webrtc'), /401/);
+  const client = await app.injectWS('/api/display/camera/sample_camera_entrance/webrtc', {
+    headers,
+  });
+  t.after(() => client.terminate());
+  const answer = once(client, 'message');
+  client.send(JSON.stringify({ type: 'offer', sdp: 'v=0\r\ntest-offer-long-enough' }));
+  await answer;
+  const closed = once(client, 'close');
+  await pairings.revoke(pairing.device.id);
+  assert.equal((await closed)[0], 1008);
+  assert.equal(stops, 1);
+  assert.equal((await app.inject({ url, headers })).statusCode, 401);
+});
+test('non-admin Ingress camera sockets carry viewer flags and close when the account becomes inactive', async (t) => {
+  const { showcaseDocument } = await import('../src/shared/showcase');
+  let active = true;
+  const { app, store, hub } = await fixture(t, {
+    mode: 'ingress',
+    cameraAccess: 'authenticated',
+    isAdmin: async () => false,
+    isActiveUser: async () => active,
+  });
+  const draft = await store.save(showcaseDocument, 1);
+  await store.publish(draft.draft.revision);
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  let stops = 0;
+  t.mock.method(
+    hub,
+    'cameraWebRtc',
+    (_id: string, _offer: string, send: (event: CameraSignalEvent) => void) => {
+      send({ type: 'answer', sdp: 'v=0\r\ntest' });
+      return {
+        ready: Promise.resolve(),
+        candidate: async () => {},
+        stop: () => {
+          stops++;
+        },
+      };
+    },
+  );
+  const context = {
+    headers: { 'x-remote-user-id': 'viewer' },
+    socket: { remoteAddress: '172.30.32.2' } as Socket,
+  };
+  let first!: Promise<any[]>;
+  const updates = await app.injectWS('/api/display/stream', context, {
+    onInit: (ws) => {
+      first = once(ws, 'message');
+    },
+  });
+  t.after(() => updates.terminate());
+  const initial = JSON.parse((await first)[0].toString());
+  assert.equal(initial.canEdit, false);
+  assert.equal(initial.canControl, false);
+  assert.equal(initial.snapshot.cameraView, true);
+  assert.equal(initial.snapshot.alarmControl, false);
+  const rtc = await app.injectWS('/api/display/camera/sample_camera_entrance/webrtc', context);
+  t.after(() => rtc.terminate());
+  const answer = once(rtc, 'message');
+  rtc.send(JSON.stringify({ type: 'offer', sdp: 'v=0\r\ntest-offer-long-enough' }));
+  await answer;
+  const updatesClosed = once(updates, 'close'),
+    rtcClosed = once(rtc, 'close');
+  active = false;
+  t.mock.timers.tick(20_001);
+  assert.equal((await updatesClosed)[0], 1008);
+  assert.equal((await rtcClosed)[0], 1008);
+  assert.equal(stops, 1);
 });
 test('authenticated alarm actions sanitise HA errors and throttle repeated attempts without logging PINs', async (t) => {
   const { showcaseDocument } = await import('../src/shared/showcase');

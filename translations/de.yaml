@@ -1,12 +1,15 @@
 configuration:
   demo_mode:
     name: Beispieldaten verwenden
-    description: Beispieldaten statt echter Geräte verwenden. Ingress-Zugriff bleibt auf HA-Administratoren beschränkt.
+    description: Beispieldaten statt echter Geräte verwenden. Der Designer bleibt auf HA-Administratoren beschränkt.
   display_enabled:
     name: Separaten Displayserver aktivieren
     description: Ermöglicht den Zugriff gekoppelter Wandtablets über den zusätzlichen Netzwerkport.
   public_origin:
     name: Öffentliche Display-Adresse
     description: Exakte HTTPS-Origin des Displayservers, z. B. https://panel.example.net. Aktiviert sichere Cookies.
+  camera_access:
+    name: Kameraanzeige
+    description: 'admin: Nur Administratoren. authenticated: Veröffentlichte Kameras auch für aktive HA-Benutzer und alle gültig gekoppelten Displays. Designer und Alarm bleiben Administratoren vorbehalten; neue HA-Betrachter erhalten keine Gerätebedienung.'
 network:
   8098/tcp: Optionaler Displayserver für gekoppelte Geräte; HTTPS-Reverse-Proxy verwenden.

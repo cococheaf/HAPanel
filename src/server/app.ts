@@ -33,6 +33,8 @@ export interface AppOptions {
   publicOrigin?: string;
   displayEnabled?: boolean;
   isAdmin?: (id: string) => Promise<boolean>;
+  isActiveUser?: (id: string) => Promise<boolean>;
+  cameraAccess?: 'admin' | 'authenticated';
 }
 const localHosts = new Set(['localhost', '127.0.0.1', '[::1]']);
 const isLoopback = (address: string) => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(address);
@@ -41,7 +43,13 @@ const revisionBody = z.object({ expectedRevision: z.number().int().positive() })
 export async function createApp(options: AppOptions) {
   const { store, pairings, hub } = options;
   const alarmAttempts = new Map<string, number[]>();
-  const snapshotFor = (document: Dashboard, alarmControl: boolean) => {
+  const sharedCameras = options.cameraAccess === 'authenticated';
+  const displayRoles = new WeakMap<FastifyRequest, boolean>();
+  const isAdmin = options.isAdmin ?? ((id: string) => hub.isAdmin(id));
+  const isActiveUser = options.isActiveUser ?? ((id: string) => hub.isActiveUser(id));
+  const isSupervisor = (request: FastifyRequest) =>
+    ['172.30.32.2', '::ffff:172.30.32.2'].includes(request.ip);
+  const snapshotFor = (document: Dashboard, alarmControl: boolean, cameraView = alarmControl) => {
     const snapshot = hub.getSnapshot(entityIds(document));
     snapshot.entities = Object.fromEntries(
       Object.entries(snapshot.entities).map(([id, entity]) => [id, publicEntity(entity)]),
@@ -49,12 +57,16 @@ export async function createApp(options: AppOptions) {
     return {
       ...snapshot,
       alarmControl,
-      cameraView: alarmControl,
+      cameraView,
       contactSources: documentContacts(document, snapshot),
     };
   };
-  const actor = (request: FastifyRequest) =>
-    options.mode === 'ingress' ? String(request.headers['x-remote-user-id']) : request.ip;
+  const actor = (request: FastifyRequest) => {
+    if (options.mode === 'ingress' && options.surface === 'editor' && isSupervisor(request))
+      return 'ha:' + String(request.headers['x-remote-user-id']);
+    const device = pairings.authenticate(request.cookies.hapanel_device);
+    return device ? 'device:' + device.id : request.ip;
+  };
   const performAction = async (
     document: Dashboard,
     action: Action,
@@ -119,7 +131,7 @@ export async function createApp(options: AppOptions) {
       )
         return;
       const host =
-        options.mode === 'ingress' && request.ip === '172.30.32.2'
+        options.mode === 'ingress' && isSupervisor(request)
           ? String(request.headers['x-forwarded-host'] ?? request.headers.host)
           : request.headers.host;
       if (incoming.host === host) return;
@@ -128,15 +140,17 @@ export async function createApp(options: AppOptions) {
     }
     throw new HttpError(403, 'error.crossOrigin');
   };
+  const ingressUser = (request: FastifyRequest) => {
+    if (!isSupervisor(request)) throw new HttpError(403, 'error.ingressOnly');
+    const user = request.headers['x-remote-user-id'];
+    if (typeof user !== 'string' || !user) throw new HttpError(403, 'error.adminRequired');
+    return user;
+  };
   const requireEditor = async (request: FastifyRequest) => {
     sameOrigin(request);
     if (options.surface !== 'editor') throw new HttpError(403, 'error.editorUnavailable');
     if (options.mode === 'ingress') {
-      if (!['172.30.32.2', '::ffff:172.30.32.2'].includes(request.ip))
-        throw new HttpError(403, 'error.ingressOnly');
-      const user = request.headers['x-remote-user-id'];
-      if (typeof user !== 'string' || !(await (options.isAdmin ?? ((id) => hub.isAdmin(id)))(user)))
-        throw new HttpError(403, 'error.adminRequired');
+      if (!(await isAdmin(ingressUser(request)))) throw new HttpError(403, 'error.adminRequired');
     } else {
       const host = new URL(`http://${request.headers.host ?? ''}`).hostname;
       if (!isLoopback(request.ip) || !localHosts.has(host))
@@ -145,11 +159,18 @@ export async function createApp(options: AppOptions) {
   };
   const ingressDisplay = options.mode === 'ingress' && options.surface === 'editor';
   const requireDisplay = async (request: FastifyRequest) => {
-    // The embedded player inherits the same administrator gate as Studio.
-    if (ingressDisplay) return requireEditor(request);
     sameOrigin(request);
+    if (ingressDisplay) {
+      const user = ingressUser(request);
+      const admin = await isAdmin(user);
+      if (!admin && (!sharedCameras || !(await isActiveUser(user))))
+        throw new HttpError(403, 'error.displayAccessRequired');
+      displayRoles.set(request, admin);
+      return;
+    }
     if (!pairings.authenticate(request.cookies.hapanel_device))
       throw new HttpError(401, 'error.pairRequired');
+    displayRoles.set(request, false);
   };
 
   app.addHook('onSend', async (_request, reply) => {
@@ -291,7 +312,7 @@ export async function createApp(options: AppOptions) {
             return hub.getHistory(request.params.entityId);
           },
         );
-        admin.get('/stream', { websocket: true }, (socket) => {
+        admin.get('/stream', { websocket: true }, (socket, request) => {
           const send = () => {
             if (socket.readyState === 1)
               socket.send(
@@ -302,8 +323,15 @@ export async function createApp(options: AppOptions) {
               );
           };
           hub.on('snapshot', send);
+          const interval = setInterval(
+            () => void requireEditor(request).catch(() => socket.close(1008)),
+            20_000,
+          );
           send();
-          socket.on('close', () => hub.off('snapshot', send));
+          socket.on('close', () => {
+            clearInterval(interval);
+            hub.off('snapshot', send);
+          });
         });
       },
       { prefix: '/api/editor' },
@@ -337,19 +365,26 @@ export async function createApp(options: AppOptions) {
       display.addHook('onSend', async (_request, reply) => {
         reply.header('Cache-Control', 'no-store');
       });
-      display.get('/bootstrap', async () => ({
+      display.get('/bootstrap', async (request) => ({
         published: store.getRevision('published'),
-        snapshot: snapshotFor(store.getRevision('published').document, ingressDisplay),
-        canEdit: ingressDisplay,
+        snapshot: snapshotFor(
+          store.getRevision('published').document,
+          displayRoles.get(request) === true,
+          ingressDisplay || sharedCameras,
+        ),
+        canEdit: displayRoles.get(request) === true,
+        canControl: !ingressDisplay || displayRoles.get(request) === true,
       }));
       display.post(
         '/action',
         { config: { rateLimit: { max: 20, timeWindow: 1000 } } },
         async (request) => {
+          if (ingressDisplay && displayRoles.get(request) !== true)
+            throw new HttpError(403, 'error.viewerReadOnly');
           await performAction(
             store.getRevision('published').document,
             actionSchema.parse(request.body),
-            ingressDisplay,
+            displayRoles.get(request) === true,
             actor(request),
           );
           return { ok: true };
@@ -387,7 +422,13 @@ export async function createApp(options: AppOptions) {
           socket.send(
             JSON.stringify({
               type: 'snapshot',
-              snapshot: snapshotFor(published.document, ingressDisplay),
+              snapshot: snapshotFor(
+                published.document,
+                displayRoles.get(request) === true,
+                ingressDisplay || sharedCameras,
+              ),
+              canEdit: displayRoles.get(request) === true,
+              canControl: !ingressDisplay || displayRoles.get(request) === true,
               ...(changed ? { published } : {}),
             }),
           );
@@ -395,11 +436,19 @@ export async function createApp(options: AppOptions) {
         hub.on('snapshot', send);
         store.on('change', send);
         pairings.on('change', send);
+        const interval = setInterval(
+          () =>
+            void requireDisplay(request)
+              .then(send)
+              .catch(() => socket.close(1008)),
+          20_000,
+        );
         send();
         socket.on('close', () => {
           hub.off('snapshot', send);
           store.off('change', send);
           pairings.off('change', send);
+          clearInterval(interval);
         });
       });
     },
@@ -411,7 +460,7 @@ export async function createApp(options: AppOptions) {
       prefix: '/api/display/camera',
       document: () => store.getRevision('published').document,
       authorize: requireDisplay,
-      allowed: ingressDisplay,
+      allowed: ingressDisplay || sharedCameras,
     },
     ...(options.surface === 'editor'
       ? [
@@ -493,6 +542,7 @@ export async function createApp(options: AppOptions) {
         };
         const interval = setInterval(() => void check(), 20_000);
         store.on('change', check);
+        pairings.on('change', check);
         socket.on('message', (raw) => {
           try {
             if (++messages > 128) throw new Error();
@@ -518,6 +568,7 @@ export async function createApp(options: AppOptions) {
           clearTimeout(closing);
           clearInterval(interval);
           store.off('change', check);
+          pairings.off('change', check);
           releaseControl();
           cameraPeers.delete(socket);
         });

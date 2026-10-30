@@ -123,7 +123,21 @@ test('HA adapter authenticates, filters subscriptions, merges deltas, receives f
           success: true,
           result:
             message.type === 'config/auth/list'
-              ? [{ id: 'owner', is_active: true, is_owner: true, group_ids: [] }]
+              ? [
+                  { id: 'owner', is_active: true, is_owner: true, group_ids: [] },
+                  {
+                    id: 'viewer',
+                    is_active: true,
+                    is_owner: false,
+                    group_ids: ['system-read-only'],
+                  },
+                  {
+                    id: 'inactive',
+                    is_active: false,
+                    is_owner: false,
+                    group_ids: ['system-admin'],
+                  },
+                ]
               : null,
         }),
       );
@@ -195,6 +209,12 @@ test('HA adapter authenticates, filters subscriptions, merges deltas, receives f
   assert.equal(hub.getSnapshot().entities['light.living_room'].attributes.old_attribute, undefined);
   assert.equal(await hub.isAdmin('owner'), true);
   assert.equal(await hub.isAdmin('other'), false);
+  assert.equal(await hub.isActiveUser('viewer'), true);
+  assert.equal(await hub.isAdmin('viewer'), false);
+  assert.equal(await hub.isActiveUser('inactive'), false);
+  assert.equal(await hub.isAdmin('inactive'), false);
+  assert.equal(await hub.isActiveUser('unknown'), false);
+  assert.equal(calls.filter((call) => call.type === 'config/auth/list').length, 1);
   await hub.act(demoDocument, { tileId: 'light', command: 'brightness', value: 55 });
   assert.deepEqual(calls.find((c) => c.type === 'call_service')!.service_data, {
     brightness_pct: 55,

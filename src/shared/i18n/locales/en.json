@@ -454,7 +454,7 @@
   "camera.stillOnly": "This HA camera currently provides still images only. The image refreshes every two seconds.",
   "error.cameraUnavailable": "Camera image or stream is currently unavailable.",
   "error.cameraSource": "Invalid camera request.",
-  "error.cameraAdminRequired": "Camera views require the existing HA administrator session.",
+  "error.cameraAdminRequired": "Camera viewing is not enabled for this access.",
   "sample.surveillance": "Surveillance",
   "sample.headingSurveillance": "A view of home.",
   "sample.subtitleSurveillance": "Cameras · Live views on demand.",
@@ -541,5 +541,8 @@
   "light.readOnlyNamed": "{title}: display only",
   "error.lightNotDimmable": "This light or group does not fully support dimming.",
   "error.requiredText": "Please enter some text.",
-  "editor.requiredTextHint": "Please enter some text. Leaving an empty required field restores its saved text."
+  "editor.requiredTextHint": "Please enter some text. Leaving an empty required field restores its saved text.",
+  "error.displayAccessRequired": "This account is not authorised for HAPanel. An administrator can enable camera viewing for signed-in users in the HAPanel app options.",
+  "error.viewerReadOnly": "This Home Assistant account may view HAPanel but cannot control devices.",
+  "player.readOnlyAccess": "View only"
 }

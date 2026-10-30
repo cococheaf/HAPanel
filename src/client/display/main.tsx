@@ -14,6 +14,7 @@ function Display() {
     published: Revision;
     snapshot: Snapshot;
     canEdit?: boolean;
+    canControl?: boolean;
   }>();
   const [pairing, setPairing] = useState(false),
     [error, setError] = useState<unknown>();
@@ -21,7 +22,9 @@ function Display() {
     [name, setName] = useState<string>();
   const displayName = name ?? t('pairing.defaultName');
   const load = useCallback(() => {
-    api<{ published: Revision; snapshot: Snapshot; canEdit?: boolean }>('api/display/bootstrap')
+    api<{ published: Revision; snapshot: Snapshot; canEdit?: boolean; canControl?: boolean }>(
+      'api/display/bootstrap',
+    )
       .then((result) => {
         setData(result);
         setPairing(false);
@@ -45,6 +48,8 @@ function Display() {
               ...d,
               snapshot: message.snapshot ?? d.snapshot,
               published: message.published ?? d.published,
+              canEdit: message.canEdit ?? d.canEdit,
+              canControl: message.canControl ?? d.canControl,
             },
         );
     });
@@ -115,7 +120,7 @@ function Display() {
       <Player
         published={data.published}
         snapshot={data.snapshot}
-        onAction={act}
+        onAction={data.canControl === false ? undefined : act}
         onEdit={
           data.canEdit ? () => window.location.assign(new URL('./', document.baseURI)) : undefined
         }

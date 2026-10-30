@@ -27,16 +27,17 @@ This release includes a source-built add-on for `amd64` and `aarch64`. Installat
 1. In **Settings → Apps/Add-ons → Store → Repositories**, add `https://github.com/cococheaf/HAPanel`.
 2. Install **HAPanel**. The container image is built from the repository; the first build may take several minutes.
 3. Start it and enable **Show in sidebar**.
-4. **HAPanel** in the HA sidebar opens the published dashboard. **Open Designer** opens the editor. Both views use the verified HA administrator session, without a separate network port or device pairing. The home icon in Studio returns to the dashboard.
+4. **HAPanel** in the HA sidebar opens the published dashboard. **Open Designer** opens the editor. The Designer uses the verified HA administrator session. Explicitly enabling `camera_access` also gives signed-in users access to the published view without a separate network port. The home icon in Studio returns to the dashboard.
 5. After testing the design, set `demo_mode` to `false` and restart. Assign your own entities in Studio and publish.
 
 The add-on reads `/data/options.json` and writes only to `/data/hapanel`. It requests HA Core API access, but no Supervisor management permissions, host networking or HA configuration mounts.
 
-| Option            | Default | Purpose                                                                              |
-| ----------------- | ------- | ------------------------------------------------------------------------------------ |
-| `demo_mode`       | `true`  | Use sample data; Ingress administrator checks still use HA.                          |
-| `display_enabled` | `false` | Start the separate display endpoint on container port 8098.                          |
-| `public_origin`   | empty   | Exact public HTTPS origin, e.g. `https://panel.example.net`; enables Secure cookies. |
+| Option            | Default | Purpose                                                                                                                                           |
+| ----------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `demo_mode`       | `true`  | Use sample data; Ingress administrator checks still use HA.                                                                                       |
+| `display_enabled` | `false` | Start the separate display endpoint on container port 8098.                                                                                       |
+| `public_origin`   | empty   | Exact public HTTPS origin, e.g. `https://panel.example.net`; enables Secure cookies.                                                              |
+| `camera_access`   | `admin` | `admin`: existing administrator access; `authenticated`: published view with cameras for active HA users, plus cameras for valid paired displays. |
 
 Changing modes does not trigger device actions. In live mode, example entities may initially be unavailable; select your own entities in Studio.
 
@@ -101,7 +102,7 @@ Light groups use an existing HA light entity. Automation cards show whether trig
 
 The alarm card shows live status and opens its mode picker directly inside HAPanel. In the Designer, enable and reorder the desired modes: Disarmed, Home, Away, Night, Vacation and Custom bypass. Unsupported integration modes remain disabled. Every command requires confirmation. Open and unavailable configured contacts are listed before arming. When required by HA, enter the code in a password field; it is used only for that request and is never stored in the layout or on the server. The visible alarm state always comes from HA, rather than an optimistic command result.
 
-Alarm commands and camera images are available through the existing HA administrator Ingress access. Separately paired displays retain their previous permissions and show alarm status only. Use the HAPanel entry in HA for security controls on the iPad.
+Alarm commands remain restricted to the HA administrator Ingress session. Camera images can additionally be shared with active HA users and valid paired displays through `camera_access: authenticated`. The default `admin` preserves existing access.
 
 ## Surveillance
 
@@ -138,7 +139,7 @@ Previously shared views are copied independently per display on first startup. F
 
 Each camera has **Camera overview: Snapshot / Live stream** and **Connection: Automatic / WebRTC / HLS**. Automatic detects HA capabilities, prefers WebRTC and falls back to HLS after a bounded wait when the direct connection is unavailable. The live indicator identifies the transport. Smaller HLS buffers and **Jump to live edge** reduce additional player delay without guaranteeing camera or network latency.
 
-Signalling uses the existing administrator gate through the add-on. Media uses the local route offered by HA. HAPanel uses no external STUN/TURN service, requests no microphone and installs no additional camera server. HLS fallback may be necessary across network boundaries or remote connections. Router, firewall and HA permissions are preserved.
+Signalling uses the same camera access check as snapshots and HLS through the add-on. Media uses the local route offered by HA. HAPanel uses no external STUN/TURN service, requests no microphone and installs no additional camera server. HLS fallback may be necessary across network boundaries or remote connections. Router, firewall and HA user roles are preserved. Additional HAPanel camera sharing is explicitly selected through `camera_access`.
 
 Live tiles start only while visible and pause behind an open detail view. For multiple streams on weaker tablets, choose a lower-resolution camera channel already available in HA. Cameras without video keep the updated-image fallback.
 
@@ -155,3 +156,13 @@ Capabilities use HA colour modes and recursive group membership. Extra group mem
 Custom text retains spaces. Required names may be cleared temporarily while renaming, but empty values are not saved. **Publish** activates the valid configuration.
 
 The extension retains schema 1 and reads existing configurations with their previous default actions. Older HAPanel versions do not understand the new light options. Retain the Supervisor update backup and restore its matching configuration when downgrading.
+
+## Camera sharing for users and tablets
+
+The add-on option **Camera viewing** (`camera_access`) accepts `admin` (default) or `authenticated`. With `authenticated`, active HA-authenticated users may read the published dashboard and cameras. They receive no device controls, Designer, drafts, device management or alarm commands. Valid paired tablets receive camera images in addition to their existing controls. Snapshots, HLS resources and WebRTC always require HA authentication or a valid pairing.
+
+The published configuration acts as the sharing allowlist. All cameras bound there are shared with these viewers; clients cannot choose arbitrary camera targets or HA services. This is an explicit HAPanel administrator sharing policy; individual HA entity permissions are not replicated. Camera tokens and private stream URLs stay on the server.
+
+Save changes and restart the app. The sidebar entry is visible to non-administrators, but the data API remains blocked until sharing is enabled. Revoking a pairing closes active camera WebRTC sessions. HA accounts are revalidated (30-second role cache, 20-second session check). Selecting `admin` disables camera sharing for paired and non-admin viewers again.
+
+For standalone deployment, `HAPANEL_CAMERA_ACCESS=authenticated` enables the same sharing policy; the default is `admin`.

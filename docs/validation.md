@@ -1,8 +1,8 @@
-# Prüfstand für 1.3.0
+# Prüfstand für 1.4.0
 
 ## Automatisiert
 
-62 Tests mit Node.js-Test-Runner: Geometrie aller Beispielprofile, Schema- und Domänenvalidierung, Rastergrenzen und Überlappungen, Revisionskonflikte, Entwurf/Veröffentlichung/Wiederherstellung, persistente Sitzungen, einmalige Kopplungscodes, Zugriffsschutz für Ingress und lokale Verwaltung, eingeschränkte Display-API, YAML-Import und aktiver WebSocket-Widerruf.
+65 Tests mit Node.js-Test-Runner: Geometrie aller Beispielprofile, Schema- und Domänenvalidierung, Rastergrenzen und Überlappungen, Revisionskonflikte, Entwurf/Veröffentlichung/Wiederherstellung, persistente Sitzungen, einmalige Kopplungscodes, Zugriffsschutz für Ingress und lokale Verwaltung, eingeschränkte Display-API, YAML-Import und aktiver WebSocket-Widerruf.
 
 Der HA-Adapter wird mit einem lokalen WebSocket-Simulator geprüft: Authentifizierung, gefilterte Abonnements, komprimierte Attribut-Deltas, Prognosen, Administratorprüfung, typisierte Serviceaufrufe und Unterbrechung. Es werden keine echten HA-Geräte angesteuert.
 
@@ -56,3 +56,9 @@ Einseitige Schaltregeln und Zustandsanzeige werden in verschachtelten Geräten, 
 Die Durchsicht umfasst Schema und Migration, Entwurf/Veröffentlichung, Eingaben, Lichtaktionen, WebSocket-Daten, Kamera- und Alarmgrenzen, Kopplungen, Übersetzungen und Builds. Das ist keine vollständige Hardware-, Langzeit- oder unabhängige Sicherheitsprüfung; die offenen Abnahmen bleiben oben dokumentiert.
 
 Im Browser wurden alle vier Licht-Schaltmodi mit Beispieldaten durchgespielt, Dimmer in Raumdetails ein-/ausgeblendet, ein Raumgerät hinzugefügt und per Undo wieder entfernt. Seitenname und Überschrift wurden Wort für Wort eingegeben und nach Neuladen im gespeicherten Entwurf wiedergefunden. Deutsch/Englisch sowie Designer bei 1440 × 900 und 810 × 1080 wurden geprüft.
+
+## 1.4.0 · Kamera-Zugriff ohne Administratorrolle
+
+API- und WebSocket-Tests prüfen aktive normale HA-Benutzer, deaktivierte/unbekannte Konten, gefälschte Ingress-Header, Origin-Prüfung und die Standardoption ohne zusätzliche Freigabe. Nach ausdrücklicher Freigabe sind Standbilder, HLS-Ressourcen, Fähigkeiten und WebRTC auf veröffentlichte Kamera-IDs begrenzt. Normale HA-Betrachter können keine Geräteaktionen, Alarmbefehle, Entwürfe, Veröffentlichungen oder Kopplungsverwaltung aufrufen.
+
+Gekoppelte Kameraansichten verlangen weiterhin eine gültige Sitzung; Widerruf beendet WebRTC und entzieht nachfolgende HTTP-Abrufe. Eine deaktivierte HA-Identität beendet aktive Viewer- und Kamera-Sockets nach erneuter Prüfung. Administrator- und Viewerprüfung teilen denselben Rollen-Cache. Eine Anmeldung mit einem tatsächlichen Nicht-Administrator-Account und ein physischer Tablet-Test sind nicht durch den Simulator ersetzt.

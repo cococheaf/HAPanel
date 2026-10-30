@@ -28,18 +28,19 @@ Diese Version enthält ein aus Quellcode baubares Add-on für `amd64` und `aarch
    `https://github.com/cococheaf/HAPanel`
 2. **HAPanel** installieren. Das Containerimage wird aus dem Repository gebaut; der erste Build kann einige Minuten dauern.
 3. Starten und **In Seitenleiste anzeigen** aktivieren.
-4. **HAPanel** in der HA-Seitenleiste öffnet das veröffentlichte Dashboard. **Designer öffnen** führt zum Editor. Beide Ansichten verwenden den geprüften HA-Administratorzugang; dafür ist kein zusätzlicher Port und keine Displaykopplung erforderlich. Das Haus-Symbol im Studio führt zurück zum Dashboard.
+4. **HAPanel** in der HA-Seitenleiste öffnet das veröffentlichte Dashboard. **Designer öffnen** führt zum Editor. Der Designer verwendet den geprüften HA-Administratorzugang. Für angemeldete Benutzer ist die veröffentlichte Ansicht nach ausdrücklicher Freigabe unter `camera_access` ohne zusätzlichen Port verfügbar. Das Haus-Symbol im Studio führt zurück zum Dashboard.
 5. Nach dem ersten Design-Test `demo_mode` auf `false` setzen und das Add-on neu starten. Die Kacheln im Studio den eigenen Entitäten zuordnen und veröffentlichen.
 
 Das Add-on liest `/data/options.json` und schreibt ausschließlich in `/data/hapanel`. Es fordert HA-Core-API-Zugriff an, aber keine Supervisor-Verwaltungsrechte, Host-Netzwerkfreigaben oder HA-Konfigurations-Mounts.
 
 ### Optionen
 
-| Option            | Standard | Bedeutung                                                                                                    |
-| ----------------- | -------- | ------------------------------------------------------------------------------------------------------------ |
-| `demo_mode`       | `true`   | Beispieldaten verwenden. Ingress-Administratoren werden weiterhin über HA geprüft.                           |
-| `display_enabled` | `false`  | Separaten Displayserver auf Container-Port 8098 starten.                                                     |
-| `public_origin`   | leer     | Exakte externe HTTPS-Origin des Displayservers, z. B. `https://panel.example.net`. Aktiviert Secure-Cookies. |
+| Option            | Standard | Bedeutung                                                                                                                                                         |
+| ----------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `demo_mode`       | `true`   | Beispieldaten verwenden. Ingress-Administratoren werden weiterhin über HA geprüft.                                                                                |
+| `display_enabled` | `false`  | Separaten Displayserver auf Container-Port 8098 starten.                                                                                                          |
+| `public_origin`   | leer     | Exakte externe HTTPS-Origin des Displayservers, z. B. `https://panel.example.net`. Aktiviert Secure-Cookies.                                                      |
+| `camera_access`   | `admin`  | `admin`: bisheriger Administratorzugang; `authenticated`: veröffentlichte Ansicht samt Kameras für aktive HA-Benutzer und Kameras für gültig gekoppelte Displays. |
 
 Ein geänderter Modus startet nicht automatisch Geräteaktionen. Im Live-Modus sind die Beispielentitäten zunächst möglicherweise nicht verfügbar; im Editor eigene Entitäten wählen.
 
@@ -105,7 +106,7 @@ Lichtgruppen verwenden die vorhandene HA-Lichtentität. Automationskacheln zeige
 
 Das Alarmpanel zeigt den Live-Zustand und öffnet die Moduswahl direkt in HAPanel. Im Designer unter **Alarmmodi** lassen sich die angebotenen Modi aktivieren und sortieren. Unterstützt werden Unscharf, Zuhause, Abwesend, Nacht, Urlaub und benutzerdefinierter Bypass, soweit die HA-Integration diese unterstützt. Nicht unterstützte Modi sind deaktiviert. Vor jedem Befehl erscheint eine Bestätigung; offene und unbekannte Tür-/Fensterkontakte werden vor dem Scharfschalten angezeigt. Wenn HA einen Code verlangt, fragt HAPanel ihn als Passwort ab. Codes werden weder im Layout noch auf dem Server gespeichert. Ein bestätigter Befehl ersetzt keine Rückmeldung: Der angezeigte Alarmzustand stammt weiterhin aus HA.
 
-Alarmbefehle und Kamerabilder stehen im bestehenden HA-Administratorzugang über Ingress zur Verfügung. Eine separat gekoppelte Displayadresse erhält diese zusätzlichen Rechte nicht. Dort bleibt der Alarmstatus sichtbar. Für die Sicherheitsbedienung auf dem iPad den HAPanel-Eintrag in HA verwenden. Bestehende Displaykopplungen werden nicht erweitert.
+Alarmbefehle bleiben dem HA-Administratorzugang über Ingress vorbehalten. Kamerabilder können zusätzlich unter `camera_access: authenticated` für aktive HA-Benutzer und gültig gekoppelte Displays freigegeben werden. Der Standard `admin` erweitert bestehende Freigaben nicht.
 
 ## Überwachung
 
@@ -142,7 +143,7 @@ Die früher gemeinsam genutzten Ansichten werden beim ersten Start unabhängig p
 
 Jede Kamerakachel besitzt **Kameraübersicht: Standbild / Livestream** und **Verbindung: Automatisch / WebRTC / HLS**. Automatisch ermittelt die aktuellen HA-Kamerafähigkeiten. WebRTC vermeidet den HLS-Puffer. Ist die direkte Verbindung nicht erreichbar, nutzt HAPanel nach begrenzter Wartezeit HLS. Der Verbindungsweg ist an der Live-Anzeige sichtbar. **Zur Livekante springen** und ein kleinerer Puffer helfen bei HLS; sie garantieren keine bestimmte Verzögerung der Kamera oder des Netzwerks.
 
-Die WebRTC-Signalisierung läuft über das Add-on mit derselben Administratorprüfung wie bisher. Medien nutzen die lokale Verbindung, die HA vermittelt. HAPanel verwendet keine externen STUN-/TURN-Dienste, fragt kein Mikrofon an und installiert keinen weiteren Kameraserver. Über Netzgrenzen oder Fernzugriffe kann deshalb der HLS-Rückfall erforderlich sein. Router, Firewall und HA-Zugriffsrechte werden nicht verändert.
+Die WebRTC-Signalisierung läuft über das Add-on mit derselben Freigabeprüfung wie Standbilder und HLS. Medien nutzen die lokale Verbindung, die HA vermittelt. HAPanel verwendet keine externen STUN-/TURN-Dienste, fragt kein Mikrofon an und installiert keinen weiteren Kameraserver. Über Netzgrenzen oder Fernzugriffe kann deshalb der HLS-Rückfall erforderlich sein. Router, Firewall und HA-Benutzerrollen werden nicht verändert. Die zusätzliche HAPanel-Kamerafreigabe wird ausdrücklich über `camera_access` gewählt.
 
 Live-Kacheln starten nur sichtbar und pausieren hinter einem geöffneten Detaildialog. Auf leistungsschwächeren Tablets für mehrere gleichzeitige Livekacheln möglichst einen niedrigeren, bereits in HA verfügbaren Kamerakanal wählen. Kameras ohne Videostream behalten die aktualisierte Bildfolge.
 
@@ -159,3 +160,13 @@ Die Fähigkeiten werden aus den HA-Farbmodi und rekursiv aus Gruppenmitgliedern 
 Eigene Texte behalten ihre Leerzeichen. Leere Pflichtfelder sind während des Umbenennens vorübergehend erlaubt, werden aber nicht gespeichert. **Veröffentlichen** aktiviert die gültige Konfiguration.
 
 Die Erweiterung bleibt in Schema 1 und liest vorhandene Konfigurationen mit bisherigen Standardaktionen. Ältere HAPanel-Versionen kennen die neuen Lichtoptionen nicht. Vor einem Downgrade die zum alten Add-on passende Sicherung wiederherstellen; die Update-Sicherung im Supervisor beibehalten.
+
+## Kamerafreigabe für Benutzer und Tablets
+
+Die Add-on-Option **Kameraanzeige** (`camera_access`) bietet `admin` (Standard) und `authenticated`. Bei `authenticated` dürfen aktive, über HA angemeldete Benutzer die veröffentlichte Ansicht samt Kameras lesen. Sie erhalten keine Gerätebedienung, keinen Designer, keine Entwürfe, keine Geräteverwaltung und keine Alarmbefehle. Gültig gekoppelte Tablets erhalten Kamerabilder zusätzlich zu ihren bisherigen Bedienrechten. Ohne Anmeldung oder gültige Kopplung sind Standbilder, HLS-Dateien und WebRTC gesperrt.
+
+Die Veröffentlichung bildet die Freigabeliste. Alle dort gebundenen Kameras sind für die genannten Betrachter sichtbar; Kamera-Ziele oder HA-Services können nicht frei angegeben werden. Dies ist eine eigene Freigabe durch den HAPanel-Administrator; individuelle HA-Entitätsrechte werden nicht nachgebildet. Kameratokens und private Streamadressen bleiben serverseitig.
+
+Nach einer Änderung speichern und die App neu starten. Die Sidebar ist auch für Nicht-Administratoren sichtbar; ohne die Freigabe bleibt die Daten-API für sie gesperrt. Kopplungswiderruf beendet aktive Kamera-WebRTC-Sitzungen. Aktive HA-Konten werden nachgeprüft (30 Sekunden Rollen-Cache, 20 Sekunden Sitzungsprüfung). Die Option `admin` sperrt gekoppelte und nicht administrative Kameraansichten wieder.
+
+Im eigenständigen Betrieb entspricht `HAPANEL_CAMERA_ACCESS=authenticated` dieser Freigabe; ohne die Variable bleibt `admin` aktiv.

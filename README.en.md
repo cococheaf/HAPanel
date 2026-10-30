@@ -18,7 +18,7 @@
 
 HAPanel combines rounded tiles, calm colours and direct touch controls with a visual layout editor. It runs as a Home Assistant app (add-on) or a local Node.js process. Existing Lovelace dashboards and HA configuration files are preserved.
 
-**Version: 1.3.0.** The preview, editor and API are implemented. The HA adapter is tested against a simulated WebSocket server. Installation, updates, Ingress and live data are verified on HA OS 18.4 / Core 2026.10.4 (amd64). Testing on physical iPad hardware remains pending.
+**Version: 1.4.0.** The preview, editor and API are implemented. The HA adapter is tested against a simulated WebSocket server. Installation, updates, Ingress and live data are verified on HA OS 18.4 / Core 2026.10.4 (amd64). Testing on physical iPad hardware remains pending.
 
 ## Try it
 
@@ -41,7 +41,7 @@ For a standalone view, choose **Share → Add to Home Screen**. Landscape, portr
 - Autosaved drafts, explicit publication and up to 30 previous revisions.
 - JSON/YAML import and export.
 - Server-side HA WebSocket connection with filtered subscriptions and reconnection.
-- Ingress access for HA administrators and an optional paired display endpoint with revocable device sessions.
+- Administrator-only Designer, optional camera viewing for active HA users, and a paired display endpoint with revocable device sessions.
 - Dockerfile and GitHub Actions for validation, the hosted preview and amd64/aarch64 builds.
 
 UI language is stored per browser, independently of HA settings and saved layouts. Untouched sample labels are localised for the preview. Your own titles, greetings and HA entity names remain as entered. [Adding more languages](docs/translations.md) requires a translation catalog and registry entry.
@@ -120,3 +120,11 @@ Dimmer sliders require confirmed dimming support. **Every** group member must be
 Page names, headings and custom labels preserve spaces while typing and saving. Required fields can be cleared temporarily while renaming; leaving an empty required field restores its last valid text.
 
 ![Switch behaviour in the Designer](docs/images/light-settings-en.png)
+
+## Cameras without an administrator role
+
+In **Settings → Apps → HAPanel → Configuration → Camera viewing**, select `authenticated`, save and restart. The default `admin` retains the existing access policy.
+
+With `authenticated`, **active, signed-in HA users** can view the published HAPanel dashboard including cameras in **View only** mode. **Valid paired tablets** also receive camera images while retaining their previous device controls. Designer, drafts, pairing management and alarm commands remain administrator-only. Camera access always requires HA sign-in or a valid pairing.
+
+Sharing covers all cameras bound in the published HAPanel configuration, not arbitrary HA entities. This is an explicit HAPanel sharing policy; individual HA entity permissions are not replicated.
