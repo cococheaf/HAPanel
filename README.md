@@ -35,7 +35,7 @@ Für eine eigenständige Ansicht: **Teilen → Zum Home-Bildschirm**. Wähle bei
 ## Bereits enthalten
 
 - General-Lichtgruppen, Automationen, direkte Alarmbedienung mit konfigurierbaren Modi sowie eine filterbare Übersicht offener Türen und Fenster.
-- Kamerakacheln mit Vorschaubildern und HLS-Livestreams bei Bedarf, inklusive Bildfolge für Kameras ohne Stream-Unterstützung.
+- Kamerakacheln mit Vorschaubildern, optionaler Live-Übersicht, WebRTC und HLS; Bildfolge für Kameras ohne Stream-Unterstützung.
 - Raumübersicht mit getrennten Etagen, antippbaren Details und eigener Geräteansicht pro Raum.
 - Licht, Klima, Beschattung, Medien mit Album-Art, Wetter mit Stundenprognose, Szenen und Sensoren.
 - Energiecockpit für Solar, Netz, Speicher und erfasste Verbraucher; Messwerte mit 24-Stunden-Verlauf.
@@ -82,7 +82,7 @@ Das Supervisor-Token bleibt im Backend und wird als Administratorzugang behandel
 
 ## Nächste Schritte
 
-Die [Roadmap](docs/roadmap.md) benennt die noch offenen Arbeiten: echte HA-/iPad-Abnahme, automatische Viewport-Kalibrierung, weitere Gerätefähigkeiten und vollständig adaptive Layouts. Deutsch und Englisch sind von Anfang an unterstützt; [weitere Sprachen](docs/translations.md) können folgen. Ältere gespeicherte Schemaversionen werden derzeit ausdrücklich abgelehnt und nicht verändert; Migrationen folgen bei der ersten Schemaänderung.
+Die [Roadmap](docs/roadmap.md) benennt die noch offenen Arbeiten: physische iPad- und Langzeitabnahme, automatische Viewport-Kalibrierung, weitere Gerätefähigkeiten und vollständig adaptive Layouts. Deutsch und Englisch sind von Anfang an unterstützt; [weitere Sprachen](docs/translations.md) können folgen. Unbekannte Schemaversionen werden ausdrücklich abgelehnt und ihre Dateien erhalten. Geteilte Ansichten in Schema 1 werden mit einer Sicherung der Originaldatei in unabhängige Display-Ansichten überführt.
 
 ## Herkunft und Lizenz
 

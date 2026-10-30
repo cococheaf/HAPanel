@@ -78,7 +78,7 @@ The Supervisor token stays in the backend and is treated as an administrator cre
 
 ## Development status
 
-Real HA/iPad acceptance, automatic viewport calibration, additional device capabilities and adaptive reflow are the next milestones. German and English are implemented; more languages can follow through the shared catalogs. Unknown stored schema versions are explicitly rejected and their files are preserved. Shared layouts are migrated to independent display views with a backup of the original file.
+Physical iPad and long-term acceptance, automatic viewport calibration, additional device capabilities and adaptive reflow are the next milestones. German and English are implemented; more languages can follow through the shared catalogs. Unknown stored schema versions are explicitly rejected and their files are preserved. Shared layouts are migrated to independent display views with a backup of the original file.
 
 ## Credits and licence
 
