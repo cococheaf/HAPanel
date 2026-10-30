@@ -13,6 +13,8 @@ const domains: Record<string, TileKind> = {
   binary_sensor: 'sensor',
   scene: 'scene',
   script: 'scene',
+  automation: 'automation',
+  alarm_control_panel: 'alarm',
 };
 const freshControl = () => 'control_' + crypto.randomUUID().slice(0, 12);
 
@@ -94,66 +96,138 @@ export function InsightSettings({
     );
   return (
     <>
-      <div className="form-section">
-        <h3>{t('editor.cardView')}</h3>
-        <label>
-          {t('editor.cardView')}
-          <select
-            value={tile.room ? 'room' : tile.energy ? 'energy' : 'standard'}
-            onChange={(event) => {
-              const view = event.target.value;
-              update({
-                room:
-                  view === 'room'
-                    ? {
-                        icon: 'home',
-                        controls: [
-                          {
-                            id: freshControl(),
-                            kind: tile.kind,
-                            title: tile.title,
-                            entityId: tile.entityId,
-                            accent: tile.accent,
-                          },
-                        ],
-                        presence: [],
-                        windows: [],
-                      }
-                    : undefined,
-                energy:
-                  view === 'energy'
-                    ? {
-                        solarPower: [tile.entityId],
-                        batteryPositive: 'charge',
-                        consumers: [],
-                        metrics: [],
-                      }
-                    : undefined,
-              });
-            }}
-          >
-            <option value="standard">{t('editor.standardView')}</option>
-            <option value="room">{t('editor.roomView')}</option>
-            {tile.kind === 'sensor' && tile.entityId.startsWith('sensor.') && (
-              <option value="energy">{t('editor.energyView')}</option>
+      {tile.kind === 'alarm' && (
+        <div className="form-section">
+          <h3>{t('kind.alarm')}</h3>
+          <label>
+            {t('alarm.haUrl')}
+            <input
+              type="url"
+              value={tile.homeAssistantUrl ?? ''}
+              placeholder="https://homeassistant.local:8123/lovelace"
+              onChange={(event) => update({ homeAssistantUrl: event.target.value || undefined })}
+            />
+          </label>
+          <p className="field-hint">{t('alarm.manageInHA')}</p>
+        </div>
+      )}
+      {tile.contacts && (
+        <div className="form-section">
+          <h3>{t('kind.contacts')}</h3>
+          {tile.contacts.map((item) => (
+            <div className="inspector-reference" key={item.entityId}>
+              <input
+                aria-label={item.label}
+                value={item.label}
+                onChange={(event) =>
+                  event.target.value.trim() &&
+                  update({
+                    contacts: tile.contacts!.map((row) =>
+                      row.entityId === item.entityId ? { ...row, label: event.target.value } : row,
+                    ),
+                  })
+                }
+              />
+              <button
+                className="icon-button"
+                disabled={tile.contacts!.length === 1}
+                aria-label={t('editor.remove')}
+                onClick={() =>
+                  update({
+                    contacts: tile.contacts!.filter((row) => row.entityId !== item.entityId),
+                  })
+                }
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+          {tile.contacts.length < 32 &&
+            picker(
+              t('editor.addContact'),
+              '',
+              (id) => {
+                const entity = catalog.find((item) => item.entity_id === id);
+                if (entity && !tile.contacts!.some((item) => item.entityId === id))
+                  update({
+                    contacts: [
+                      ...tile.contacts!,
+                      { entityId: id, label: name(entity).slice(0, 64) },
+                    ],
+                  });
+              },
+              catalog.filter(
+                (entity) =>
+                  entity.entity_id.startsWith('binary_sensor.') &&
+                  ['door', 'window', 'opening'].includes(String(entity.attributes.device_class)),
+              ),
             )}
-          </select>
-        </label>
-        <label>
-          {t('editor.navigationTarget')}
-          <select
-            value={tile.navigateTo ?? ''}
-            onChange={(event) => update({ navigateTo: event.target.value || undefined })}
-          >
-            <option value="">{t('detail.title')}</option>
-            {pages.map((page) => (
-              <option key={page.id} value={page.id}>
-                {page.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+        </div>
+      )}
+      {!['contacts', 'alarm', 'automation'].includes(tile.kind) && (
+        <>
+          <div className="form-section">
+            <h3>{t('editor.cardView')}</h3>
+            <label>
+              {t('editor.cardView')}
+              <select
+                value={tile.room ? 'room' : tile.energy ? 'energy' : 'standard'}
+                onChange={(event) => {
+                  const view = event.target.value;
+                  update({
+                    room:
+                      view === 'room'
+                        ? {
+                            icon: 'home',
+                            controls: [
+                              {
+                                id: freshControl(),
+                                kind: tile.kind,
+                                title: tile.title,
+                                entityId: tile.entityId,
+                                accent: tile.accent,
+                              },
+                            ],
+                            presence: [],
+                            windows: [],
+                          }
+                        : undefined,
+                    energy:
+                      view === 'energy'
+                        ? {
+                            solarPower: [tile.entityId],
+                            batteryPositive: 'charge',
+                            consumers: [],
+                            metrics: [],
+                          }
+                        : undefined,
+                  });
+                }}
+              >
+                <option value="standard">{t('editor.standardView')}</option>
+                <option value="room">{t('editor.roomView')}</option>
+                {tile.kind === 'sensor' && tile.entityId.startsWith('sensor.') && (
+                  <option value="energy">{t('editor.energyView')}</option>
+                )}
+              </select>
+            </label>
+            <label>
+              {t('editor.navigationTarget')}
+              <select
+                value={tile.navigateTo ?? ''}
+                onChange={(event) => update({ navigateTo: event.target.value || undefined })}
+              >
+                <option value="">{t('detail.title')}</option>
+                {pages.map((page) => (
+                  <option key={page.id} value={page.id}>
+                    {page.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </>
+      )}
       {tile.room && (
         <div className="form-section">
           <h3>{t('editor.roomView')}</h3>

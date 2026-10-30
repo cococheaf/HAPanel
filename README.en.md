@@ -16,17 +16,18 @@
 
 HAPanel combines rounded tiles, calm colours and direct touch controls with a visual layout editor. It runs as a Home Assistant app (add-on) or a local Node.js process. Existing Lovelace dashboards and HA configuration files are preserved.
 
-**Status: 0.2.0-alpha.1 — functional preview.** The demo, editor and API are implemented. The HA adapter is tested against a simulated WebSocket server. Installation, updates, Ingress and live data are verified on HA OS 18.4 / Core 2026.10.4 (amd64). Testing on physical iPad hardware remains pending.
+**Version: 1.0.0.** The demo, editor and API are implemented. The HA adapter is tested against a simulated WebSocket server. Installation, updates, Ingress and live data are verified on HA OS 18.4 / Core 2026.10.4 (amd64). Testing on physical iPad hardware remains pending.
 
 ## Try it
 
-Open the [demo](https://cococheaf.github.io/HAPanel/) in Safari on your iPad. Room details, lights, dimming, temperature, shades, weather and the energy cockpit use interactive sample data. Choose **Explore Studio** to edit the layout. Changes stay in your browser; **Publish** applies your draft to the demo dashboard.
+Open the [demo](https://cococheaf.github.io/HAPanel/) in Safari on your iPad. Room details, lights, dimming, temperature, shades, weather and the energy cockpit use interactive sample data. Choose **Open Designer** to edit the layout. Changes stay in your browser; **Publish** applies your draft to the demo dashboard.
 
 For a standalone view, choose **Share → Add to Home Screen**. Landscape, portrait and compact profiles are included. The public demo has no access to a real Home Assistant instance or credentials. Media controls simulate states and do not play audio.
 
 ## Included
 
 - **German and English from the start**, with automatic browser-language detection, a manual language selector, localised dates/numbers and translatable errors.
+- Light groups, automation controls, alarm status with a link to the HA alarm panel, and open-door/window summaries.
 - Floor navigation and room cards with individual device detail views.
 - Lights, climate, shades, media with album art, hourly weather, scenes and sensors.
 - Energy cockpit for solar, grid, battery and monitored loads, plus 24-hour meter history.

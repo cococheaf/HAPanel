@@ -27,6 +27,7 @@ import { isMessageKey } from '../../shared/i18n';
 import { useI18n } from '../i18n';
 import { api } from '../service';
 import { Modal } from './Modal';
+import { ContactList } from './Security';
 
 export const roomIcons = {
   home: Home,
@@ -450,7 +451,9 @@ export function TileDetails({
           ← {tile.title}
         </button>
       ) : null}
-      {tile.room && !metric ? (
+      {tile.contacts && !metric ? (
+        <ContactList tile={tile} snapshot={snapshot} />
+      ) : tile.room && !metric ? (
         <>
           <RoomSummary room={tile.room} snapshot={snapshot} />
           <h3 className="insight-section-title">{t('detail.controls')}</h3>

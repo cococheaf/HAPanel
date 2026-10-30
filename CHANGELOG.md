@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0
+
+Erste finale Veröffentlichung. Die Zuhause-Übersicht unterstützt jetzt Lichtgruppen, Automationen, ein Alarmpanel mit Live-Status und direktem Zugang zur authentifizierten HA-Bedienung sowie offene Türen/Fenster mit klarer Kennzeichnung nicht erreichbarer Kontakte. Manuelle Automationsaufrufe respektieren bestehende Bedingungen. Die Schaltfläche zum Editor heißt „Designer öffnen“. Deutsch und Englisch, bestehende Räume und das Energiecockpit bleiben enthalten.
+
+First final release. Home controls now include light groups, automations, alarm status linked to the existing authenticated Home Assistant panel, and door/window summaries that distinguish open, closed and unavailable contacts. Manual automation runs retain existing conditions. The editor button is now “Open Designer”. Existing room and energy views remain available.
+
 ## 0.2.0-alpha.1
 
 Raumkacheln mit eigener Geräteansicht, Etagen-Navigation und individuellen Seitentiteln. Wetterdetails mit Stundenprognose und 24-Stunden-Verläufen. Energiecockpit für Solarleistung, Netzbezug/-einspeisung, Speicher und ausdrücklich gekennzeichnete erfasste Verbraucher; Tageswerte und Zählerstände bleiben getrennt. Beschattung mit Öffnen, Stoppen, Schließen und Position. Alle neuen Einstellungen sind im Studio auf Deutsch und Englisch bearbeitbar. Abwärtskompatible Erweiterung von Schema 1; vorhandene Veröffentlichungen werden nicht automatisch ersetzt.

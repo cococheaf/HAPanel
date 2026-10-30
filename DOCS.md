@@ -13,20 +13,20 @@ Datum, Uhrzeit, Zahlen, Bedienelemente und HAPanel-Fehlermeldungen folgen der Au
 1. <https://cococheaf.github.io/HAPanel/> in Safari öffnen.
 2. Für eine passende Anordnung oben das Querformat- oder Hochformatprofil wählen.
 3. Lichtschalter, Dimmer, Temperatur und Mediensteuerung ausprobieren.
-4. **Studio erkunden** öffnet den visuellen Editor. Seiten und Kacheln bearbeiten; **Veröffentlichen** übernimmt die Änderungen in die Dashboard-Demo.
+4. **Designer öffnen** öffnet den visuellen Editor. Seiten und Kacheln bearbeiten; **Veröffentlichen** übernimmt die Änderungen in die Dashboard-Demo.
 5. **Teilen → Zum Home-Bildschirm** fügt die Demo als eigenständige Web-App hinzu.
 
 Die Demo besitzt Beispieldaten und speichert Konfigurationen nur im jeweiligen Browser. Safari und eine Home-Screen-Web-App können getrennte Speicherbereiche besitzen. Es wird kein Audio abgespielt. Fullscreen, Gerätesperre und dauerhaftes Wachhalten hängen vom verwendeten Betriebssystem ab.
 
 ## Home Assistant OS / Supervisor
 
-Diese Alpha enthält ein aus Quellcode baubares Add-on für `amd64` und `aarch64`. Installation, Updates, Ingress und Live-Daten wurden auf Home Assistant OS 18.4 mit Core 2026.10.4 (amd64) geprüft. Für die erste Inbetriebnahme kann der voreingestellte Demo-Modus verwendet werden.
+Diese Version enthält ein aus Quellcode baubares Add-on für `amd64` und `aarch64`. Installation, Updates, Ingress und Live-Daten wurden auf Home Assistant OS 18.4 mit Core 2026.10.4 (amd64) geprüft. Für die erste Inbetriebnahme kann der voreingestellte Demo-Modus verwendet werden.
 
 1. Unter **Einstellungen → Apps/Add-ons → App-Store → Repositories** dieses Repository hinzufügen:
    `https://github.com/cococheaf/HAPanel`
 2. **HAPanel** installieren. Das Containerimage wird aus dem Repository gebaut; der erste Build kann einige Minuten dauern.
 3. Starten und **In Seitenleiste anzeigen** aktivieren.
-4. **HAPanel** in der HA-Seitenleiste öffnet das veröffentlichte Dashboard. **Studio erkunden** führt zum Editor. Beide Ansichten verwenden den geprüften HA-Administratorzugang; dafür ist kein zusätzlicher Port und keine Displaykopplung erforderlich. Das Haus-Symbol im Studio führt zurück zum Dashboard.
+4. **HAPanel** in der HA-Seitenleiste öffnet das veröffentlichte Dashboard. **Designer öffnen** führt zum Editor. Beide Ansichten verwenden den geprüften HA-Administratorzugang; dafür ist kein zusätzlicher Port und keine Displaykopplung erforderlich. Das Haus-Symbol im Studio führt zurück zum Dashboard.
 5. Nach dem ersten Design-Test `demo_mode` auf `false` setzen und das Add-on neu starten. Die Kacheln im Studio den eigenen Entitäten zuordnen und veröffentlichen.
 
 Das Add-on liest `/data/options.json` und schreibt ausschließlich in `/data/hapanel`. Es fordert HA-Core-API-Zugriff an, aber keine Supervisor-Verwaltungsrechte, Host-Netzwerkfreigaben oder HA-Konfigurations-Mounts.
@@ -96,6 +96,14 @@ Im Eigenschaftenbereich unter **Kachelansicht** zwischen Gerät, Raum und Energi
 Für Energie werden ausschließlich vorhandene Sensoren gebunden. Solarquellen dürfen sich nicht überlappen; keinen Gesamtwert zusammen mit seinen Teilwerten addieren. Netzbezug und Einspeisung sind getrennte Leistungswerte. Das Vorzeichen der Batterieleistung entsprechend der Integration einstellen. Erfasste Verbraucher sind nur die ausgewählten Geräte und kein Hausgesamtverbrauch. Tageswerte und kumulierte Zählerstände individuell und eindeutig benennen. Unbekannte Werte bleiben als Strich sichtbar.
 
 Ein Tipp auf Wetter, Messwert oder Energiequelle öffnet Details. Prognosen hängen von der Wetterintegration ab, 24-Stunden-Verläufe vom HA-Recorder. Es werden keine zusätzlichen History-Daten in HA angelegt. Bereits gespeicherte Layouts bleiben erhalten; die neue Beispielanordnung ersetzt keine eigenen Dashboards.
+
+## Zuhause: Lichtgruppen, Automation und Sicherheit
+
+Lichtgruppen verwenden die vorhandene HA-Lichtentität. Automationskacheln zeigen, ob die Automatik aktiviert ist; Ein/Aus steuert ihre Trigger. **Jetzt ausführen** ruft die Automation mit ihren bestehenden Bedingungen auf. Auf kleinen Kacheln ist der manuelle Aufruf in der Detailansicht erreichbar.
+
+Das Alarmpanel zeigt den Live-Zustand. Eine optional konfigurierte HA-Paneladresse öffnet die bestehende Bedienung in Home Assistant; dafür gilt die dortige Anmeldung. HAPanel speichert keine Alarmcodes und bietet keine eigene Scharf-/Unscharf-API an.
+
+**Türen & Fenster** enthält eine konfigurierbare Kontaktliste. Offene Kontakte stehen im Detail zuerst, nicht erreichbare Kontakte werden separat ausgewiesen. „Keine offenen gemeldet“ bedeutet nicht, dass unbekannte Kontakte sicher geschlossen sind. Alle neuen Einstellungen sind im Designer bearbeitbar.
 
 ## Displaymaße
 

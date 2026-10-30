@@ -68,4 +68,4 @@ Hardwareauflösung, Pixelverhältnis, Browserfläche, Raster und reservierte Kop
 
 Automatisierte Tests prüfen Schema und Rastergrenzen, persistente Revisionen, Konflikte, Veröffentlichungstrennung, Kopplung/Replay/Widerruf, Ingress-Vertrauensgrenzen, Display-Zugriff und den HA-WebSocket-Dialog gegen einen lokalen Simulator.
 
-Die Alpha benötigt zusätzlich eine Abnahme mit echtem Supervisor, realen Gerätefähigkeiten und Safari auf physischer iPad-Hardware. Der Testsimulator ersetzt diese Abnahme nicht. Die ersten Klima-Steuerelemente sind auf ein einzelnes Temperatursoll ausgelegt; erweiterte HVAC-Modi, Temperaturbereiche und Fahrenheit folgen in einer weiteren Ausbaustufe.
+Zusätzlich erforderlich ist eine Abnahme mit echtem Supervisor, realen Gerätefähigkeiten und Safari auf physischer iPad-Hardware. Der Testsimulator ersetzt diese Abnahme nicht. Die ersten Klima-Steuerelemente sind auf ein einzelnes Temperatursoll ausgelegt; erweiterte HVAC-Modi, Temperaturbereiche und Fahrenheit folgen in einer weiteren Ausbaustufe.

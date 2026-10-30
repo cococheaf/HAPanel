@@ -10,10 +10,36 @@ export const tileKinds = [
   'scene',
   'sensor',
   'cover',
+  'automation',
+  'alarm',
+  'contacts',
 ] as const;
 export type TileKind = (typeof tileKinds)[number];
 const entityId = z.string().regex(/^[a-z_]+\.[a-z0-9_]+$/);
 const sensorId = z.string().regex(/^sensor\.[a-z0-9_]+$/);
+export const contactsSchema = z
+  .array(
+    z
+      .object({
+        entityId: z.string().regex(/^binary_sensor\.[a-z0-9_]+$/),
+        label: z.string().trim().min(1).max(64),
+      })
+      .strict(),
+  )
+  .min(1)
+  .max(32)
+  .superRefine((items, ctx) => {
+    if (new Set(items.map((item) => item.entityId)).size !== items.length)
+      ctx.addIssue({ code: 'custom', message: 'error.uniqueIds' });
+  });
+const alarmLink = z
+  .string()
+  .url()
+  .max(2048)
+  .refine((value) => {
+    const url = new URL(value);
+    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password;
+  });
 export const controlSchema = z
   .object({
     id,
@@ -101,6 +127,8 @@ export const tileSchema = z
     room: roomSchema.optional(),
     energy: energySchema.optional(),
     navigateTo: id.optional(),
+    contacts: contactsSchema.optional(),
+    homeAssistantUrl: alarmLink.optional(),
   })
   .strict();
 export const dashboardSchema = z
@@ -186,9 +214,21 @@ export const dashboardSchema = z
       scene: ['scene', 'script'],
       sensor: ['sensor', 'binary_sensor'],
       cover: ['cover'],
+      automation: ['automation'],
+      alarm: ['alarm_control_panel'],
+      contacts: ['binary_sensor'],
     };
     for (const [pageIndex, page] of doc.pages.entries())
       for (const [ti, tile] of page.tiles.entries()) {
+        if (
+          (tile.kind === 'contacts') !== Boolean(tile.contacts) ||
+          (tile.homeAssistantUrl && tile.kind !== 'alarm')
+        )
+          ctx.addIssue({
+            code: 'custom',
+            message: 'error.entityKind',
+            path: ['pages', pageIndex, 'tiles', ti],
+          });
         if ((tile.room && tile.energy) || (tile.energy && tile.kind !== 'sensor')) {
           ctx.addIssue({
             code: 'custom',
@@ -204,7 +244,10 @@ export const dashboardSchema = z
           });
         }
         for (const control of tile.room?.controls ?? []) {
-          if (!domains[control.kind].includes(control.entityId.split('.')[0]))
+          if (
+            control.kind === 'contacts' ||
+            !domains[control.kind].includes(control.entityId.split('.')[0])
+          )
             ctx.addIssue({
               code: 'custom',
               message: 'error.entityKind',
@@ -320,6 +363,7 @@ export function entityIds(document: Dashboard) {
         page.tiles
           .flatMap((tile) => [
             tile.entityId,
+            ...(tile.contacts?.map((contact) => contact.entityId) ?? []),
             ...(tile.room
               ? [
                   tile.room.temperature,
@@ -394,6 +438,10 @@ export function resolveAction(document: Dashboard, action: Action) {
     if (action.command === 'volume') return result('volume_set', { volume_level: value(0, 1) });
   }
   if (tile.kind === 'scene' && action.command === 'activate') return result('turn_on');
+  if (tile.kind === 'automation') {
+    if (action.command === 'toggle') return result('toggle');
+    if (action.command === 'activate') return result('trigger', { skip_condition: false });
+  }
   if (tile.kind === 'cover') {
     if (action.command === 'open') return result('open_cover');
     if (action.command === 'close') return result('close_cover');

@@ -6,6 +6,9 @@ import {
   Thermometer,
   Wind,
   PanelsTopLeft,
+  ShieldCheck,
+  DoorOpen,
+  Sun,
 } from 'lucide-react';
 export const kindIcons = {
   light: Lightbulb,
@@ -15,6 +18,9 @@ export const kindIcons = {
   scene: Sparkles,
   sensor: Wind,
   cover: PanelsTopLeft,
+  automation: Sun,
+  alarm: ShieldCheck,
+  contacts: DoorOpen,
 };
 export const kindLabelKeys = {
   light: 'kind.light',
@@ -24,4 +30,7 @@ export const kindLabelKeys = {
   scene: 'kind.scene',
   sensor: 'kind.sensor',
   cover: 'kind.cover',
+  automation: 'kind.automation',
+  alarm: 'kind.alarm',
+  contacts: 'kind.contacts',
 } as const;

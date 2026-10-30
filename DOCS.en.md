@@ -13,19 +13,19 @@ Dates, times, numbers, controls and HAPanel errors follow the selection. Untouch
 1. Open <https://cococheaf.github.io/HAPanel/> in Safari.
 2. Select a landscape or portrait profile as appropriate.
 3. Try lights, dimming, temperature and media controls.
-4. **Explore Studio** opens the visual editor. Edit tiles/pages and **Publish** to apply the draft to the demo dashboard.
+4. **Open Designer** opens the visual editor. Edit tiles/pages and **Publish** to apply the draft to the demo dashboard.
 5. Use **Share → Add to Home Screen** for a standalone web app.
 
 The demo uses sample data and browser-local configuration. Safari and a Home Screen app may have separate storage. No audio is played. Fullscreen behaviour, screen locking and keeping the screen awake depend on the operating system.
 
 ## Home Assistant OS / Supervisor
 
-This alpha includes a source-built add-on for `amd64` and `aarch64`. Installation, updates, Ingress and live data have been checked on Home Assistant OS 18.4 with Core 2026.10.4 (amd64). The default demo mode remains available for initial setup.
+This release includes a source-built add-on for `amd64` and `aarch64`. Installation, updates, Ingress and live data have been checked on Home Assistant OS 18.4 with Core 2026.10.4 (amd64). The default demo mode remains available for initial setup.
 
 1. In **Settings → Apps/Add-ons → Store → Repositories**, add `https://github.com/cococheaf/HAPanel`.
 2. Install **HAPanel**. The container image is built from the repository; the first build may take several minutes.
 3. Start it and enable **Show in sidebar**.
-4. **HAPanel** in the HA sidebar opens the published dashboard. **Explore Studio** opens the editor. Both views use the verified HA administrator session, without a separate network port or device pairing. The home icon in Studio returns to the dashboard.
+4. **HAPanel** in the HA sidebar opens the published dashboard. **Open Designer** opens the editor. Both views use the verified HA administrator session, without a separate network port or device pairing. The home icon in Studio returns to the dashboard.
 5. After testing the design, set `demo_mode` to `false` and restart. Assign your own entities in Studio and publish.
 
 The add-on reads `/data/options.json` and writes only to `/data/hapanel`. It requests HA Core API access, but no Supervisor management permissions, host networking or HA configuration mounts.
@@ -92,6 +92,14 @@ In tile properties, choose Device, Room or Energy under **Card view**. Rooms hav
 Bind existing sensors for energy. Solar sources must be disjoint; never add a total together with its component meters. Grid import and export are separate power readings. Configure the battery sign convention to match the integration. Monitored loads include only selected devices and are not total home consumption. Clearly distinguish daily energy values from cumulative counters in their labels. Missing values remain unknown.
 
 Tap weather, a meter or an energy source for details. Forecast availability depends on the weather integration; 24-hour history depends on the HA recorder. HAPanel creates no new history records in HA. Existing saved layouts are preserved and are not replaced by the new sample layout.
+
+## Home controls and contact status
+
+Light groups use an existing HA light entity. Automation cards show whether triggers are enabled; the power button enables or disables the automation. **Run now** invokes it while retaining its existing conditions. On small cards, open details to reach the manual run action.
+
+The alarm card shows live status. Its optional HA panel URL opens the existing controls in Home Assistant, using HA authentication. HAPanel stores no alarm codes and exposes no arm/disarm API.
+
+**Doors & windows** uses a configurable contact list. Open contacts appear first in details, with unavailable contacts shown separately. “None reported open” does not mean unknown contacts are safely closed. These settings are editable in the Designer.
 
 ## Display dimensions
 

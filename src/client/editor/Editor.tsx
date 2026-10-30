@@ -64,6 +64,8 @@ const domainKinds: Record<string, TileKind> = {
   sensor: 'sensor',
   binary_sensor: 'sensor',
   cover: 'cover',
+  automation: 'automation',
+  alarm_control_panel: 'alarm',
 };
 
 export default function Editor({
@@ -296,7 +298,12 @@ function Studio({
   const addTile = (kind: TileKind, entityId?: string, drop?: { x: number; y: number }) => {
     const entity =
       bootstrap.catalog.find((e) => e.entity_id === entityId) ??
-      bootstrap.catalog.find((e) => domainKinds[e.entity_id.split('.')[0]] === kind);
+      bootstrap.catalog.find((e) =>
+        kind === 'contacts'
+          ? e.entity_id.startsWith('binary_sensor.') &&
+            ['door', 'window', 'opening'].includes(String(e.attributes.device_class))
+          : domainKinds[e.entity_id.split('.')[0]] === kind,
+      );
     if (!entity) {
       notify(t('editor.noEntityKind'));
       return;
@@ -325,6 +332,12 @@ function Studio({
               ? 'blue'
               : 'mint',
       layouts,
+      ...(kind === 'contacts'
+        ? {
+            title: t('kind.contacts'),
+            contacts: [{ entityId: entity.entity_id, label: entityName(entity) }],
+          }
+        : {}),
     };
     if (
       change((d) => {
@@ -866,7 +879,11 @@ function Studio({
                   </div>
                   <div
                     className="form-section"
-                    style={selected.room || selected.energy ? { display: 'none' } : undefined}
+                    style={
+                      selected.room || selected.energy || selected.contacts
+                        ? { display: 'none' }
+                        : undefined
+                    }
                   >
                     <h3>{t('editor.connectionHeading')}</h3>
                     <label>

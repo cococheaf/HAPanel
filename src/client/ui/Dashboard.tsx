@@ -32,6 +32,7 @@ import {
 } from '../../shared/model';
 
 import { kindIcons } from './kinds';
+import { AlarmStatus, ContactsSummary } from './Security';
 import {
   WeatherGlyph,
   EnergyPanel,
@@ -137,6 +138,7 @@ export function TileView({
   const unavailable =
     !tile.room &&
     !tile.energy &&
+    !tile.contacts &&
     (!entity ||
       entity.state === 'unavailable' ||
       (entity.state === 'unknown' && tile.kind !== 'scene'));
@@ -169,6 +171,15 @@ export function TileView({
     }
   }, [activated]);
   const body = () => {
+    if (tile.contacts) return <ContactsSummary tile={tile} snapshot={snapshot} />;
+    if (tile.kind === 'alarm')
+      return (
+        <AlarmStatus
+          tile={tile}
+          snapshot={snapshot}
+          allowLink={detailsEnabled || Boolean(onAction)}
+        />
+      );
     if (tile.room) return <RoomSummary room={tile.room} snapshot={snapshot} />;
     if (tile.energy)
       return (
@@ -220,6 +231,31 @@ export function TileView({
         </>
       );
     }
+    if (tile.kind === 'automation')
+      return (
+        <div className="automation-content">
+          <div className="light-main">
+            <button
+              className="light-power"
+              aria-label={t(entity.state === 'on' ? 'automation.disable' : 'automation.enable', {
+                title: tile.title,
+              })}
+              disabled={disabled}
+              onClick={() => act('toggle')}
+            >
+              <Power size={25} />
+            </button>
+            <strong>
+              {t(entity.state === 'on' ? 'automation.enabled' : 'automation.disabled')}
+            </strong>
+          </div>
+          <button className="automation-run" disabled={disabled} onClick={() => act('activate')}>
+            {t(activated ? 'automation.requested' : 'automation.run')}
+            <Play size={14} />
+          </button>
+          <span className="tile-caption">{t('automation.conditions')}</span>
+        </div>
+      );
     if (tile.kind === 'light') {
       const brightness =
         entity.state === 'on' ? Math.round(numberAttr(entity, 'brightness', 255) / 2.55) : 0;
@@ -258,7 +294,11 @@ export function TileView({
             />
           )}
           <div className="tile-caption light-caption">
-            {active ? t('dashboard.lightOnCaption') : t('dashboard.lightOffCaption')}
+            {Array.isArray(entity.attributes.entity_id)
+              ? t('dashboard.groupLightCaption')
+              : active
+                ? t('dashboard.lightOnCaption')
+                : t('dashboard.lightOffCaption')}
           </div>
         </>
       );
@@ -479,7 +519,9 @@ export function TileView({
   return (
     <>
       <article
-        data-view={tile.room ? 'room' : tile.energy ? 'energy' : 'device'}
+        data-view={
+          tile.room ? 'room' : tile.energy ? 'energy' : tile.contacts ? 'contacts' : 'device'
+        }
         data-drillable={detailsEnabled}
         onClick={(event) => {
           if (

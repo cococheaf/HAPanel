@@ -160,6 +160,10 @@ const sampleTileKeys = {
   sensor: 'sample.sensor',
 } as const;
 const showcaseCopy: Record<string, { title: string; key: MessageKey }> = {
+  demo_general: { title: 'General Licht', key: 'sample.generalLight' },
+  demo_summer: { title: 'Beschattung Sommer', key: 'sample.summer' },
+  demo_alarm: { title: 'Alarmpanel', key: 'kind.alarm' },
+  demo_contacts: { title: 'Türen & Fenster', key: 'kind.contacts' },
   demo_home_eg: { title: 'Erdgeschoss', key: 'sample.floorEG' },
   demo_home_og: { title: 'Obergeschoss', key: 'sample.floorOG' },
   demo_living: { title: 'Wohnzimmer', key: 'sample.media' },
@@ -266,7 +270,24 @@ export function localizeSampleDocument(document: Dashboard, language: Language):
                   ? sample(page.name, 'Favoriten', 'sample.favourites')
                   : page.name,
       tiles: page.tiles.map((tile) => {
-        const view = localizedSampleTile(tile, language);
+        let view = localizedSampleTile(tile, language);
+        if (tile.id === 'demo_contacts' && tile.contacts) {
+          const labels: Record<string, MessageKey> = {
+            Terrassentür: 'sample.terraceDoor',
+            Küchenfenster: 'sample.kitchenWindow',
+            Schlafzimmerfenster: 'sample.bedroomWindow',
+            Badfenster: 'sample.bathWindow',
+          };
+          view = {
+            ...view,
+            contacts: tile.contacts.map((item) => ({
+              ...item,
+              label: Object.hasOwn(labels, item.label)
+                ? translate(language, labels[item.label])
+                : item.label,
+            })),
+          };
+        }
         if (!tile.energy || !tile.id.startsWith('demo_')) return view;
         const label = (value: string) =>
           Object.hasOwn(showcaseLabels, value) ? translate(language, showcaseLabels[value]) : value;
@@ -382,6 +403,8 @@ export function applyDemoAction(snapshot: Snapshot, document: Dashboard, action:
       entity.attributes.brightness = Math.round(Number(command.service_data.brightness_pct) * 2.55);
   }
   if (command.service === 'turn_off') entity.state = 'off';
+  if (command.domain === 'automation' && command.service === 'trigger')
+    entity.attributes.last_triggered = new Date().toISOString();
   if (command.service === 'set_temperature')
     entity.attributes.temperature = command.service_data.temperature;
   if (

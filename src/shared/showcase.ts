@@ -94,7 +94,7 @@ const homeEnergy: Tile = {
   layouts: {
     ipad: { x: 8, y: 2, w: 4, h: 4 },
     compact: { x: 8, y: 2, w: 4, h: 4 },
-    portrait: { x: 0, y: 7, w: 8, h: 3 },
+    portrait: { x: 0, y: 8, w: 8, h: 2 },
   },
 };
 const floor = (id: string, title: string, pageId: string, index: number, tiles: Tile[]): Tile => ({
@@ -122,14 +122,62 @@ const weather = {
   ...base.pages[0].tiles[0],
   layouts: { ...grid(0), portrait: { x: 0, y: 0, w: 8, h: 2 } },
 };
-const media = {
-  ...base.pages[0].tiles[3],
-  layouts: {
-    ipad: { x: 0, y: 2, w: 8, h: 4 },
-    compact: { x: 0, y: 2, w: 8, h: 4 },
-    portrait: { x: 0, y: 4, w: 8, h: 3 },
+const homeControls: Tile[] = [
+  {
+    id: 'demo_general',
+    kind: 'light',
+    title: 'General Licht',
+    entityId: 'light.demo_general',
+    accent: 'amber',
+    layouts: {
+      ipad: { x: 0, y: 2, w: 4, h: 2 },
+      compact: { x: 0, y: 2, w: 4, h: 2 },
+      portrait: { x: 0, y: 4, w: 4, h: 2 },
+    },
   },
-};
+  {
+    id: 'demo_summer',
+    kind: 'automation',
+    title: 'Beschattung Sommer',
+    entityId: 'automation.demo_summer',
+    accent: 'mint',
+    layouts: {
+      ipad: { x: 4, y: 2, w: 4, h: 2 },
+      compact: { x: 4, y: 2, w: 4, h: 2 },
+      portrait: { x: 4, y: 4, w: 4, h: 2 },
+    },
+  },
+  {
+    id: 'demo_alarm',
+    kind: 'alarm',
+    title: 'Alarmpanel',
+    entityId: 'alarm_control_panel.demo_home',
+    accent: 'mint',
+    layouts: {
+      ipad: { x: 0, y: 4, w: 4, h: 2 },
+      compact: { x: 0, y: 4, w: 4, h: 2 },
+      portrait: { x: 0, y: 6, w: 4, h: 2 },
+    },
+  },
+  {
+    id: 'demo_contacts',
+    kind: 'contacts',
+    title: 'Türen & Fenster',
+    entityId: 'binary_sensor.demo_terrace',
+    accent: 'amber',
+    layouts: {
+      ipad: { x: 4, y: 4, w: 4, h: 2 },
+      compact: { x: 4, y: 4, w: 4, h: 2 },
+      portrait: { x: 4, y: 6, w: 4, h: 2 },
+    },
+    contacts: [
+      { entityId: 'binary_sensor.demo_terrace', label: 'Terrassentür' },
+      { entityId: 'binary_sensor.demo_kitchen_window', label: 'Küchenfenster' },
+      { entityId: 'binary_sensor.demo_bedroom_window', label: 'Schlafzimmerfenster' },
+      { entityId: 'binary_sensor.demo_bath_window', label: 'Badfenster' },
+    ],
+  },
+];
 export const showcaseDocument: Dashboard = dashboardSchema.parse({
   ...base,
   profiles: base.profiles.map((profile) => ({
@@ -145,7 +193,7 @@ export const showcaseDocument: Dashboard = dashboardSchema.parse({
         weather,
         floor('demo_home_eg', 'Erdgeschoss', 'eg', 1, eg),
         floor('demo_home_og', 'Obergeschoss', 'og', 2, og),
-        media,
+        ...homeControls,
         homeEnergy,
       ],
     },
@@ -184,6 +232,34 @@ export const showcaseDocument: Dashboard = dashboardSchema.parse({
   ],
 });
 
+// Upgrade only untouched 0.2 sample layouts; personalised browser layouts stay intact.
+export const legacyShowcaseDocument: Dashboard = dashboardSchema.parse({
+  ...showcaseDocument,
+  pages: showcaseDocument.pages.map((page, index) =>
+    index !== 0
+      ? page
+      : {
+          ...page,
+          tiles: [
+            weather,
+            ...page.tiles.filter((tile) => ['demo_home_eg', 'demo_home_og'].includes(tile.id)),
+            {
+              ...base.pages[0].tiles[3],
+              layouts: {
+                ipad: { x: 0, y: 2, w: 8, h: 4 },
+                compact: { x: 0, y: 2, w: 8, h: 4 },
+                portrait: { x: 0, y: 4, w: 8, h: 3 },
+              },
+            },
+            {
+              ...homeEnergy,
+              layouts: { ...homeEnergy.layouts, portrait: { x: 0, y: 7, w: 8, h: 3 } },
+            },
+          ],
+        },
+  ),
+});
+
 export function showcaseSnapshot(): Snapshot {
   const snapshot = demoSnapshot();
   const add = (
@@ -203,6 +279,22 @@ export function showcaseSnapshot(): Snapshot {
       last_updated: new Date().toISOString(),
     };
   };
+  add('light.demo_general', 'on', undefined, {
+    friendly_name: 'General Licht',
+    entity_id: ['light.living_room', 'light.kitchen'],
+    supported_color_modes: ['onoff'],
+  });
+  add('automation.demo_summer', 'on', undefined, { friendly_name: 'Beschattung Sommer' });
+  add('alarm_control_panel.demo_home', 'disarmed', undefined, { friendly_name: 'Alarmpanel' });
+  for (const [id, state] of [
+    ['demo_terrace', 'off'],
+    ['demo_kitchen_window', 'on'],
+    ['demo_bedroom_window', 'off'],
+    ['demo_bath_window', 'unavailable'],
+  ])
+    add('binary_sensor.' + id, state, undefined, {
+      device_class: id === 'demo_terrace' ? 'door' : 'window',
+    });
   for (const [index, tile] of [...eg, ...og].entries()) {
     add(tile.entityId, tile.id === 'demo_living' ? 22.1 : 20.5 + index * 0.3, '°C', {
       device_class: 'temperature',
