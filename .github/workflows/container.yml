@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - id: version
-        run: echo "value=$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
+        run: node -p '"value=" + require("./package.json").version' >> "$GITHUB_OUTPUT"
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
