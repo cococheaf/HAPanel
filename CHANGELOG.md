@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.0-alpha.3
+
+Fehlende konfigurierte Entitäten bleiben im Editor als nicht verfügbar sichtbar, statt irreführend die erste reale Entität auszuwählen. Dadurch kann auch die einzige verfügbare Entität eines Typs beim Wechsel von Beispieldaten auf Live-Daten korrekt zugeordnet werden. / Missing configured entities retain an explicit unavailable option, allowing the first or only real entity to be selected reliably.
+
 ## 0.1.0-alpha.2
 
 Deutsch und Englisch sind jetzt in Studio, Dashboard, Kopplungsdialog und HAPanel-Fehlermeldungen verfügbar. Sprachwahl pro Browser mit automatischer Erkennung und englischem Fallback; Datums- und Zahlenformate folgen der Auswahl. Zentrale, typgeprüfte JSON-Kataloge ermöglichen weitere Sprachen. Eigene Dashboard-Texte, Layouts und HA-Einstellungen bleiben erhalten. Englische Dokumentation und zweisprachige Add-on-Optionen ergänzt.

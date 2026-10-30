@@ -16,7 +16,7 @@
 
 HAPanel verbindet großzügige, abgerundete Kacheln, ruhige Farben und direkte Touch-Bedienung mit einem visuellen Layout-Editor. Es läuft als eigene Home Assistant App (Add-on) oder als lokaler Node.js-Prozess. Bestehende Lovelace-Dashboards und HA-Konfigurationsdateien bleiben unverändert.
 
-**Status: 0.1.0-alpha.2 – erste funktionsfähige Vorschau.** Die Demo, der Editor und die API sind implementiert. Die HA-Anbindung ist gegen einen simulierten WebSocket-Server geprüft. Ein echter Supervisor-Installationslauf und Tests auf physischer iPad-Hardware sind noch ausstehend.
+**Status: 0.1.0-alpha.3 – erste funktionsfähige Vorschau.** Die Demo, der Editor und die API sind implementiert. Die HA-Anbindung ist gegen einen simulierten WebSocket-Server geprüft. Ein echter Supervisor-Installationslauf und Tests auf physischer iPad-Hardware sind noch ausstehend.
 
 ## Ausprobieren
 

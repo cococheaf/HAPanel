@@ -846,6 +846,15 @@ function Studio({
                         value={selected.entityId}
                         onChange={(e) => updateTile({ entityId: e.target.value })}
                       >
+                        {!bootstrap.catalog.some(
+                          (e) =>
+                            e.entity_id === selected.entityId &&
+                            domainKinds[e.entity_id.split('.')[0]] === selected.kind,
+                        ) && (
+                          <option value={selected.entityId} disabled>
+                            {t('common.unavailable')} · {selected.entityId}
+                          </option>
+                        )}
                         {bootstrap.catalog
                           .filter((e) => domainKinds[e.entity_id.split('.')[0]] === selected.kind)
                           .map((e) => (
