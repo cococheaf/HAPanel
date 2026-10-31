@@ -993,3 +993,208 @@ test('WebRTC sockets inherit Ingress auth, use only their configured camera and 
   assert.equal((await closed)[0], 1008);
   assert.equal(stops, 1);
 });
+
+test('device scope is enforced for snapshots, actions, history, statistics and camera paths; policy updates revoke existing access', async (t) => {
+  const { app, store, pairings, hub } = await fixture(t, {
+    surface: 'display',
+    cameraAccess: 'authenticated',
+    alarmAccess: 'authenticated',
+  });
+  const { showcaseDocument } = await import('../src/shared/showcase');
+  const saved = await store.save(showcaseDocument, 1);
+  await store.publish(saved.draft.revision);
+  const code = await pairings.createCode(),
+    paired = await pairings.pair(code.code, 'Scoped');
+  const cookie = 'hapanel_device=' + paired.token;
+  await pairings.configure(paired.device.id, {
+    allowedProfiles: ['ipad'],
+    profileId: 'ipad',
+    readOnly: true,
+    cameraBlocked: true,
+    alarmBlocked: true,
+  });
+  const data = (await app.inject({ url: '/api/display/bootstrap', headers: { cookie } })).json();
+  assert.equal(data.published.document.profiles.length, 1);
+  assert.equal(data.snapshot.deviceControl, false);
+  assert.equal(data.snapshot.alarmControl, false);
+  assert.equal(data.snapshot.cameraView, false);
+  const restricted = store
+    .getRevision('published')
+    .document.pages.find((p) => p.profileIds?.[0] === 'portrait')!.tiles[0];
+  assert.equal(
+    (
+      await app.inject({
+        url: '/api/display/action',
+        method: 'POST',
+        headers: { cookie },
+        payload: { tileId: restricted.id, command: 'toggle' },
+      })
+    ).statusCode,
+    403,
+  );
+  assert.equal(
+    (await app.inject({ url: '/api/display/history/sensor.unpublished', headers: { cookie } }))
+      .statusCode,
+    403,
+  );
+  assert.equal(
+    (
+      await app.inject({
+        url: '/api/display/statistics/sensor.unpublished?range=month',
+        headers: { cookie },
+      })
+    ).statusCode,
+    403,
+  );
+  const camera = store
+    .getRevision('published')
+    .document.pages.flatMap((p) => p.tiles)
+    .find((t) => t.kind === 'camera')!;
+  assert.equal(
+    (await app.inject({ url: `/api/display/camera/${camera.id}/still`, headers: { cookie } }))
+      .statusCode,
+    403,
+  );
+  assert.equal(
+    (
+      await app.inject({
+        url: '/api/display/observe',
+        method: 'POST',
+        headers: { cookie },
+        payload: { width: 1080, height: 810, dpr: 2 },
+      })
+    ).statusCode,
+    200,
+  );
+  assert.equal(pairings.list()[0].observation?.width, 1080);
+  await pairings.revoke(paired.device.id);
+  assert.equal(
+    (await app.inject({ url: '/api/display/bootstrap', headers: { cookie } })).statusCode,
+    401,
+  );
+});
+test('per-user restrictions narrow explicit global grants and leave admin access unchanged', async (t) => {
+  const { app, pairings } = await fixture(t, {
+    mode: 'ingress',
+    cameraAccess: 'authenticated',
+    alarmAccess: 'authenticated',
+    isAdmin: async (id) => id === 'admin',
+    isActiveUser: async () => true,
+  });
+  await pairings.configureViewer('viewer', {
+    cameraBlocked: true,
+    alarmBlocked: true,
+    readOnly: true,
+    allowedProfiles: ['ipad'],
+  });
+  const get = (id: string, url = '/api/display/bootstrap') =>
+    app.inject({ url, remoteAddress: '172.30.32.2', headers: { 'x-remote-user-id': id } });
+  const data = (await get('viewer')).json();
+  assert.equal(data.snapshot.cameraView, false);
+  assert.equal(data.snapshot.alarmControl, false);
+  assert.equal(data.canEdit, false);
+  assert.equal((await get('viewer', '/api/editor/diagnostics')).statusCode, 403);
+  const admin = (await get('admin')).json();
+  assert.equal(admin.snapshot.cameraView, true);
+  assert.equal(admin.snapshot.alarmControl, true);
+  assert.equal(admin.canEdit, true);
+});
+
+test('a restricted display cannot request another profile camera even when cameras are globally shared', async (t) => {
+  const { app, store, pairings } = await fixture(t, {
+    surface: 'display',
+    cameraAccess: 'authenticated',
+  });
+  const { showcaseDocument } = await import('../src/shared/showcase');
+  const draft = await store.save(showcaseDocument, 1);
+  await store.publish(draft.draft.revision);
+  const { code } = await pairings.createCode(),
+    paired = await pairings.pair(code, 'Scoped');
+  await pairings.configure(paired.device.id, { allowedProfiles: ['ipad'] });
+  const camera = store
+    .getRevision('published')
+    .document.pages.filter((p) => p.profileIds?.[0] === 'portrait')
+    .flatMap((p) => p.tiles)
+    .find((t) => t.kind === 'camera')!;
+  const headers = { cookie: 'hapanel_device=' + paired.token };
+  assert.equal(
+    (await app.inject({ url: `/api/display/camera/${camera.id}/still`, headers })).statusCode,
+    404,
+  );
+  assert.equal(
+    (await app.inject({ url: `/api/display/camera/${camera.id}/capabilities`, headers }))
+      .statusCode,
+    404,
+  );
+  assert.equal((await app.inject({ url: '/api/editor/devices', headers })).statusCode, 404);
+});
+
+test('overview and detail camera sources stay server-bound to the published tile', async (t) => {
+  const { app, store, hub } = await fixture(t, { mode: 'ingress', isAdmin: async () => true });
+  const { showcaseDocument } = await import('../src/shared/showcase');
+  const document = structuredClone(showcaseDocument),
+    camera = document.pages.flatMap((p) => p.tiles).find((t) => t.kind === 'camera')!;
+  camera.camera = { ...camera.camera!, overviewEntityId: 'camera.low_bandwidth' };
+  const draft = await store.save(document, 1);
+  await store.publish(draft.draft.revision);
+  const seen: string[] = [];
+  t.mock.method(hub, 'cameraStill', async (id: string) => {
+    seen.push(id);
+    return { buffer: Buffer.from('synthetic'), type: 'image/jpeg' };
+  });
+  const context = { remoteAddress: '172.30.32.2', headers: { 'x-remote-user-id': 'admin' } };
+  assert.equal(
+    (await app.inject({ url: `/api/display/camera/${camera.id}/overview/still`, ...context }))
+      .statusCode,
+    200,
+  );
+  assert.equal(
+    (await app.inject({ url: `/api/display/camera/${camera.id}/still`, ...context })).statusCode,
+    200,
+  );
+  assert.deepEqual(seen, ['camera.low_bandwidth', camera.entityId]);
+  assert.equal(
+    (await app.inject({ url: `/api/display/camera/unpublished/overview/still`, ...context }))
+      .statusCode,
+    404,
+  );
+});
+
+test('scoped alert cameras resolve to the equivalent permitted camera tile and never retain excluded tile IDs', async (t) => {
+  const { app, store, pairings } = await fixture(t, {
+    surface: 'display',
+    cameraAccess: 'authenticated',
+  });
+  const { showcaseDocument } = await import('../src/shared/showcase');
+  const doc = structuredClone(showcaseDocument),
+    camera = doc.pages.flatMap((page) => page.tiles).find((tile) => tile.kind === 'camera')!;
+  doc.alerts = [
+    {
+      id: 'bell',
+      title: 'Bell',
+      message: '',
+      condition: { entityId: 'binary_sensor.demo_terrace', operator: 'is', value: 'on' },
+      cameraTileId: camera.id,
+      timeout: 30,
+      priority: 'info',
+    },
+  ];
+  const draft = await store.save(doc, 1);
+  await store.publish(draft.draft.revision);
+  const { code } = await pairings.createCode(),
+    paired = await pairings.pair(code, 'Wall');
+  await pairings.configure(paired.device.id, { allowedProfiles: ['portrait'] });
+  const data = (
+    await app.inject({
+      url: '/api/display/bootstrap',
+      headers: { cookie: 'hapanel_device=' + paired.token },
+    })
+  ).json();
+  const target = data.published.document.alerts[0].cameraTileId;
+  assert.notEqual(target, camera.id);
+  assert.ok(
+    data.published.document.pages
+      .flatMap((page: any) => page.tiles)
+      .some((tile: any) => tile.id === target && tile.entityId === camera.entityId),
+  );
+});

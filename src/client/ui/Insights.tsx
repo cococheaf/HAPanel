@@ -1,3 +1,4 @@
+import { EnergyStatistics } from './EnergyStatistics';
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import {
   ArrowUpRight,
@@ -268,7 +269,7 @@ export function EnergyPanel({
   );
 }
 
-function HistoryChart({
+export function HistoryChart({
   entityId,
   snapshot,
   historyBase,
@@ -278,6 +279,16 @@ function HistoryChart({
   historyBase: string;
 }) {
   const { t, intlLocale, describeError } = useI18n();
+  const [range, setRange] = useState<'history' | 'day' | 'week' | 'month'>('history');
+  const controls = (
+    <div className="v2-segmented">
+      {(['history', 'day', 'week', 'month'] as const).map((v) => (
+        <button key={v} className={range === v ? 'active' : ''} onClick={() => setRange(v)}>
+          {t(v === 'history' ? 'detail.history' : `v2.${v}`)}
+        </button>
+      ))}
+    </div>
+  );
   const [points, setPoints] = useState<HistoryPoint[]>();
   const [error, setError] = useState<unknown>();
   const gradient = 'history' + useId().replace(/:/g, '');
@@ -299,7 +310,11 @@ function HistoryChart({
           : [],
       );
     } else {
-      api<HistoryPoint[]>(historyBase + encodeURIComponent(entityId))
+      api<HistoryPoint[]>(
+        (range === 'history' ? historyBase : historyBase.replace(/history\/$/, 'statistics/')) +
+          encodeURIComponent(entityId) +
+          (range === 'history' ? '' : '?range=' + range),
+      )
         .then((data) => {
           if (current) setPoints(data);
         })
@@ -310,24 +325,36 @@ function HistoryChart({
     return () => {
       current = false;
     };
-  }, [entityId, historyBase, snapshot.status]);
+  }, [entityId, historyBase, snapshot.status, range]);
   const rawUnit =
     entityId.startsWith('climate.') || entityId.startsWith('weather.')
       ? String(entity?.attributes.temperature_unit ?? entity?.attributes.unit_of_measurement ?? '°')
       : String(entity?.attributes.unit_of_measurement ?? '');
   if (error)
     return (
-      <p className="insight-muted" role="status">
-        {describeError(error)}
-      </p>
+      <>
+        {controls}
+        <p className="insight-muted" role="status">
+          {describeError(error)}
+        </p>
+      </>
     );
   if (!points)
     return (
-      <p className="insight-muted" role="status">
-        {t('detail.loading')}
-      </p>
+      <>
+        {controls}
+        <p className="insight-muted" role="status">
+          {t('detail.loading')}
+        </p>
+      </>
     );
-  if (points.length < 2) return <p className="insight-muted">{t('detail.noHistory')}</p>;
+  if (points.length < 2)
+    return (
+      <>
+        {controls}
+        <p className="insight-muted">{t('detail.noHistory')}</p>
+      </>
+    );
   const factor =
     rawUnit === 'Wh' ||
     (rawUnit === 'W' && Math.max(...points.map((point) => Math.abs(point.value))) >= 1000)
@@ -348,6 +375,7 @@ function HistoryChart({
     value.toLocaleString(intlLocale, { maximumFractionDigits: 2 }) + ' ' + unit;
   return (
     <div className="history-chart">
+      {controls}
       <div className="history-range">
         <span>{number(min)}</span>
         <span>{number(max)}</span>
@@ -469,6 +497,11 @@ export function TileDetails({
             config={tile.energy}
             snapshot={snapshot}
             onInspect={(entityId, label) => setMetric({ entityId, label })}
+          />
+          <EnergyStatistics
+            config={tile.energy}
+            snapshot={snapshot}
+            base={mediaBase.replace(/media\/$/, 'statistics/')}
           />
           <h3 className="insight-section-title">{t('energy.sources')}</h3>
           <div className="energy-sources">

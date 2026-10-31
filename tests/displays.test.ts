@@ -31,7 +31,7 @@ test('legacy display migration keeps first-display IDs, isolates other views and
   assert.deepEqual(independentDisplayViews(document), document);
   for (const profile of document.profiles) {
     const pages = pagesForProfile(document, profile.id);
-    assert.equal(pages.length, 5);
+    assert.equal(pages.length, showcaseDocument.pages.length);
     for (const page of pages)
       for (const tile of page.tiles) {
         assert.deepEqual(Object.keys(tile.layouts), [profile.id]);
@@ -57,7 +57,7 @@ test('new displays can start empty or copy complete independent navigation and c
   const base = independentDisplayViews(showcaseDocument);
   const copied = createDisplay(base, 'Kitchen iPad', 'ipad', true, 'Home');
   const pages = pagesForProfile(copied.document, copied.profileId);
-  assert.equal(pages.length, 5);
+  assert.equal(pages.length, showcaseDocument.pages.length);
   assert.ok(pages[0].tiles.find((tile) => tile.navigateTo)?.navigateTo);
   for (const tile of pages.flatMap((page) => page.tiles))
     if (tile.navigateTo) assert.ok(pages.some((page) => page.id === tile.navigateTo));
@@ -131,7 +131,10 @@ test('server migration makes a one-time recoverable backup and preserves draft p
   assert.equal(store.get().published.revision, 6);
   assert.equal(store.get().draft.document.greeting, 'Unpublished');
   assert.notEqual(store.get().published.document.greeting, 'Unpublished');
-  assert.equal(store.get().published.document.pages.length, 15);
+  assert.equal(
+    store.get().published.document.pages.length,
+    showcaseDocument.pages.length * showcaseDocument.profiles.length,
+  );
   const reopened = new DocumentStore(dir);
   await reopened.init();
   assert.equal(await readFile(join(dir, 'dashboard-before-display-views.json'), 'utf8'), backup);

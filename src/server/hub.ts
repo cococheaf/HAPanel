@@ -1,3 +1,4 @@
+import { validateCapability } from '../shared/widgets';
 import { UserError } from '../shared/i18n';
 import { EventEmitter } from 'node:events';
 import WebSocket from 'ws';
@@ -14,6 +15,7 @@ import { CameraProxy } from './cameras';
 import {
   entityIds,
   resolveAction,
+  materializeAction,
   type Action,
   type Dashboard,
   type EntityState,
@@ -48,11 +50,38 @@ export class HomeAssistantHub extends EventEmitter {
   private desired: string[] = [];
   private subscriptions: number[] = [];
   private subscriptionQueue: Promise<unknown> = Promise.resolve();
-  private users?: { until: number; roles: Map<string, boolean> };
+  private users?: {
+    until: number;
+    roles: Map<string, boolean>;
+    list: { id: string; name: string; admin: boolean }[];
+  };
   private catalog?: { until: number; entities: EntityState[] };
   private catalogStates: Record<string, EntityState> = {};
   private catalogRequest?: Promise<EntityState[]>;
   private history = new Map<string, { until: number; data: Promise<HistoryPoint[]> }>();
+  private structureCache?: {
+    until: number;
+    data: Promise<{
+      areas: { id: string; name: string; floor?: string }[];
+      entities: Record<string, { areaId?: string; deviceName?: string }>;
+    }>;
+  };
+  private statisticsCache = new Map<
+    string,
+    { until: number; data: Promise<{ time: string; value: number }[]> }
+  >();
+  private alertSubscription?: number;
+  private proxiedCameraBytes = 0;
+  recordCameraTransfer(bytes: number) {
+    this.proxiedCameraBytes += bytes;
+  }
+  diagnostics() {
+    return {
+      proxiedCameraBytes: this.proxiedCameraBytes,
+      haConnection: this.snapshot.status,
+      subscribedEntities: this.desired.length,
+    };
+  }
   private cameras: CameraProxy;
   private cameraCapabilitiesCache = new Map<
     string,
@@ -123,9 +152,21 @@ export class HomeAssistantHub extends EventEmitter {
           this.snapshot.forecasts = {};
           this.users = undefined;
           this.catalog = undefined;
+          this.structureCache = undefined;
           this.catalogStates = {};
           this.subscriptions = [];
           this.refreshSubscriptions();
+          const alertEvents = this.request(
+            { type: 'subscribe_events', event_type: 'hapanel_alert' },
+            (event) => {
+              const id = event?.data?.rule_id;
+              if (typeof id === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(id))
+                this.emit('notification', id);
+            },
+          );
+          alertEvents.promise.catch(() => {
+            this.events.delete(alertEvents.id);
+          });
           this.heartbeat = setInterval(() => {
             this.rpc({ type: 'ping' }).catch(() => socket.terminate());
           }, 30_000);
@@ -283,10 +324,143 @@ export class HomeAssistantHub extends EventEmitter {
       await this.catalogRequest;
     }
   }
-  async getCatalog(): Promise<EntityState[]> {
+  async getCatalog(refresh = false): Promise<EntityState[]> {
+    if (refresh) {
+      this.catalog = undefined;
+      this.structureCache = undefined;
+    }
     if (this.options.demo) return structuredClone(Object.values(this.snapshot.entities));
     await this.ensureCatalog();
-    return structuredClone(this.catalog?.entities ?? []);
+    const structure = await this.getStructure();
+    return structuredClone(
+      (this.catalog?.entities ?? []).map((entity) => {
+        const item = structure.entities[entity.entity_id],
+          area = structure.areas.find((area) => area.id === item?.areaId);
+        return {
+          ...entity,
+          ...(entity.entity_id.startsWith('light.')
+            ? {
+                lightCapabilities: lightDimming(
+                  entity.entity_id,
+                  (id) => this.snapshot.entities[id] ?? this.catalogStates[id],
+                ),
+              }
+            : {}),
+          ...(area ? { area } : {}),
+          ...(item?.deviceName ? { deviceName: item.deviceName } : {}),
+        };
+      }),
+    );
+  }
+  async getStructure() {
+    if (this.options.demo)
+      return {
+        areas: [
+          { id: 'living', name: 'Wohnzimmer', floor: 'EG' },
+          { id: 'bedroom', name: 'Schlafzimmer', floor: 'OG' },
+        ],
+        entities: Object.fromEntries(
+          Object.keys(this.snapshot.entities).map((id) => [
+            id,
+            { areaId: id.includes('bed') ? 'bedroom' : 'living', deviceName: id.split('.')[1] },
+          ]),
+        ),
+      };
+    if (!this.structureCache || this.structureCache.until < Date.now()) {
+      const data = (async () => {
+        const results = await Promise.allSettled(
+          [
+            'config/area_registry/list',
+            'config/floor_registry/list',
+            'config/device_registry/list',
+            'config/entity_registry/list',
+          ].map((type) => this.rpc({ type })),
+        );
+        const list = (i: number): any[] =>
+          results[i].status === 'fulfilled' && Array.isArray(results[i].value)
+            ? results[i].value
+            : [];
+        const floors = new Map(list(1).map((x) => [x.floor_id, x.name]));
+        const areas = list(0).map((x) => ({
+          id: String(x.area_id),
+          name: String(x.name),
+          ...(floors.has(x.floor_id) ? { floor: String(floors.get(x.floor_id)) } : {}),
+        }));
+        const devices = new Map(list(2).map((x) => [x.id, x]));
+        const entities = Object.fromEntries(
+          list(3)
+            .filter((x) => !x.disabled_by)
+            .map((x) => {
+              const device = devices.get(x.device_id);
+              return [
+                x.entity_id,
+                {
+                  areaId: x.area_id ?? device?.area_id,
+                  deviceName: device?.name_by_user ?? device?.name,
+                },
+              ];
+            }),
+        );
+        return { areas, entities };
+      })();
+      this.structureCache = { until: Date.now() + 300_000, data };
+    }
+    return this.structureCache.data;
+  }
+  async getStatistics(entityId: string, range: 'day' | 'week' | 'month') {
+    const key = entityId + ':' + range,
+      cached = this.statisticsCache.get(key);
+    if (cached && cached.until > Date.now()) return cached.data;
+    if (this.options.demo) return [];
+    const data = (async () => {
+      const days = range === 'day' ? 1 : range === 'week' ? 7 : 30;
+      const end = new Date();
+      end.setUTCMinutes(0, 0, 0);
+      const start = new Date(end.getTime() - days * 86400000);
+      if (!this.snapshot.entities[entityId] && !this.catalogStates[entityId])
+        await this.ensureCatalog();
+      const sourceUnit = String(
+        (this.snapshot.entities[entityId] ?? this.catalogStates[entityId])?.attributes
+          .unit_of_measurement ?? '',
+      );
+      const unitType = ['Wh', 'kWh', 'MWh'].includes(sourceUnit)
+        ? 'energy'
+        : ['W', 'kW'].includes(sourceUnit)
+          ? 'power'
+          : ['°C', '°F', 'K'].includes(sourceUnit)
+            ? 'temperature'
+            : undefined;
+      const result = await this.rpc({
+        type: 'recorder/statistics_during_period',
+        start_time: start.toISOString(),
+        end_time: end.toISOString(),
+        statistic_ids: [entityId],
+        period: 'hour',
+        ...(unitType ? { units: { [unitType]: sourceUnit } } : {}),
+        types: ['change', 'mean'],
+      });
+      return (Array.isArray(result?.[entityId]) ? result[entityId] : [])
+        .slice(0, 800)
+        .flatMap((row: any) => {
+          const unit = (this.snapshot.entities[entityId] ?? this.catalogStates[entityId])
+            ?.attributes.unit_of_measurement;
+          const value = ['Wh', 'kWh', 'MWh'].includes(String(unit)) ? row.change : row.mean;
+          const time =
+            typeof row.start === 'number' ? new Date(row.start).toISOString() : row.start;
+          return typeof value === 'number' &&
+            Number.isFinite(value) &&
+            Number.isFinite(Date.parse(time))
+            ? [{ time, value }]
+            : [];
+        });
+    })().catch(() => {
+      this.statisticsCache.delete(key);
+      throw new UserError('error.historyUnavailable');
+    });
+    if (this.statisticsCache.size >= 128)
+      this.statisticsCache.delete(this.statisticsCache.keys().next().value!);
+    this.statisticsCache.set(key, { until: Date.now() + 300_000, data });
+    return data;
   }
   async getHistory(entityId: string): Promise<HistoryPoint[]> {
     if (this.options.demo) {
@@ -363,12 +537,20 @@ export class HomeAssistantHub extends EventEmitter {
     if (!this.users || this.users.until < Date.now()) {
       const users = (await this.rpc({ type: 'config/auth/list' })) as {
         id: string;
+        name?: string;
         is_active: boolean;
         is_owner: boolean;
         group_ids: string[];
       }[];
       this.users = {
         until: Date.now() + 30_000,
+        list: users
+          .filter((u) => u.is_active)
+          .map((u) => ({
+            id: u.id,
+            name: u.name ?? u.id,
+            admin: u.is_owner || u.group_ids.includes('system-admin'),
+          })),
         roles: new Map(
           users
             .filter((u) => u.is_active)
@@ -378,13 +560,18 @@ export class HomeAssistantHub extends EventEmitter {
     }
     return this.users.roles;
   }
+  async getUsers() {
+    await this.userRoles();
+    return this.users?.list ?? [];
+  }
   async isAdmin(userId: string) {
     return (await this.userRoles()).get(userId) === true;
   }
   async isActiveUser(userId: string) {
     return (await this.userRoles()).has(userId);
   }
-  async act(document: Dashboard, action: Action) {
+  async act(document: Dashboard, requested: Action) {
+    const action = materializeAction(document, requested);
     const resolved = resolveAction(document, action);
     if (this.options.demo) {
       this.snapshot = applyDemoAction(this.snapshot, document, action);
@@ -393,6 +580,7 @@ export class HomeAssistantHub extends EventEmitter {
     }
     const entity = this.snapshot.entities[resolved.target.entity_id];
     if (!entity || entity.state === 'unavailable') throw new UserError('error.entityUnavailable');
+    validateCapability(entity, action);
     if (action.command === 'brightness') {
       await this.ensureCatalog();
       if (

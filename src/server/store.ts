@@ -63,6 +63,12 @@ export class DocumentStore extends EventEmitter {
     try {
       originalSource = await readFile(join(this.directory, 'dashboard.json'), 'utf8');
       this.state = workspaceSchema.parse(JSON.parse(originalSource));
+      await writeFile(join(this.directory, 'dashboard-before-2.0.json'), originalSource, {
+        mode: 0o600,
+        flag: 'wx',
+      }).catch((error) => {
+        if (error.code !== 'EEXIST') throw error;
+      });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
         throw new Error(
@@ -141,7 +147,28 @@ export class DocumentStore extends EventEmitter {
 }
 
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
+export const deviceSettingsSchema = z
+  .object({
+    profileId: z.string().max(64).optional(),
+    pageId: z.string().max(64).optional(),
+    language: z.enum(['auto', 'de', 'en']).optional(),
+    readOnly: z.boolean().optional(),
+    cameraBlocked: z.boolean().optional(),
+    alarmBlocked: z.boolean().optional(),
+    allowedProfiles: z.array(z.string().max(64)).min(1).max(8).optional(),
+  })
+  .strict();
+export type DeviceSettings = z.infer<typeof deviceSettingsSchema>;
 const pairingFile = z.object({
+  viewers: z
+    .record(
+      z
+        .string()
+        .max(100)
+        .refine((id) => !['__proto__', 'constructor', 'prototype'].includes(id)),
+      deviceSettingsSchema,
+    )
+    .optional(),
   codes: z.array(z.object({ digest: z.string(), expires: z.number() })),
   devices: z.array(
     z.object({
@@ -150,11 +177,27 @@ const pairingFile = z.object({
       digest: z.string(),
       createdAt: z.string(),
       expires: z.number(),
+      settings: deviceSettingsSchema.optional(),
     }),
   ),
 });
 type Pairings = z.infer<typeof pairingFile>;
 export class PairingStore extends EventEmitter {
+  private observations = new Map<
+    string,
+    { width: number; height: number; dpr: number; lastSeen: number }
+  >();
+  private identifications = new Map<string, number>();
+  observe(id: string, size: { width: number; height: number; dpr: number }) {
+    this.observations.set(id, { ...size, lastSeen: Date.now() });
+  }
+  identify(id: string) {
+    this.identifications.set(id, Date.now() + 15000);
+    this.emit('change');
+  }
+  identification(id: string) {
+    return this.identifications.get(id) ?? 0;
+  }
   private state: Pairings = { codes: [], devices: [] };
   private queue: Promise<unknown> = Promise.resolve();
   constructor(private directory: string) {
@@ -164,9 +207,14 @@ export class PairingStore extends EventEmitter {
   async init() {
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
     try {
-      this.state = pairingFile.parse(
-        JSON.parse(await readFile(join(this.directory, 'devices.json'), 'utf8')),
-      );
+      const original = await readFile(join(this.directory, 'devices.json'), 'utf8');
+      this.state = pairingFile.parse(JSON.parse(original));
+      await writeFile(join(this.directory, 'devices-before-2.0.json'), original, {
+        mode: 0o600,
+        flag: 'wx',
+      }).catch((error) => {
+        if (error.code !== 'EEXIST') throw error;
+      });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
@@ -216,7 +264,37 @@ export class PairingStore extends EventEmitter {
     return this.state.devices.find((d) => d.digest === hash(token) && d.expires > Date.now());
   }
   list() {
-    return this.state.devices.filter((d) => d.expires > Date.now()).map(({ digest: _, ...d }) => d);
+    return this.state.devices
+      .filter((d) => d.expires > Date.now())
+      .map(({ digest: _, ...d }) => ({ ...d, observation: this.observations.get(d.id) }));
+  }
+  configure(id: string, settings: DeviceSettings) {
+    return this.update((state) => {
+      const device = state.devices.find((d) => d.id === id);
+      if (!device) throw new HttpError(404, 'error.pairRequired');
+      device.settings = deviceSettingsSchema.parse(settings);
+    });
+  }
+  viewerSettings(id: string) {
+    return this.state.viewers && Object.hasOwn(this.state.viewers, id)
+      ? this.state.viewers[id]
+      : undefined;
+  }
+  viewers() {
+    return structuredClone(this.state.viewers ?? {});
+  }
+  configureViewer(id: string, settings: DeviceSettings) {
+    if (
+      !/^[a-zA-Z0-9_-]{1,100}$/.test(id) ||
+      ['__proto__', 'constructor', 'prototype'].includes(id)
+    )
+      throw new HttpError(400, 'error.valueRange');
+    return this.update((state) => {
+      state.viewers ??= {};
+      if (!Object.hasOwn(state.viewers, id) && Object.keys(state.viewers).length >= 128)
+        throw new HttpError(400, 'error.valueRange');
+      state.viewers[id] = deviceSettingsSchema.parse(settings);
+    });
   }
   revoke(id: string) {
     return this.update((state) => {

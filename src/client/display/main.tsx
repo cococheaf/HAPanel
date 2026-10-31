@@ -15,6 +15,8 @@ function Display() {
     snapshot: Snapshot;
     canEdit?: boolean;
     canControl?: boolean;
+    settings?: import('../../server/store').DeviceSettings;
+    identifyUntil?: number;
   }>();
   const [pairing, setPairing] = useState(false),
     [error, setError] = useState<unknown>();
@@ -22,9 +24,14 @@ function Display() {
     [name, setName] = useState<string>();
   const displayName = name ?? t('pairing.defaultName');
   const load = useCallback(() => {
-    api<{ published: Revision; snapshot: Snapshot; canEdit?: boolean; canControl?: boolean }>(
-      'api/display/bootstrap',
-    )
+    api<{
+      published: Revision;
+      snapshot: Snapshot;
+      canEdit?: boolean;
+      canControl?: boolean;
+      settings?: import('../../server/store').DeviceSettings;
+      identifyUntil?: number;
+    }>('api/display/bootstrap')
       .then((result) => {
         setData(result);
         setPairing(false);
@@ -39,6 +46,8 @@ function Display() {
   useEffect(() => {
     if (!data) return;
     return liveStream('api/display/stream', (message) => {
+      if (message.alertId)
+        window.dispatchEvent(new CustomEvent('hapanel:alert', { detail: message.alertId }));
       if (message.online === false)
         setData((d) => d && { ...d, snapshot: { ...d.snapshot, status: 'reconnecting' } });
       if (message.snapshot || message.published)
@@ -48,11 +57,31 @@ function Display() {
               ...d,
               snapshot: message.snapshot ?? d.snapshot,
               published: message.published ?? d.published,
+              settings: message.settings,
+              identifyUntil: message.identifyUntil,
               canEdit: message.canEdit ?? d.canEdit,
               canControl: message.canControl ?? d.canControl,
             },
         );
     });
+  }, [!!data]);
+  useEffect(() => {
+    if (!data) return;
+    const observe = () => {
+      if (!window.document.hidden)
+        void api('api/display/observe', {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          dpr: window.devicePixelRatio,
+        }).catch(() => undefined);
+    };
+    observe();
+    const timer = setInterval(observe, 60000);
+    window.addEventListener('resize', observe);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('resize', observe);
+    };
   }, [!!data]);
   const act = async (action: Action) => {
     await api('api/display/action', action);
@@ -118,6 +147,8 @@ function Display() {
   return (
     <>
       <Player
+        settings={data.settings}
+        identifyUntil={data.identifyUntil}
         published={data.published}
         snapshot={data.snapshot}
         onAction={data.canControl === false && !data.snapshot.alarmControl ? undefined : act}

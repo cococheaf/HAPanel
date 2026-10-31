@@ -199,6 +199,17 @@ export function localizedSampleTile<T extends { id: string; title: string; origi
   language: Language,
 ): T {
   const originalId = tile.originId ?? tile.id;
+  const featureNames: Record<string, [string, MessageKey]> = {
+    feature_timer: ['Timer', 'kind.timer'],
+    feature_select: ['Auswahl', 'kind.select'],
+    feature_number: ['Zahlenregler', 'kind.number'],
+    feature_fan: ['Ventilator', 'kind.fan'],
+    feature_vacuum: ['Staubsauger', 'kind.vacuum'],
+    feature_button: ['Taste', 'kind.button'],
+  };
+  const feature = featureNames[originalId];
+  if (feature && tile.title === feature[0])
+    return { ...tile, title: translate(language, feature[1]) };
   const example = Object.hasOwn(showcaseCopy, originalId) ? showcaseCopy[originalId] : undefined;
   if (example && tile.title === example.title)
     return { ...tile, title: translate(language, example.key) };
@@ -271,19 +282,21 @@ export function localizeSampleDocument(document: Dashboard, language: Language):
                   )
                 : page.subtitle,
       name:
-        (page.originId ?? page.id) === 'eg'
-          ? sample(page.name, 'EG', 'sample.navEG')
-          : (page.originId ?? page.id) === 'og'
-            ? sample(page.name, 'OG', 'sample.navOG')
-            : (page.originId ?? page.id) === 'energy'
-              ? sample(page.name, 'Energie', 'sample.energy')
-              : (page.originId ?? page.id) === 'surveillance'
-                ? sample(page.name, 'Überwachung', 'sample.surveillance')
-                : (page.originId ?? page.id) === 'overview'
-                  ? sample(page.name, 'Zuhause', 'sample.home')
-                  : (page.originId ?? page.id) === 'favorites'
-                    ? sample(page.name, 'Favoriten', 'sample.favourites')
-                    : page.name,
+        (page.originId ?? page.id) === 'features'
+          ? sample(page.name, 'Geräte', 'sample.features')
+          : (page.originId ?? page.id) === 'eg'
+            ? sample(page.name, 'EG', 'sample.navEG')
+            : (page.originId ?? page.id) === 'og'
+              ? sample(page.name, 'OG', 'sample.navOG')
+              : (page.originId ?? page.id) === 'energy'
+                ? sample(page.name, 'Energie', 'sample.energy')
+                : (page.originId ?? page.id) === 'surveillance'
+                  ? sample(page.name, 'Überwachung', 'sample.surveillance')
+                  : (page.originId ?? page.id) === 'overview'
+                    ? sample(page.name, 'Zuhause', 'sample.home')
+                    : (page.originId ?? page.id) === 'favorites'
+                      ? sample(page.name, 'Favoriten', 'sample.favourites')
+                      : page.name,
       tiles: page.tiles.map((tile) => {
         let view = localizedSampleTile(tile, language);
         if ((tile.originId ?? tile.id) === 'demo_contacts' && tile.contacts) {
@@ -374,6 +387,14 @@ export function demoSnapshot(): Snapshot {
         max_temp: 30,
         target_temp_step: 0.5,
         hvac_action: 'heating',
+        supported_features: 57,
+        hvac_modes: ['off', 'heat', 'cool', 'auto'],
+        fan_modes: ['auto', 'low', 'high'],
+        fan_mode: 'auto',
+        swing_modes: ['off', 'vertical'],
+        swing_mode: 'off',
+        preset_modes: ['eco', 'comfort'],
+        preset_mode: 'comfort',
       }),
       'media_player.living_room': state('media_player.living_room', 'playing', {
         friendly_name: 'Wohnzimmer',
@@ -381,6 +402,7 @@ export function demoSnapshot(): Snapshot {
         media_artist: 'HAPanel Sessions',
         media_album_name: 'Slow Sunday',
         volume_level: 0.42,
+        supported_features: 16437,
         media_position: 84,
         media_duration: 245,
         entity_picture: './album-art.svg',
@@ -454,6 +476,56 @@ export function applyDemoAction(snapshot: Snapshot, document: Dashboard, action:
     next.entities['light.living_room'].state = 'on';
     next.entities['light.living_room'].attributes.brightness = 90;
   }
+  for (const [service, attribute] of Object.entries({
+    set_hvac_mode: 'hvac_mode',
+    set_fan_mode: 'fan_mode',
+    set_swing_mode: 'swing_mode',
+    set_preset_mode: 'preset_mode',
+    set_cover_tilt_position: 'current_tilt_position',
+    set_percentage: 'percentage',
+    set_value: 'value',
+    select_option: 'option',
+  }))
+    if (command.service === service) {
+      const value = Object.values(command.service_data)[0];
+      if (service === 'set_hvac_mode' || service === 'select_option' || service === 'set_value')
+        entity.state = String(value);
+      else entity.attributes[attribute] = value;
+    }
+  if (command.domain === 'timer') {
+    const duration = String(
+      entity.attributes.remaining ?? entity.attributes.duration ?? '00:05:00',
+    );
+    const parts = duration.split(':').map(Number);
+    const seconds = parts.length === 3 ? parts[0] * 3600 + parts[1] * 60 + parts[2] : 300;
+    if (command.service === 'start') {
+      entity.state = 'active';
+      entity.attributes.finishes_at = new Date(Date.now() + seconds * 1000).toISOString();
+    } else {
+      if (command.service === 'pause') {
+        const left = Math.max(
+          0,
+          Math.ceil((Date.parse(String(entity.attributes.finishes_at)) - Date.now()) / 1000),
+        );
+        if (Number.isFinite(left))
+          entity.attributes.remaining = `${String(Math.floor(left / 3600)).padStart(2, '0')}:${String(Math.floor(left / 60) % 60).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;
+        entity.state = 'paused';
+      } else {
+        entity.state = 'idle';
+        entity.attributes.remaining = entity.attributes.duration;
+      }
+      delete entity.attributes.finishes_at;
+    }
+  }
+  if (command.domain === 'vacuum')
+    entity.state =
+      command.service === 'start'
+        ? 'cleaning'
+        : command.service === 'pause'
+          ? 'paused'
+          : 'returning';
+  if (command.domain === 'button' || command.domain === 'input_button')
+    entity.state = new Date().toISOString();
   entity.last_updated = new Date().toISOString();
   return next;
 }

@@ -342,3 +342,109 @@ test('WebRTC signalling stays bound to a camera, hides session/config secrets an
   await new Promise((resolve) => setTimeout(resolve, 15));
   assert.equal(events.length, count);
 });
+
+test('statistics, room metadata and capability validation use bounded cached HA calls and reject unsupported actions before service dispatch', async (t) => {
+  const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
+  await once(server, 'listening');
+  const calls: any[] = [];
+  const states = [
+    { entity_id: 'input_number.test', state: '1', attributes: { min: 0, max: 10, step: 0.5 } },
+    { entity_id: 'sensor.energy', state: '120', attributes: { unit_of_measurement: 'kWh' } },
+  ];
+  server.on('connection', (socket) => {
+    socket.send(JSON.stringify({ type: 'auth_required' }));
+    socket.on('message', (raw) => {
+      const m = JSON.parse(raw.toString());
+      calls.push(m);
+      if (m.type === 'auth') {
+        socket.send(JSON.stringify({ type: 'auth_ok' }));
+        return;
+      }
+      const results: Record<string, unknown> = {
+        get_states: states,
+        'config/area_registry/list': [{ area_id: 'office', name: 'Office', floor_id: 'eg' }],
+        'config/floor_registry/list': [{ floor_id: 'eg', name: 'Ground floor' }],
+        'config/device_registry/list': [{ id: 'device', name: 'Test device', area_id: 'office' }],
+        'config/entity_registry/list': [{ entity_id: 'input_number.test', device_id: 'device' }],
+        'recorder/statistics_during_period': {
+          'sensor.energy': [
+            { start: Date.now() - 3600000, change: 2.5, mean: 120 },
+            { start: Date.now(), change: 1, mean: 121 },
+          ],
+        },
+      };
+      socket.send(
+        JSON.stringify({
+          id: m.id,
+          type: 'result',
+          success: true,
+          result: results[m.type] ?? null,
+        }),
+      );
+      if (m.type === 'subscribe_entities')
+        socket.send(
+          JSON.stringify({
+            id: m.id,
+            type: 'event',
+            event: {
+              a: Object.fromEntries(
+                states.map((e) => [e.entity_id, { s: e.state, a: e.attributes }]),
+              ),
+            },
+          }),
+        );
+    });
+  });
+  const hub = new HomeAssistantHub({
+    demo: false,
+    token: 'synthetic',
+    websocketUrl: `ws://127.0.0.1:${(server.address() as { port: number }).port}`,
+  });
+  t.after(async () => {
+    await hub.stop();
+    for (const client of server.clients) client.terminate();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+  const document = structuredClone(demoDocument);
+  document.pages[1].tiles = [
+    {
+      id: 'number_test',
+      kind: 'number',
+      title: 'Number',
+      entityId: 'input_number.test',
+      accent: 'mint',
+      layouts: {
+        ipad: { x: 0, y: 0, w: 2, h: 2 },
+        compact: { x: 0, y: 0, w: 2, h: 2 },
+        portrait: { x: 0, y: 0, w: 2, h: 2 },
+      },
+    },
+  ];
+  hub.setDocuments([document]);
+  hub.start();
+  await until(() => Boolean(hub.getSnapshot().entities['input_number.test']));
+  await assert.rejects(hub.act(document, { tileId: 'number_test', command: 'number', value: 2.3 }));
+  assert.equal(calls.filter((c) => c.type === 'call_service').length, 0);
+  await hub.act(document, { tileId: 'number_test', command: 'number', value: 2.5 });
+  assert.equal(calls.find((c) => c.type === 'call_service').service, 'set_value');
+  const first = await hub.getStatistics('sensor.energy', 'week'),
+    second = await hub.getStatistics('sensor.energy', 'week');
+  assert.deepEqual(
+    first.map((p) => p.value),
+    [2.5, 1],
+  );
+  assert.deepEqual(first, second);
+  assert.equal(calls.filter((c) => c.type === 'recorder/statistics_during_period').length, 1);
+  assert.equal(calls.find((c) => c.type === 'recorder/statistics_during_period').period, 'hour');
+  assert.deepEqual(calls.find((c) => c.type === 'recorder/statistics_during_period').units, {
+    energy: 'kWh',
+  });
+  const catalog = await hub.getCatalog();
+  assert.deepEqual(catalog.find((e) => e.entity_id === 'input_number.test')?.area, {
+    id: 'office',
+    name: 'Office',
+    floor: 'Ground floor',
+  });
+  await hub.getCatalog();
+  assert.equal(calls.filter((c) => c.type === 'config/area_registry/list').length, 1);
+});

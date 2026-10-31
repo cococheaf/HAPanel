@@ -42,13 +42,13 @@ Im Beispielmodus des Add-ons existiert zusätzlich ein reiner HA-Authentifizieru
 
 ## Berechtigungen
 
-Ingress-Identität wird ausschließlich von der dokumentierten Supervisor-Quelladresse akzeptiert. Fehlende Benutzer-IDs, nicht aktive Benutzer und Nicht-Administratoren werden abgewiesen. `panel_admin` ist eine Anzeigeeinstellung und ersetzt diese Serverprüfung nicht. Die Standalone-Verwaltung ist ausschließlich auf Loopback erreichbar und validiert zusätzlich den Host.
+Ingress-Identität wird ausschließlich von der Supervisor-Quelladresse akzeptiert. Designer und Verwaltungsrouten prüfen HA-Administratorrechte serverseitig. Der Player kann nach ausdrücklicher globaler Freigabe aktive normale HA-Benutzer zulassen. Kamera- und Alarmfreigabe sind unabhängig; normale HA-Benutzer erhalten dadurch keine allgemeine Gerätebedienung.
 
-Display-Endpunkte sind separat registriert und besitzen keine Verwaltungsrouten. Gerätesitzungen werden über HttpOnly-/SameSite-Cookies identifiziert. Mit konfigurierter HTTPS-Origin sind Cookies zusätzlich Secure. Kopplungscodes und Sitzungen werden nur gehasht persistiert. Widerruf beendet aktive Displaystreams.
+Display-Endpunkte besitzen keine Verwaltungsrouten. Gekoppelte Geräte verwenden widerrufbare HttpOnly-/SameSite-Cookies, bei HTTPS zusätzlich Secure. Codes und Sitzungen sind nur gehasht gespeichert. Geräteeinstellungen und Regeln je HA-Benutzer können globale Rechte nur einschränken. Ein erlaubter Layoutbereich filtert Dokument, Snapshot, Aktionen, History, Statistiken und alle Kamerawege vor einem HA-Aufruf. Verwaltungsrechte werden dadurch nie erteilt.
 
-Der Server bestimmt aus einer Kachel-ID deren Zielentität und den zulässigen HA-Service. Clients können keine beliebigen Entitäten, URLs oder Services übergeben. HA-Zugangsdaten werden weder an den Browser übertragen noch in Dashboard-Dateien gespeichert. Supervisor-Zugang ist ein Administratorzugang, weshalb eine Veröffentlichung die Freigabe der dort enthaltenen Bedienaktionen bedeutet.
+Der Server leitet typisierte Aktionen aus der veröffentlichten Kachel ab. Gesten werden ebenfalls aus der gespeicherten Konfiguration materialisiert. Entity-ID und Service sind keine Clientparameter. HA-Fähigkeitslisten, Featureflags, Wertebereiche und Licht-Schaltregeln werden vor Live-Befehlen geprüft. HA-Zugangsdaten bleiben im Backend. Supervisor-Zugang ist ein Administratorzugang; veröffentlichte Bedienaktionen sind daher eine ausdrückliche Delegation.
 
-Album-Art ist auf bildliefernde HA-API-Pfade der konfigurierten Instanz begrenzt; es gibt keinen allgemeinen URL-Proxy. Weiterleitungen werden nicht verfolgt, Anfragen sind zeitlich begrenzt und Bilder dürfen maximal 5 MiB groß sein.
+Album-Art und Kameraproxy erlauben nur konfigurierte HA-Ziele, keine beliebigen URLs. Es werden keine HA-Benutzerrollen, zusätzlichen Tokens oder externen ICE-Dienste eingerichtet.
 
 ## Räume, Energie und Verläufe
 
@@ -62,22 +62,32 @@ Leistung (W/kW) und Energie (Wh/kWh) werden getrennt normalisiert. Solarquellen 
 
 Kachelinhalt und Positionierung sind getrennt. Eine Kachel hat pro Displayprofil einen Rasterbereich. Der Editor verwendet React Grid Layout ohne automatische Verdichtung; der Player berechnet aus denselben Rastermaßen feste Rechtecke. Identische Rundung auf CSS-Pixel hält Vorschau und Player deckungsgleich.
 
-Hardwareauflösung, Pixelverhältnis, Browserfläche, Raster und reservierte Kopf-/Navigationsflächen werden getrennt gespeichert. „Einpassen“ skaliert proportional; „Exakt“ behält CSS-Pixel bei. Automatisches Reflow ist eine spätere, ausdrücklich wählbare Strategie. Aktuell werden alternative Anordnungen über eigenständige Profile gepflegt.
+Hardwareauflösung, Pixelverhältnis, Browserfläche, Raster und reservierte Kopf-/Navigationsflächen werden getrennt gespeichert. „Einpassen“ skaliert proportional; „Exakt“ behält CSS-Pixel bei. Eine optionale adaptive Darstellung ordnet Kacheln je Browserfläche neu an und darf vertikal scrollen. Die Transformation verändert keine gespeicherten Rasterpositionen. Eigenständige Profile bleiben für pixelgenaue Anordnungen verfügbar.
 
 ## Prüfungen und Grenzen
 
 Automatisierte Tests prüfen Schema und Rastergrenzen, persistente Revisionen, Konflikte, Veröffentlichungstrennung, Kopplung/Replay/Widerruf, Ingress-Vertrauensgrenzen, Display-Zugriff und den HA-WebSocket-Dialog gegen einen lokalen Simulator.
 
-Zusätzlich erforderlich ist eine Abnahme mit echtem Supervisor, realen Gerätefähigkeiten und Safari auf physischer iPad-Hardware. Der Testsimulator ersetzt diese Abnahme nicht. Die ersten Klima-Steuerelemente sind auf ein einzelnes Temperatursoll ausgelegt; erweiterte HVAC-Modi, Temperaturbereiche und Fahrenheit folgen in einer weiteren Ausbaustufe.
+Zusätzlich erforderlich ist eine Abnahme mit echtem Supervisor, realen Gerätefähigkeiten und Safari auf physischer iPad-Hardware. Der Testsimulator ersetzt diese Abnahme nicht. Klimamodi, Fan-/Swing-/Preset-Listen, Einzel- und Bereichssollwerte verwenden die gemeldeten HA-Fähigkeiten und Einheiten.
 
 ## Alarm und Kamera
 
-Alarmbefehle werden aus einer pro Kachel konfigurierten Liste von Modi auf feste HA-Services abgebildet. Entity-ID und Service bestimmt der Server. Die Laufzeitprüfung berücksichtigt unterstützte Funktionen und erforderliche Codes. Fehler enthalten keine von HA zurückgespiegelten Codes. Pro Administrator sind fünf Alarmversuche pro Minute erlaubt. Die bestehende Ingress-Administratorprüfung gilt für Editor und Player; separat gekoppelte Displays erhalten keine neuen Alarm-/Kamerarechte.
+Alarmbefehle werden aus einer pro Kachel konfigurierten Liste von Modi auf feste HA-Services abgebildet. Entity-ID und Service bestimmt der Server. Die Laufzeitprüfung berücksichtigt unterstützte Funktionen und erforderliche Codes. Fehler enthalten keine von HA zurückgespiegelten Codes. Pro HA-Benutzer oder gekoppeltem Gerät sind fünf Alarmversuche pro Minute erlaubt. Globale Kamera-/Alarmfreigabe und zusätzliche Einschränkungen werden unabhängig geprüft; Standard bleibt jeweils Administratorzugang.
 
-Kamerametadaten werden vor Katalog- und Snapshot-Ausgabe auf Name, unterstützte Funktionen und Streamtyp reduziert. Bilder und HLS-Ressourcen laufen durch einen authentifizierten Proxy. Bilder sind auf 5 MiB, Playlists auf 256 KiB und Segmente auf 12 MiB begrenzt. Playlists werden auf zufällige lokale Ressourcen-IDs umgeschrieben und dürfen den jeweiligen HA-Stream-Pfad nicht verlassen. HA-Streamadressen, Kameratokens und Supervisor-Zugangsdaten bleiben auf dem Server. Vorschaubilder werden kurz zwischengespeichert; Streams starten erst in der Detailansicht. Das Add-on transkodiert selbst keine Videos.
+Kamerametadaten werden vor Katalog- und Snapshot-Ausgabe auf Name, unterstützte Funktionen und Streamtyp reduziert. Bilder und HLS-Ressourcen laufen durch einen authentifizierten Proxy. Bilder sind auf 5 MiB, Playlists auf 256 KiB und Segmente auf 12 MiB begrenzt. Playlists werden auf zufällige lokale Ressourcen-IDs umgeschrieben und dürfen den jeweiligen HA-Stream-Pfad nicht verlassen. HA-Streamadressen, Kameratokens und Supervisor-Zugangsdaten bleiben auf dem Server. Vorschaubilder werden kurz zwischengespeichert; Streams starten je Kachel optional bereits in der sichtbaren Übersicht. Ein pro Layout einstellbares Budget begrenzt gleichzeitige Vorschau-Streams; verdeckte Streams pausieren. Das Add-on transkodiert selbst keine Videos.
 
 ## Unabhängige Display-Ansichten
 
 Seiten können über `profileIds` einem Display zugeordnet sein; fehlende Zuordnungen bedeuten beim Import zunächst alle Profile. Eine deterministische Migration kopiert gemeinsam genutzte Seiten in unabhängige Ansichten. Der erste Besitzer behält IDs, Kopien erhalten eigene IDs und angepasste Navigation. `originId` bewahrt die Herkunft für Navigation und die Lokalisierung unveränderter Beispieltexte. Validierung prüft Layouts nur in ihren zugeordneten Profilen, 1–12 Ansichten pro Display und maximal acht Displays. Kopieren zwischen Rastern erhält jede Kachel oder lehnt einen unmöglichen Kopiervorgang vollständig ab.
 
 WebRTC nutzt `camera/capabilities`, `camera/webrtc/get_client_config`, `camera/webrtc/offer` und `camera/webrtc/candidate`. Sitzung und Entität bleiben serverseitig gebunden. Schließen und Veröffentlichung geänderter Bindungen beenden die zugehörige HA-Sitzung. Begrenzte SDP-/ICE-Größen, Nachrichten- und Sitzungsgrenzen sowie erneute Autorisierung begrenzen Ressourcen. ICE-Serverzugangsdaten werden nicht ausgegeben; der Browser verwendet lokale Host-Kandidaten ohne externe STUN-/TURN-Dienste.
+
+## Erweiterte Darstellung und Ereignisse
+
+`experience.ts` enthält rein funktionale Darstellungs-, Gesten-, Sichtbarkeits- und Meldungsregeln. `designer.ts` validiert Gruppenoperationen atomar. Eine Widget-Registry vereinheitlicht Domänen und Fähigkeiten. Optionale Felder erweitern Schema 1 rückwärtskompatibel; vorhandene Dateien werden vor dem ersten 2.0-Schreiben zusätzlich unveränderlich gesichert.
+
+Der HA-Adapter hält eine feste zusätzliche `subscribe_events`-Subscription auf `hapanel_alert`. Nur die ID einer veröffentlichten Meldungsregel gelangt an berechtigte Displays. Inhalt und Kamerabindung stammen aus dem veröffentlichten Dokument, keine Services aus Ereignispayloads. Zustandstrigger werden im Player auf Flanken geprüft; initiale beziehungsweise wiederaufgenommene Zustände lösen keine alten Meldungen aus.
+
+Recorder-Statistiken werden pro Entität und Zeitraum fünf Minuten gecacht, auf abgeschlossene Stunden und maximal 800 Punkte begrenzt. Quellen bleiben auf den jeweiligen Dokumentbereich beschränkt. Energiezähler verwenden `change`, Messwerte `mean`; angeforderte Einheiten passen zur aktuellen Quelle. Fehlende Werte, Tarife und erforderliche Messgrenzen werden nicht ersetzt.
+
+Tablet-Messungen enthalten ausschließlich CSS-Fläche, DPR und Kontaktzeit. Sie bleiben im Arbeitsspeicher; Layoutzuweisung und zusätzliche Einschränkungen werden separat neben gehashten Kopplungen persistiert. Langsame Display-WebSockets werden bei über 1 MiB ausstehender Daten geschlossen und verbinden sich anschließend erneut.

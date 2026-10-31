@@ -303,6 +303,29 @@ export const legacyV1ShowcaseDocument: Dashboard = dashboardSchema.parse({
     })),
 });
 
+// Additional browser widgets, kept out of the immutable legacy fixtures above.
+showcaseDocument.pages.push({
+  id: 'features',
+  name: 'Geräte',
+  tiles: (['timer', 'select', 'number', 'fan', 'vacuum', 'button'] as const).map((kind, index) => ({
+    id: 'feature_' + kind,
+    kind,
+    entityId:
+      (kind === 'select' ? 'input_select' : kind === 'number' ? 'input_number' : kind) + '.example',
+    title: ['Timer', 'Auswahl', 'Zahlenregler', 'Ventilator', 'Staubsauger', 'Taste'][index],
+    accent: kind === 'fan' ? 'blue' : 'mint',
+    layouts: grid(index),
+  })),
+});
+for (const profile of showcaseDocument.profiles)
+  profile.experience = {
+    density: 'normal',
+    colorMode: 'dark',
+    background: 'gradient',
+    swipe: true,
+  };
+dashboardSchema.parse(showcaseDocument);
+
 export function showcaseSnapshot(): Snapshot {
   const snapshot = demoSnapshot();
   const add = (
@@ -392,5 +415,38 @@ export function showcaseSnapshot(): Snapshot {
     temperature: Math.round(11 + 3 * Math.sin(index / 4)),
     condition: index < 3 ? 'partlycloudy' : 'cloudy',
   }));
+  add('timer.example', 'idle', undefined, {
+    friendly_name: 'Timer',
+    duration: '00:05:00',
+    remaining: '00:05:00',
+  });
+  add('input_select.example', 'Eco', undefined, {
+    friendly_name: 'Auswahl',
+    options: ['Eco', 'Comfort'],
+  });
+  add('input_number.example', 50, '%', {
+    friendly_name: 'Zahlenregler',
+    min: 0,
+    max: 100,
+    step: 5,
+  });
+  add('fan.example', 'on', undefined, {
+    friendly_name: 'Ventilator',
+    supported_features: 1,
+    percentage: 50,
+    percentage_step: 10,
+  });
+  add('vacuum.example', 'docked', undefined, {
+    friendly_name: 'Staubsauger',
+    supported_features: 8212,
+    battery_level: 85,
+  });
+  add('button.example', 'unknown', undefined, { friendly_name: 'Taste' });
+  for (const entity of Object.values(snapshot.entities))
+    entity.area = {
+      id: entity.entity_id.includes('bedroom') ? 'bedroom' : 'living',
+      name: entity.entity_id.includes('bedroom') ? 'Schlafzimmer' : 'Wohnzimmer',
+      floor: entity.entity_id.includes('bedroom') ? 'OG' : 'EG',
+    };
   return snapshot;
 }

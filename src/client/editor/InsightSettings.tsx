@@ -1,3 +1,4 @@
+import { domainKinds as domains } from '../../shared/widgets';
 import { useState } from 'react';
 import { Plus, X, ChevronUp, ChevronDown } from 'lucide-react';
 import { alarmModes } from '../../shared/model';
@@ -8,19 +9,6 @@ import { layoutId } from '../../shared/display-layouts';
 import { LightSettings } from './LightSettings';
 import { TextInput } from './TextInput';
 
-const domains: Record<string, TileKind> = {
-  light: 'light',
-  switch: 'light',
-  climate: 'climate',
-  media_player: 'media',
-  cover: 'cover',
-  sensor: 'sensor',
-  binary_sensor: 'sensor',
-  scene: 'scene',
-  script: 'scene',
-  automation: 'automation',
-  alarm_control_panel: 'alarm',
-};
 const freshControl = () => layoutId('control');
 
 export function InsightSettings({
@@ -117,9 +105,110 @@ export function InsightSettings({
           <LightSettings control={tile} catalog={catalog} update={(light) => update({ light })} />
         </div>
       )}
+      {tile.energy && (
+        <div className="form-section">
+          <h3>{t('v2.energyTotals')}</h3>
+          {(['importEnergy', 'exportEnergy', 'solarEnergy', 'houseEnergy'] as const).map((key) => (
+            <div key={key}>
+              {picker(
+                t(`v2.${key}`),
+                tile.energy!.meters?.[key],
+                (id) => energy({ meters: { ...tile.energy!.meters, [key]: id || undefined } }),
+                sensors.filter((e) =>
+                  ['Wh', 'kWh', 'MWh'].includes(String(e.attributes.unit_of_measurement)),
+                ),
+              )}
+            </div>
+          ))}
+          <h4>{t('v2.additionalSolar')}</h4>
+          {(tile.energy.meters?.solarAdditional ?? []).map((id) => (
+            <div className="inspector-reference" key={id}>
+              <span>
+                {String(catalog.find((e) => e.entity_id === id)?.attributes.friendly_name ?? id)}
+              </span>
+              <button
+                className="icon-button"
+                aria-label={t('editor.remove')}
+                onClick={() =>
+                  energy({
+                    meters: {
+                      ...tile.energy!.meters,
+                      solarAdditional: tile.energy!.meters!.solarAdditional!.filter(
+                        (item) => item !== id,
+                      ),
+                    },
+                  })
+                }
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+          {(tile.energy.meters?.solarAdditional?.length ?? 0) < 3 &&
+            picker(
+              t('v2.additionalSolar'),
+              undefined,
+              (id) => {
+                if (id)
+                  energy({
+                    meters: {
+                      ...tile.energy!.meters,
+                      solarAdditional: [
+                        ...new Set([...(tile.energy!.meters?.solarAdditional ?? []), id]),
+                      ],
+                    },
+                  });
+              },
+              sensors.filter(
+                (e) =>
+                  ['Wh', 'kWh', 'MWh'].includes(String(e.attributes.unit_of_measurement)) &&
+                  e.entity_id !== tile.energy!.meters?.solarEnergy,
+              ),
+            )}
+          {(['tariff', 'exportTariff'] as const).map((key) => (
+            <label key={key}>
+              {t(`v2.${key}`)}
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step="0.001"
+                value={tile.energy!.meters?.[key] ?? ''}
+                onChange={(e) =>
+                  energy({
+                    meters: {
+                      ...tile.energy!.meters,
+                      [key]: e.target.value === '' ? undefined : Number(e.target.value),
+                    },
+                  })
+                }
+              />
+            </label>
+          ))}
+          <label>
+            {t('v2.currency')}
+            <select
+              value={tile.energy.meters?.currency ?? 'EUR'}
+              onChange={(e) =>
+                energy({ meters: { ...tile.energy!.meters, currency: e.target.value as 'EUR' } })
+              }
+            >
+              {['EUR', 'USD', 'GBP', 'CHF'].map((v) => (
+                <option key={v}>{v}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
       {tile.kind === 'camera' && (
         <div className="form-section">
           <h3>{t('kind.camera')}</h3>
+          {picker(
+            t('v2.overviewSource'),
+            tile.camera?.overviewEntityId,
+            (id) => camera({ overviewEntityId: id || undefined }),
+            catalog.filter((e) => e.entity_id.startsWith('camera.')),
+          )}
           <label>
             {t('camera.refresh')}
             <input
@@ -356,20 +445,6 @@ export function InsightSettings({
                 {tile.kind === 'sensor' && tile.entityId.startsWith('sensor.') && (
                   <option value="energy">{t('editor.energyView')}</option>
                 )}
-              </select>
-            </label>
-            <label>
-              {t('editor.navigationTarget')}
-              <select
-                value={tile.navigateTo ?? ''}
-                onChange={(event) => update({ navigateTo: event.target.value || undefined })}
-              >
-                <option value="">{t('detail.title')}</option>
-                {pages.map((page) => (
-                  <option key={page.id} value={page.id}>
-                    {page.name}
-                  </option>
-                ))}
               </select>
             </label>
           </div>

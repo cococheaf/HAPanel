@@ -1,3 +1,4 @@
+import { useStreamBudget } from './stream-budget';
 import { useEffect, useRef, useState } from 'react';
 import { Camera, Play, RefreshCw, VideoOff, LoaderCircle } from 'lucide-react';
 import type { Snapshot, Tile } from '../../shared/model';
@@ -30,7 +31,7 @@ export function CameraThumbnail({
   const visible = usePageVisible();
   const sample = snapshot.status === 'demo';
   const allowed = snapshot.cameraView ?? sample;
-  const entity = snapshot.entities[tile.entityId];
+  const entity = snapshot.entities[tile.camera?.overviewEntityId ?? tile.entityId];
   const online =
     entity &&
     !['unknown', 'unavailable', 'off'].includes(entity.state) &&
@@ -77,7 +78,9 @@ export function CameraThumbnail({
     >
       {allowed && online && !sample && visible && (
         <img
-          src={base + tile.id + '/still?t=' + tick}
+          src={
+            base + tile.id + (tile.camera?.overviewEntityId ? '/overview' : '') + '/still?t=' + tick
+          }
           alt={t('camera.image', { title: tile.title })}
           style={{ objectFit: tile.camera?.fit ?? 'cover', opacity: failed ? 0 : 1 }}
           onError={() => setFailed(true)}
@@ -126,6 +129,8 @@ export function CameraStream({
   const [transport, setTransport] = useState<PlaybackTransport>();
   const [fallback, setFallback] = useState(false),
     [lag, setLag] = useState(0);
+  const startedAt = useRef(0);
+  const [startup, setStartup] = useState<number>();
   const lastStats = useRef(0),
     initialSync = useRef(false);
   const [obscured, setObscured] = useState(false);
@@ -163,21 +168,41 @@ export function CameraStream({
   const visible = usePageVisible();
   const sample = snapshot.status === 'demo';
   const allowed = snapshot.cameraView ?? sample;
-  const entity = snapshot.entities[tile.entityId];
+  const entity =
+    snapshot.entities[
+      inline && tile.camera?.overviewEntityId ? tile.camera.overviewEntityId : tile.entityId
+    ];
+  const sourceBase = base + tile.id + (inline && tile.camera?.overviewEntityId ? '/overview' : '');
   const streamable = Boolean(Number(entity?.attributes.supported_features) & 2);
   const online =
     entity &&
     !['unknown', 'unavailable', 'off'].includes(entity.state) &&
     snapshot.status !== 'reconnecting';
+  const granted = useStreamBudget(
+    visible && inView && !obscured && !sample && allowed && Boolean(online) && streamable,
+    inline,
+  );
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !visible || !inView || obscured || sample || !allowed || !online || !streamable)
+    if (
+      !video ||
+      !visible ||
+      !inView ||
+      obscured ||
+      sample ||
+      !allowed ||
+      !online ||
+      !streamable ||
+      !granted
+    )
       return;
+    startedAt.current = performance.now();
+    setStartup(undefined);
     setPhase('loading');
     setFallback(false);
     setLag(0);
     initialSync.current = false;
-    return startCameraPlayback(video, base + tile.id, tile.camera?.transport ?? 'auto', {
+    return startCameraPlayback(video, sourceBase, tile.camera?.transport ?? 'auto', {
       transport: setTransport,
       fallback: () => {
         setFallback(true);
@@ -189,6 +214,7 @@ export function CameraStream({
   }, [
     tile.id,
     base,
+    sourceBase,
     sample,
     allowed,
     online,
@@ -198,6 +224,7 @@ export function CameraStream({
     streamable,
     tile.camera?.transport,
     obscured,
+    granted,
   ]);
   const body = () => {
     if (sample)
@@ -214,8 +241,17 @@ export function CameraStream({
           {t(!allowed ? 'error.cameraAdminRequired' : 'error.cameraUnavailable')}
         </p>
       );
+    if (inline && streamable && !granted && allowed && online)
+      return (
+        <div className="camera-placeholder">
+          <Camera size={30} />
+          <p>{t('v2.cameraBudget')}</p>
+        </div>
+      );
     if (!streamable)
-      return <CameraStillLive tile={tile} base={base} active={visible && inView && !obscured} />;
+      return (
+        <CameraStillLive tile={tile} base={sourceBase} active={visible && inView && !obscured} />
+      );
     return (
       <div className="camera-live">
         <div className="camera-live-header">
@@ -253,7 +289,10 @@ export function CameraStream({
             muted
             playsInline
             preload="none"
-            poster={base + tile.id + '/still'}
+            poster={sourceBase + '/still'}
+            onLoadedData={() => {
+              if (startedAt.current) setStartup((performance.now() - startedAt.current) / 1000);
+            }}
             onPlaying={() => {
               setPhase('playing');
               if (transport === 'hls' && !initialSync.current && videoRef.current) {
@@ -307,6 +346,12 @@ export function CameraStream({
         </div>
         {!inline && (
           <>
+            {startup !== undefined && (
+              <p className="insight-muted">
+                {t('v2.startupTime')}: {startup.toFixed(1)} s
+              </p>
+            )}
+            <p className="insight-muted">{t('v2.latencyHint')}</p>
             <p className="insight-muted">
               {transport === 'webrtc'
                 ? t('camera.directConnection')
@@ -366,7 +411,7 @@ function CameraStillLive({
       <div className="camera-video-wrap">
         {visible && (
           <img
-            src={base + tile.id + '/still?live=1&t=' + tick}
+            src={base + '/still?live=1&t=' + tick}
             alt={t('camera.image', { title: tile.title })}
             style={{ opacity: failed ? 0 : 1 }}
             onError={() => {

@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.0.0
+
+- Displayverwaltung mit Layoutzuweisung, Messung, Identifikation und zusätzlichen Geräte-/Benutzerregeln.
+- Adaptive Layouts, Dichte, Hell-/Dunkelmodus, Nachtzeiten, Ruheansicht, sichere Ränder, Startseite, Rückkehr und Wischen.
+- Mehrfachauswahl, Gruppenbewegung, Ausrichten, Verteilen, Kopieren/Einfügen, Sperren, Vorlagen, Filter und Layoutprüfung.
+- Konfigurierbare Tipp-/Halteaktionen, Bedingungen, Icons, Farben, Hintergründe und Zusatztexte.
+- Neue Timer-, Auswahl-, Zahlen-, Ventilator-, Staubsauger- und Tastenkacheln; erweiterte Licht-, Klima-, Beschattungs- und Medienfunktionen.
+- Zustands- und HA-Ereignismeldungen mit Kameradetails; getrennte Vorschauquellen, konfigurierbare Streambudgets und Diagnose der Startzeit.
+- Energie-Statistiken für 24 Stunden, 7 und 30 Tage, explizite Zähler, mehrere unabhängige PV-Quellen und Schätzung mit festen Tarifen.
+- Private unveränderliche Sicherungen vor 2.0, Diagnose ohne Zugangsdaten, Widget-Vertrag und aktualisierte DE-/EN-Dokumentation.
+- Bestehende Ansichten und globale Kamera-/Alarmfreigaben bleiben erhalten. Zusätzliche Zugriffsregeln können Rechte nur einschränken.
+
 ## 1.5.0
 
 - Indirekte Bibliotheken für die statische Dateiauslieferung auf gepatchte Versionen aktualisiert.

@@ -23,7 +23,7 @@ const sensor = (value: string, unit: string): EntityState => ({
 test('room and energy templates fit every profile and keep unique action IDs', () => {
   assert.equal(dashboardSchema.safeParse(demoDocument).success, true);
   assert.equal(dashboardSchema.safeParse(showcaseDocument).success, true);
-  assert.equal(showcaseDocument.pages.length, 5);
+  assert.equal(showcaseDocument.pages.length, 6);
   const controls = allControls(showcaseDocument);
   assert.equal(new Set(controls.map((item) => item.id)).size, controls.length);
   assert.ok(entityIds(showcaseDocument).includes('cover.demo_bedroom'));

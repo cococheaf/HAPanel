@@ -10,6 +10,12 @@ import {
   DoorOpen,
   Sun,
   Camera,
+  Timer,
+  ListFilter,
+  SlidersHorizontal,
+  Fan,
+  Bot,
+  MousePointerClick,
 } from 'lucide-react';
 export const kindIcons = {
   light: Lightbulb,
@@ -23,6 +29,12 @@ export const kindIcons = {
   alarm: ShieldCheck,
   contacts: DoorOpen,
   camera: Camera,
+  timer: Timer,
+  select: ListFilter,
+  number: SlidersHorizontal,
+  fan: Fan,
+  vacuum: Bot,
+  button: MousePointerClick,
 };
 export const kindLabelKeys = {
   light: 'kind.light',
@@ -36,4 +48,10 @@ export const kindLabelKeys = {
   alarm: 'kind.alarm',
   contacts: 'kind.contacts',
   camera: 'kind.camera',
+  timer: 'kind.timer',
+  select: 'kind.select',
+  number: 'kind.number',
+  fan: 'kind.fan',
+  vacuum: 'kind.vacuum',
+  button: 'kind.button',
 } as const;

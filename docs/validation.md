@@ -1,8 +1,8 @@
-# Prüfstand für 1.5.0
+# Prüfstand für 2.0.0
 
 ## Automatisiert
 
-68 Tests mit Node.js-Test-Runner: Geometrie aller Beispielprofile, Schema- und Domänenvalidierung, Rastergrenzen und Überlappungen, Revisionskonflikte, Entwurf/Veröffentlichung/Wiederherstellung, persistente Sitzungen, einmalige Kopplungscodes, Zugriffsschutz für Ingress und lokale Verwaltung, eingeschränkte Display-API, YAML-Import und aktiver WebSocket-Widerruf.
+84 Tests mit Node.js-Test-Runner: Geometrie aller Beispielprofile, Schema- und Domänenvalidierung, Rastergrenzen und Überlappungen, Revisionskonflikte, Entwurf/Veröffentlichung/Wiederherstellung, persistente Sitzungen, einmalige Kopplungscodes, Zugriffsschutz für Ingress und lokale Verwaltung, eingeschränkte Display-API, YAML-Import und aktiver WebSocket-Widerruf.
 
 Der HA-Adapter wird mit einem lokalen WebSocket-Simulator geprüft: Authentifizierung, gefilterte Abonnements, komprimierte Attribut-Deltas, Prognosen, Administratorprüfung, typisierte Serviceaufrufe und Unterbrechung. Es werden keine echten HA-Geräte angesteuert.
 
@@ -72,3 +72,15 @@ Standbilder, HLS-Ressourcen, Fähigkeiten und Kamera-WebRTC bleiben ohne Kameraf
 Im Browser wurde der gebaute Player mit einem lokalen, synthetischen Nicht-Administrator geprüft: Designer ausgeblendet, normale Licht-/Automationsbefehle deaktiviert, Alarmmodi bedienbar. PIN-Abfrage, Bestätigung, Rückmeldung und das Leeren des Codefelds wurden durchgespielt; der Beispielalarm wurde anschließend wieder deaktiviert. Deutsch und Englisch wurden bei 1080 × 810 geprüft. Die Testumgebung besitzt weder eine echte HA-Adresse noch HA-Zugangsdaten.
 
 Der Abhängigkeitscheck berücksichtigt die neuen Meldungen [GHSA-3g3m-2fjr-6pw4](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4) und [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249). Ein auf `@fastify/static` begrenzter Override verwendet `glob` 14.0.3 und darüber `minimatch` 11.0.3. Die von HAPanel verwendete statische Auslieferung wird nach dem Update am Produktionsbuild geprüft. Der Override kann entfallen, sobald die direkte Bibliothek selbst einen gepatchten Versionsbereich verwendet.
+
+## 2.0.0 · Flexibler Designer und Displaybetrieb
+
+84 automatisierte Tests prüfen zusätzlich: veröffentlichte Gesten und einseitige Lichtregeln, bedingte Abonnements, unbekannte Zustände, adaptive Geometrie ohne Änderung der gespeicherten Positionen, atomare Gruppenoperationen, gesperrte Kacheln, Raumvorlagen, Entitätsersatz, originale Sicherung vor 2.0, persistente zusätzliche Geräte-/Benutzerregeln, Layoutgrenzen für Snapshot/Aktionen/History/Statistiken/Kameras und die Auflösung von Alarmkamera-Verweisen auf freigegebene Kopien.
+
+Ein lokaler HA-WebSocket prüft Registry-Metadaten, Cache-Wiederverwendung, Einheiten für Recorder-Statistiken und die Zurückweisung nicht unterstützter beziehungsweise nicht schrittgerechter Werte vor einem Serviceaufruf. Kameraübersicht und Detailquelle bleiben über getrennte API-Pfade an veröffentlichte Entitäten gebunden. Kopierte Layouts erhalten passende Gesten- und Startseitenverweise. Beispiel-Timer behalten reale Fristen sowie Restzeit beim Pausieren.
+
+Im Browser geprüft: Mehrfachauswahl und Kopieren in eine neue leere Vorlage, Import/Entwurf/Prüfung/Veröffentlichung, helle adaptive Ansicht bei tatsächlich gemessenen 1080 × 810 und 810 × 1080 CSS-Pixeln, englische Oberfläche sowie eine schmale 375 × 812 Ansicht ohne horizontalen Seitenüberlauf. Der Desktop-Designer wurde bei 1440 × 900 geprüft. Die Viewport-Änderung wurde jeweils nach Neuladen anhand der tatsächlichen DOM-Fläche kontrolliert.
+
+Ein isoliertes Backend mit ausschließlich synthetischen Daten und dem Produktionsbuild prüft die normale Kopplung, Messung, Identifikation und Layout-/Sprachzuweisung. Änderungen auf Nur-anzeigen und auf ein einziges erlaubtes Layout erschienen ohne Reload auf dem gekoppelten Testdisplay. Rücknahme der Einschränkung, Übernahme der Messung als Entwurf und Undo wurden ebenfalls geprüft. Timer, Auswahl, Zahlenregler, Staubsauger und Tasten lieferten bestätigte simulierte Zustandsänderungen. Ein veröffentlichtes Testereignis zeigte eine Klingelmeldung. Fehlende statistische Daten wurden als unbekannt dargestellt.
+
+Die veröffentlichten neuen Screenshots enthalten ausschließlich Beispieldaten. Es wurden keine echten Lampen, Beschattungen, Automationen, Alarmzustände oder HA-Benutzerrollen für die Prüfung verändert. Physische iPad-, reale Benutzeranmeldung-, HTTPS-Proxy-, vollständige Supervisor-Wiederherstellungs- und mehrtägige ARM-Prüfungen bleiben offen. Ein Simulator und eine Browsergrößenprüfung ersetzen diese Abnahmen nicht.

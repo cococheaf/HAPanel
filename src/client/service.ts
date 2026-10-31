@@ -28,11 +28,14 @@ export type Bootstrap = {
   access?: { camera: 'admin' | 'authenticated'; alarm: 'admin' | 'authenticated' };
 };
 export type LiveMessage = {
+  alertId?: string;
   snapshot?: Snapshot;
   published?: Revision;
   online?: boolean;
   canEdit?: boolean;
   canControl?: boolean;
+  settings?: import('../server/store').DeviceSettings;
+  identifyUntil?: number;
 };
 export function serializeDashboard(document: Dashboard, format: 'json' | 'yaml') {
   return format === 'json' ? JSON.stringify(document, null, 2) : stringify(document);

@@ -186,3 +186,7 @@ PIN-Pflicht und PIN-Format stammen von der HA-Alarm-Entität. Führende Nullen b
 | Ohne Anmeldung/Kopplung | Nein            | Nein           | Nein                   | Nein     |
 
 Für eigenständige Installationen entspricht `HAPANEL_ALARM_ACCESS=authenticated` dieser Freigabe. Die Freigabe verändert keine HA-Benutzerrollen und bildet individuelle HA-Entitätsrechte nicht nach.
+
+## HAPanel 2.0
+
+Die neuen Designer-, Display-, Kamera-, Ereignis- und Energiefunktionen beschreibt die [Bedienungsanleitung für 2.0](docs/experience.md).

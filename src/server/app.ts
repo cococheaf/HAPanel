@@ -15,7 +15,7 @@ import {
   type Action,
   type Dashboard,
 } from '../shared/model';
-import { DocumentStore, HttpError, PairingStore } from './store';
+import { DocumentStore, HttpError, PairingStore, deviceSettingsSchema } from './store';
 import { HomeAssistantHub } from './hub';
 import { documentContacts } from '../shared/security';
 import { cameraSignalSchema } from '../shared/camera';
@@ -180,12 +180,48 @@ export async function createApp(options: AppOptions) {
       throw new HttpError(401, 'error.pairRequired');
     displayRoles.set(request, false);
   };
+  const settingsFor = (request: FastifyRequest) =>
+    displayRoles.get(request) === true
+      ? undefined
+      : ingressDisplay
+        ? pairings.viewerSettings(ingressUser(request))
+        : pairings.authenticate(request.cookies.hapanel_device)?.settings;
+  const publishedFor = (request: FastifyRequest) => {
+    const revision = store.getRevision('published');
+    const allowed = settingsFor(request)?.allowedProfiles;
+    if (allowed) {
+      const originalCameras = revision.document.pages
+        .flatMap((page) => page.tiles)
+        .filter((tile) => tile.kind === 'camera');
+      revision.document.profiles = revision.document.profiles.filter((p) => allowed.includes(p.id));
+      revision.document.pages = revision.document.pages.filter(
+        (p) => !p.profileIds || p.profileIds.some((id) => allowed.includes(id)),
+      );
+      revision.document.alerts = revision.document.alerts?.filter(
+        (rule) => !rule.profileIds || rule.profileIds.some((id) => allowed.includes(id)),
+      );
+      const permittedCameras = revision.document.pages
+        .flatMap((page) => page.tiles)
+        .filter((tile) => tile.kind === 'camera');
+      for (const rule of revision.document.alerts ?? [])
+        if (rule.cameraTileId && !permittedCameras.some((tile) => tile.id === rule.cameraTileId)) {
+          const original = originalCameras.find((tile) => tile.id === rule.cameraTileId);
+          rule.cameraTileId = permittedCameras.find(
+            (tile) => tile.entityId === original?.entityId,
+          )?.id;
+        }
+      if (!revision.document.profiles.length)
+        throw new HttpError(403, 'error.displayAccessRequired');
+    }
+    return revision;
+  };
   const canControlDevices = (request: FastifyRequest) =>
-    !ingressDisplay || displayRoles.get(request) === true;
+    (!ingressDisplay || displayRoles.get(request) === true) && !settingsFor(request)?.readOnly;
   const canControlAlarm = (request: FastifyRequest) =>
-    displayRoles.get(request) === true || sharedAlarms;
+    displayRoles.get(request) === true ||
+    (sharedAlarms && !settingsFor(request)?.alarmBlocked && !settingsFor(request)?.readOnly);
   const canViewCameras = (request: FastifyRequest) =>
-    displayRoles.get(request) === true || sharedCameras;
+    displayRoles.get(request) === true || (sharedCameras && !settingsFor(request)?.cameraBlocked);
 
   app.addHook('onSend', async (_request, reply) => {
     reply.header('X-Content-Type-Options', 'nosniff');
@@ -308,6 +344,53 @@ export async function createApp(options: AppOptions) {
           },
         );
         admin.get('/devices', async () => pairings.list());
+        admin.put<{ Params: { id: string } }>('/devices/:id', async (request) => {
+          await pairings.configure(request.params.id, deviceSettingsSchema.parse(request.body));
+          return { ok: true };
+        });
+        admin.get('/catalog', async () => (await hub.getCatalog(true)).map(publicEntity));
+        admin.get('/users', async () => hub.getUsers());
+        admin.get('/viewers', async () => pairings.viewers());
+        admin.put<{ Params: { id: string } }>('/viewers/:id', async (request) => {
+          if (!/^[a-zA-Z0-9_-]{1,100}$/.test(request.params.id))
+            throw new HttpError(400, 'error.valueRange');
+          await pairings.configureViewer(
+            request.params.id,
+            deviceSettingsSchema.parse(request.body),
+          );
+          return { ok: true };
+        });
+        admin.post<{ Params: { id: string } }>('/devices/:id/identify', async (request) => {
+          if (!pairings.list().some((d) => d.id === request.params.id))
+            throw new HttpError(404, 'error.pairRequired');
+          pairings.identify(request.params.id);
+          return { ok: true };
+        });
+        admin.get('/structure', async () => hub.getStructure());
+        admin.get('/diagnostics', async () => ({
+          version: packageInfo.version,
+          ...hub.diagnostics(),
+          connection: hub.getSnapshot([]).status,
+          draftRevision: store.get().draft.revision,
+          publishedRevision: store.get().published.revision,
+          profiles: store.get().draft.document.profiles.length,
+          pairedDisplays: pairings.list().length,
+          cameraAccess: sharedCameras ? 'authenticated' : 'admin',
+          alarmAccess: sharedAlarms ? 'authenticated' : 'admin',
+          uptimeSeconds: Math.floor(process.uptime()),
+        }));
+        admin.get<{ Params: { entityId: string }; Querystring: { range?: string } }>(
+          '/statistics/:entityId',
+          async (request) => {
+            if (!entityIds(store.getRevision('draft').document).includes(request.params.entityId))
+              throw new HttpError(403, 'error.tileNotAllowed');
+            return hub.getStatistics(
+              request.params.entityId,
+              z.enum(['day', 'week', 'month']).parse(request.query.range ?? 'day'),
+            );
+          },
+        );
+
         admin.post('/pair-code', async () => pairings.createCode());
         admin.delete<{ Params: { id: string } }>('/devices/:id', async (request) => {
           await pairings.revoke(request.params.id);
@@ -384,9 +467,13 @@ export async function createApp(options: AppOptions) {
         reply.header('Cache-Control', 'no-store');
       });
       display.get('/bootstrap', async (request) => ({
-        published: store.getRevision('published'),
+        settings: settingsFor(request),
+        identifyUntil: pairings.identification(
+          pairings.authenticate(request.cookies.hapanel_device)?.id ?? '',
+        ),
+        published: publishedFor(request),
         snapshot: snapshotFor(
-          store.getRevision('published').document,
+          publishedFor(request).document,
           canControlAlarm(request),
           canViewCameras(request),
           canControlDevices(request),
@@ -394,6 +481,35 @@ export async function createApp(options: AppOptions) {
         canEdit: displayRoles.get(request) === true,
         canControl: canControlDevices(request),
       }));
+      display.get<{ Params: { entityId: string }; Querystring: { range?: string } }>(
+        '/statistics/:entityId',
+        { config: { rateLimit: { max: 30, timeWindow: 60000 } } },
+        async (request) => {
+          if (!entityIds(publishedFor(request).document).includes(request.params.entityId))
+            throw new HttpError(403, 'error.tileNotAllowed');
+          return hub.getStatistics(
+            request.params.entityId,
+            z.enum(['day', 'week', 'month']).parse(request.query.range ?? 'day'),
+          );
+        },
+      );
+      display.post(
+        '/observe',
+        { config: { rateLimit: { max: 10, timeWindow: 60000 } } },
+        async (request) => {
+          const size = z
+            .object({
+              width: z.number().int().min(200).max(16384),
+              height: z.number().int().min(200).max(16384),
+              dpr: z.number().min(0.5).max(8),
+            })
+            .strict()
+            .parse(request.body);
+          const device = pairings.authenticate(request.cookies.hapanel_device);
+          if (device) pairings.observe(device.id, size);
+          return { ok: true };
+        },
+      );
       display.post(
         '/action',
         { config: { rateLimit: { max: 20, timeWindow: 1000 } } },
@@ -405,7 +521,7 @@ export async function createApp(options: AppOptions) {
           )
             throw new HttpError(403, 'error.viewerReadOnly');
           await performAction(
-            store.getRevision('published').document,
+            publishedFor(request).document,
             action,
             canControlAlarm(request),
             actor(request),
@@ -414,7 +530,7 @@ export async function createApp(options: AppOptions) {
         },
       );
       display.get<{ Params: { id: string } }>('/media/:id', async (request, reply) => {
-        const tile = allControls(store.getRevision('published').document).find(
+        const tile = allControls(publishedFor(request).document).find(
           (t) => t.id === request.params.id && t.kind === 'media',
         );
         const result = tile && (await hub.media(tile.entityId));
@@ -425,7 +541,7 @@ export async function createApp(options: AppOptions) {
         '/history/:entityId',
         { config: { rateLimit: { max: 60, timeWindow: 60_000 } } },
         async (request) => {
-          if (!entityIds(store.getRevision('published').document).includes(request.params.entityId))
+          if (!entityIds(publishedFor(request).document).includes(request.params.entityId))
             throw new HttpError(403, 'error.tileNotAllowed');
           return hub.getHistory(request.params.entityId);
         },
@@ -433,14 +549,27 @@ export async function createApp(options: AppOptions) {
       display.get('/stream', { websocket: true }, (socket, request) => {
         const token = request.cookies.hapanel_device;
         let revision = -1;
+        let signature = '';
         const send = () => {
           if (!ingressDisplay && !pairings.authenticate(token)) {
             socket.close(1008, 'Device access revoked');
             return;
           }
           if (socket.readyState !== 1) return;
-          const published = store.getRevision('published');
-          const changed = published.revision !== revision;
+          if (socket.bufferedAmount > 1024 * 1024) {
+            socket.close(1013, 'Slow connection');
+            return;
+          }
+          let published: ReturnType<typeof publishedFor>;
+          try {
+            published = publishedFor(request);
+          } catch {
+            socket.close(1008);
+            return;
+          }
+          const nextSignature = JSON.stringify(published.document.profiles.map((p) => p.id));
+          const changed = published.revision !== revision || signature !== nextSignature;
+          signature = nextSignature;
           revision = published.revision;
           socket.send(
             JSON.stringify({
@@ -451,12 +580,28 @@ export async function createApp(options: AppOptions) {
                 canViewCameras(request),
                 canControlDevices(request),
               ),
+              identifyUntil: pairings.identification(
+                pairings.authenticate(request.cookies.hapanel_device)?.id ?? '',
+              ),
+              settings: settingsFor(request),
               canEdit: displayRoles.get(request) === true,
               canControl: canControlDevices(request),
               ...(changed ? { published } : {}),
             }),
           );
         };
+        const notify = (alertId: string) => {
+          try {
+            if (
+              socket.readyState === 1 &&
+              publishedFor(request).document.alerts?.some((rule) => rule.id === alertId)
+            )
+              socket.send(JSON.stringify({ alertId }));
+          } catch {
+            socket.close(1008);
+          }
+        };
+        hub.on('notification', notify);
         hub.on('snapshot', send);
         store.on('change', send);
         pairings.on('change', send);
@@ -470,6 +615,7 @@ export async function createApp(options: AppOptions) {
         send();
         socket.on('close', () => {
           hub.off('snapshot', send);
+          hub.off('notification', notify);
           store.off('change', send);
           pairings.off('change', send);
           clearInterval(interval);
@@ -482,7 +628,7 @@ export async function createApp(options: AppOptions) {
   const cameraContexts = [
     {
       prefix: '/api/display/camera',
-      document: () => store.getRevision('published').document,
+      document: (request: FastifyRequest) => publishedFor(request).document,
       authorize: requireDisplay,
       allowed: canViewCameras,
     },
@@ -498,16 +644,27 @@ export async function createApp(options: AppOptions) {
       : []),
   ];
   const cameraPeers = new Map<object, string>();
-  for (const context of cameraContexts) {
-    const boundCamera = (id: string) =>
-      allControls(context.document()).find((tile) => tile.id === id && tile.kind === 'camera');
+  for (const context of cameraContexts.flatMap((context) => [
+    { ...context, overview: false },
+    { ...context, overview: true },
+  ])) {
+    const routeBase = context.prefix + '/:id' + (context.overview ? '/overview' : '');
+    const boundCamera = (id: string, request: FastifyRequest) => {
+      const tile = context
+        .document(request)
+        .pages.flatMap((page) => page.tiles)
+        .find((tile) => tile.id === id && tile.kind === 'camera');
+      if (!tile) return;
+      const overview = context.overview ? tile.camera?.overviewEntityId : undefined;
+      return { ...tile, entityId: overview ?? tile.entityId };
+    };
     app.get<{ Params: { id: string } }>(
-      context.prefix + '/:id/capabilities',
+      routeBase + '/capabilities',
       { onRequest: context.authorize, config: { rateLimit: { max: 120, timeWindow: 60_000 } } },
       async (request, reply) => {
         if (!context.allowed(request)) throw new HttpError(403, 'error.cameraAdminRequired');
         reply.header('Cache-Control', 'no-store');
-        const tile = boundCamera(request.params.id);
+        const tile = boundCamera(request.params.id, request);
         if (!tile) throw new HttpError(404, 'error.tileNotAllowed');
         try {
           return await hub.cameraCapabilities(tile.entityId);
@@ -517,10 +674,10 @@ export async function createApp(options: AppOptions) {
       },
     );
     app.get<{ Params: { id: string } }>(
-      context.prefix + '/:id/webrtc',
+      routeBase + '/webrtc',
       { websocket: true, onRequest: context.authorize },
       (socket, request) => {
-        const tile = boundCamera(request.params.id),
+        const tile = boundCamera(request.params.id, request),
           identity = actor(request);
         if (
           !context.allowed(request) ||
@@ -556,7 +713,7 @@ export async function createApp(options: AppOptions) {
             await context.authorize(request);
             if (
               !context.allowed(request) ||
-              boundCamera(request.params.id)?.entityId !== tile.entityId ||
+              boundCamera(request.params.id, request)?.entityId !== tile.entityId ||
               hub.getSnapshot([]).status === 'reconnecting'
             ) {
               deny();
@@ -602,7 +759,7 @@ export async function createApp(options: AppOptions) {
     );
     for (const suffix of ['still', 'stream.m3u8', 'assets/:asset']) {
       app.get<{ Params: { id: string; asset?: string }; Querystring: Record<string, unknown> }>(
-        context.prefix + '/:id/' + suffix,
+        routeBase + '/' + suffix,
         {
           onRequest: context.authorize,
           config: {
@@ -611,9 +768,7 @@ export async function createApp(options: AppOptions) {
         },
         async (request, reply) => {
           if (!context.allowed(request)) throw new HttpError(403, 'error.cameraAdminRequired');
-          const tile = allControls(context.document()).find(
-            (tile) => tile.id === request.params.id && tile.kind === 'camera',
-          );
+          const tile = boundCamera(request.params.id, request);
           if (!tile) throw new HttpError(404, 'error.tileNotAllowed');
           if (request.params.asset && !/^[a-f0-9]{32}\.[a-z0-9]+$/.test(request.params.asset))
             throw new HttpError(400, 'error.cameraSource');
@@ -632,6 +787,7 @@ export async function createApp(options: AppOptions) {
               .type(result.type)
               .code(result.status ?? 200);
             if (result.contentRange) reply.header('Content-Range', result.contentRange);
+            hub.recordCameraTransfer(result.buffer.length);
             return reply.send(result.buffer);
           } catch {
             throw new HttpError(502, 'error.cameraUnavailable');

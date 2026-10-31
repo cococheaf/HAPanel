@@ -1,5 +1,12 @@
 import { UserError } from './i18n';
 import { z } from 'zod';
+import {
+  commands,
+  gestureSchema,
+  tileExperienceSchema,
+  profileExperienceSchema,
+  alertRuleSchema,
+} from './experience';
 
 const id = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/);
 // Keep spaces while typing: transforming on every keystroke joins words in controlled inputs.
@@ -28,6 +35,12 @@ export const tileKinds = [
   'alarm',
   'contacts',
   'camera',
+  'timer',
+  'select',
+  'number',
+  'fan',
+  'vacuum',
+  'button',
 ] as const;
 export type TileKind = (typeof tileKinds)[number];
 const entityId = z.string().regex(/^[a-z_]+\.[a-z0-9_]+$/);
@@ -80,9 +93,10 @@ export const controlSchema = z
     kind: z.enum(tileKinds),
     title: text(64),
     entityId,
-    accent: z.enum(['amber', 'mint', 'blue', 'rose']),
+    accent: z.enum(['amber', 'mint', 'blue', 'rose', 'purple', 'orange', 'red', 'gray']),
     alarm: alarmOptionsSchema.optional(),
     light: lightOptionsSchema.optional(),
+    experience: tileExperienceSchema.optional(),
   })
   .strict();
 export const roomSchema = z
@@ -103,6 +117,19 @@ export const energySchema = z
     batteryPower: sensorId.optional(),
     batteryLevel: sensorId.optional(),
     batteryPositive: z.enum(['charge', 'discharge']).default('charge'),
+    meters: z
+      .object({
+        importEnergy: sensorId.optional(),
+        exportEnergy: sensorId.optional(),
+        solarEnergy: sensorId.optional(),
+        solarAdditional: z.array(sensorId).max(3).optional(),
+        houseEnergy: sensorId.optional(),
+        tariff: z.number().min(0).max(100).optional(),
+        exportTariff: z.number().min(0).max(100).optional(),
+        currency: z.enum(['EUR', 'USD', 'GBP', 'CHF']).optional(),
+      })
+      .strict()
+      .optional(),
     consumers: z
       .array(z.object({ label: z.string().min(1).max(64), entityId: sensorId }).strict())
       .max(12)
@@ -122,6 +149,12 @@ export const energySchema = z
       if (new Set(values).size !== values.length)
         ctx.addIssue({ code: 'custom', message: 'error.uniqueIds', path: [path] });
     }
+    const solarMeters = [
+      energy.meters?.solarEnergy,
+      ...(energy.meters?.solarAdditional ?? []),
+    ].filter(Boolean);
+    if (new Set(solarMeters).size !== solarMeters.length)
+      ctx.addIssue({ code: 'custom', message: 'error.uniqueIds', path: ['meters'] });
     if (energy.gridImport && energy.gridImport === energy.gridExport)
       ctx.addIssue({ code: 'custom', message: 'error.uniqueIds', path: ['gridExport'] });
   });
@@ -138,6 +171,7 @@ export const profileSchema = z
     id,
     name: text(64),
     theme: z.enum(['dusk', 'ocean', 'sand']).optional(),
+    experience: profileExperienceSchema.optional(),
     greeting: text(80).optional(),
     subtitle: z.string().max(100).optional(),
     physicalWidth: z.number().int().min(240).max(16384),
@@ -162,7 +196,7 @@ export const tileSchema = z
     kind: z.enum(tileKinds),
     title: text(64),
     entityId,
-    accent: z.enum(['amber', 'mint', 'blue', 'rose']),
+    accent: z.enum(['amber', 'mint', 'blue', 'rose', 'purple', 'orange', 'red', 'gray']),
     layouts: z.record(id, rectSchema),
     room: roomSchema.optional(),
     energy: energySchema.optional(),
@@ -171,8 +205,17 @@ export const tileSchema = z
     homeAssistantUrl: alarmLink.optional(),
     alarm: alarmOptionsSchema.optional(),
     light: lightOptionsSchema.optional(),
+    experience: tileExperienceSchema.optional(),
+    mediaFavorite: z
+      .object({ id: z.string().min(1).max(2048), type: z.string().min(1).max(80) })
+      .strict()
+      .optional(),
     camera: z
       .object({
+        overviewEntityId: z
+          .string()
+          .regex(/^camera\.[a-z0-9_]+$/)
+          .optional(),
         refreshSeconds: z.number().int().min(15).max(120).default(30),
         fit: z.enum(['cover', 'contain']).default('cover'),
         overview: z.enum(['snapshot', 'live']).default('snapshot'),
@@ -191,6 +234,7 @@ export const dashboardSchema = z
     subtitle: z.string().max(100),
     theme: z.enum(['dusk', 'ocean', 'sand']),
     profiles: z.array(profileSchema).min(1).max(8),
+    alerts: z.array(alertRuleSchema).max(24).optional(),
     pages: z
       .array(
         z
@@ -199,6 +243,7 @@ export const dashboardSchema = z
             name: text(40),
             profileIds: z.array(id).min(1).max(8).optional(),
             originId: id.optional(),
+            hidden: z.boolean().optional(),
             heading: text(80).optional(),
             subtitle: z.string().max(100).optional(),
             tiles: z.array(tileSchema).max(64),
@@ -241,6 +286,8 @@ export const dashboardSchema = z
       const visible = doc.pages.filter(
         (page) => !page.profileIds || page.profileIds.includes(p.id),
       );
+      if (!visible.some((page) => !page.hidden))
+        ctx.addIssue({ code: 'custom', message: 'error.invalidPage', path: ['profiles', pi] });
       if (visible.length < 1 || visible.length > 12)
         ctx.addIssue({ code: 'custom', message: 'error.displayPageCount', path: ['profiles', pi] });
       if (geometry(p).cellWidth < 12 || geometry(p).rowHeight < 12) {
@@ -288,6 +335,12 @@ export const dashboardSchema = z
       alarm: ['alarm_control_panel'],
       contacts: ['binary_sensor'],
       camera: ['camera'],
+      timer: ['timer'],
+      select: ['select', 'input_select'],
+      number: ['number', 'input_number'],
+      fan: ['fan'],
+      vacuum: ['vacuum'],
+      button: ['button', 'input_button'],
     };
     for (const [pageIndex, page] of doc.pages.entries())
       for (const [ti, tile] of page.tiles.entries()) {
@@ -360,6 +413,8 @@ export type Dashboard = z.infer<typeof dashboardSchema>;
 export type Revision = { revision: number; savedAt: string; document: Dashboard };
 export type Workspace = { draft: Revision; published: Revision; history: Revision[] };
 export type EntityState = {
+  area?: { id: string; name: string; floor?: string };
+  deviceName?: string;
   entity_id: string;
   state: string;
   attributes: Record<string, unknown>;
@@ -376,65 +431,63 @@ export type Snapshot = {
   cameraView?: boolean;
   deviceControl?: boolean;
 };
-export type Action = {
-  tileId: string;
-  command:
-    | 'toggle'
-    | 'turn_on'
-    | 'turn_off'
-    | 'brightness'
-    | 'temperature'
-    | 'play_pause'
-    | 'next'
-    | 'previous'
-    | 'open'
-    | 'close'
-    | 'stop'
-    | 'position'
-    | 'volume'
-    | 'activate'
-    | 'alarm';
-  value?: number;
-  mode?: AlarmMode;
-  code?: string;
-};
 export const actionSchema = z
   .object({
     tileId: id,
-    command: z.enum([
-      'toggle',
-      'turn_on',
-      'turn_off',
-      'brightness',
-      'temperature',
-      'play_pause',
-      'next',
-      'previous',
-      'open',
-      'close',
-      'stop',
-      'position',
-      'volume',
-      'activate',
-      'alarm',
-    ]),
+    command: z.enum([...commands, 'alarm', 'tap', 'hold']),
     value: z.number().finite().optional(),
+    valueHigh: z.number().finite().optional(),
+    option: z.string().max(256).optional(),
+    color: z
+      .tuple([z.number().min(0).max(255), z.number().min(0).max(255), z.number().min(0).max(255)])
+      .optional(),
     mode: z.enum(alarmModes).optional(),
     code: z.string().min(1).max(64).optional(),
   })
   .strict()
-  .superRefine((action, ctx) => {
+  .superRefine((a, ctx) => {
     if (
-      action.command === 'alarm'
-        ? !action.mode || action.value !== undefined
-        : action.mode !== undefined || action.code !== undefined
+      a.command === 'alarm'
+        ? !a.mode || a.value !== undefined || a.option !== undefined || a.color !== undefined
+        : a.mode !== undefined || a.code !== undefined
+    )
+      ctx.addIssue({ code: 'custom', message: 'error.actionNotAllowed' });
+    if (a.valueHigh !== undefined && a.command !== 'temperature_range')
+      ctx.addIssue({ code: 'custom', message: 'error.actionNotAllowed' });
+    if (
+      ['tap', 'hold'].includes(a.command) &&
+      (a.value !== undefined ||
+        a.option !== undefined ||
+        a.color !== undefined ||
+        a.valueHigh !== undefined)
     )
       ctx.addIssue({ code: 'custom', message: 'error.actionNotAllowed' });
   });
+export type Action = z.infer<typeof actionSchema>;
+export function materializeAction(document: Dashboard, action: Action): Action {
+  if (action.command !== 'tap' && action.command !== 'hold') return action;
+  const tile = allControls(document).find((t) => t.id === action.tileId);
+  const gesture = tile?.experience?.[action.command];
+  if (gesture?.type !== 'command' || !gesture.command)
+    throw new UserError('error.actionNotAllowed');
+  return {
+    tileId: action.tileId,
+    command: gesture.command,
+    ...(gesture.value !== undefined ? { value: gesture.value } : {}),
+    ...(gesture.valueHigh !== undefined ? { valueHigh: gesture.valueHigh } : {}),
+    ...(gesture.option !== undefined ? { option: gesture.option } : {}),
+  };
+}
 
 export function geometry(p: Profile) {
   const width = p.width - p.margin * 2;
-  const height = p.height - p.margin * 2 - p.headerHeight - p.footerHeight;
+  const height =
+    p.height -
+    p.margin * 2 -
+    p.headerHeight -
+    p.footerHeight -
+    (p.experience?.safeTop ?? 0) -
+    (p.experience?.safeBottom ?? 0);
   return {
     width,
     height,
@@ -463,6 +516,8 @@ export function allControls(document: {
       entityId: string;
       alarm?: z.infer<typeof alarmOptionsSchema>;
       light?: z.infer<typeof lightOptionsSchema>;
+      experience?: z.infer<typeof tileExperienceSchema>;
+      mediaFavorite?: { id: string; type: string };
       room?: { controls: Control[] };
     }[];
   }[];
@@ -473,11 +528,14 @@ export function allControls(document: {
 }
 export function entityIds(document: Dashboard) {
   return [
-    ...new Set(
-      document.pages.flatMap((page) =>
+    ...new Set([
+      ...(document.alerts?.map((rule) => rule.condition.entityId) ?? []),
+      ...document.pages.flatMap((page) =>
         page.tiles
           .flatMap((tile) => [
-            tile.entityId,
+            ...(tile.room || tile.energy || tile.contacts ? [] : [tile.entityId]),
+            tile.camera?.overviewEntityId,
+            tile.experience?.visibleWhen?.entityId,
             ...(tile.contacts?.map((contact) => contact.entityId) ?? []),
             ...(tile.room
               ? [
@@ -491,6 +549,11 @@ export function entityIds(document: Dashboard) {
             ...(tile.energy
               ? [
                   ...tile.energy.solarPower,
+                  ...(tile.energy.meters?.solarAdditional ?? []),
+                  tile.energy.meters?.importEnergy,
+                  tile.energy.meters?.exportEnergy,
+                  tile.energy.meters?.solarEnergy,
+                  tile.energy.meters?.houseEnergy,
                   tile.energy.gridImport,
                   tile.energy.gridExport,
                   tile.energy.batteryPower,
@@ -502,7 +565,7 @@ export function entityIds(document: Dashboard) {
           ])
           .filter((value): value is string => Boolean(value)),
       ),
-    ),
+    ]),
   ];
 }
 export function numberAttr(entity: EntityState | undefined, key: string, fallback = 0) {
@@ -516,7 +579,8 @@ export function stringAttr(entity: EntityState | undefined, key: string, fallbac
 }
 
 /** Resolve only typed, tile-bound actions. Clients cannot supply HA services or targets. */
-export function resolveAction(document: Dashboard, action: Action) {
+export function resolveAction(document: Dashboard, requested: Action) {
+  const action = materializeAction(document, requested);
   const tile = allControls(document).find((t) => t.id === action.tileId);
   if (!tile) throw new UserError('error.tileNotAllowed');
   const domain = tile.entityId.split('.')[0];
@@ -546,6 +610,14 @@ export function resolveAction(document: Dashboard, action: Action) {
       throw new UserError('error.actionNotAllowed');
     return result(services[action.mode], action.code ? { code: action.code } : {});
   }
+  if (tile.kind === 'light' && ['color_temp', 'color'].includes(action.command)) {
+    if (tile.light?.allowTurnOn === false || tile.light?.allowTurnOff === false)
+      throw new UserError('error.actionNotAllowed');
+    if (action.command === 'color_temp')
+      return result('turn_on', { color_temp_kelvin: value(1000, 12000) });
+    if (!action.color) throw new UserError('error.valueRange');
+    return result('turn_on', { rgb_color: action.color });
+  }
   if (tile.kind === 'light') {
     const allowOn = tile.light?.allowTurnOn ?? true;
     const allowOff = tile.light?.allowTurnOff ?? true;
@@ -561,8 +633,67 @@ export function resolveAction(document: Dashboard, action: Action) {
         : result('turn_on', { brightness_pct: Math.round(brightness) });
     }
   }
+  if (tile.kind === 'climate' && action.command === 'temperature_range') {
+    if (
+      action.valueHigh === undefined ||
+      action.valueHigh < value(-50, 100) ||
+      action.valueHigh > 100
+    )
+      throw new UserError('error.valueRange');
+    return result('set_temperature', {
+      target_temp_low: action.value,
+      target_temp_high: action.valueHigh,
+    });
+  }
+  if (tile.kind === 'climate' && action.command === 'humidity')
+    return result('set_humidity', { humidity: value(0, 100) });
   if (tile.kind === 'climate' && action.command === 'temperature')
-    return result('set_temperature', { temperature: value(5, 35) });
+    return result('set_temperature', { temperature: value(-50, 100) });
+  const option = () => {
+    if (!action.option) throw new UserError('error.actionNotAllowed');
+    return action.option;
+  };
+  if (tile.kind === 'climate') {
+    if (action.command === 'hvac') return result('set_hvac_mode', { hvac_mode: option() });
+    if (action.command === 'climate_fan') return result('set_fan_mode', { fan_mode: option() });
+    if (action.command === 'swing') return result('set_swing_mode', { swing_mode: option() });
+    if (action.command === 'preset') return result('set_preset_mode', { preset_mode: option() });
+  }
+  if (tile.kind === 'select' && action.command === 'select')
+    return result('select_option', { option: option() });
+  if (tile.kind === 'number' && action.command === 'number')
+    return result('set_value', { value: value(-1e12, 1e12) });
+  if (tile.kind === 'button' && action.command === 'press') return result('press');
+  if (tile.kind === 'fan') {
+    if (['turn_on', 'turn_off', 'toggle'].includes(action.command)) return result(action.command);
+    if (action.command === 'fan_speed')
+      return result('set_percentage', { percentage: value(0, 100) });
+    if (action.command === 'preset') return result('set_preset_mode', { preset_mode: option() });
+  }
+  if (tile.kind === 'vacuum') {
+    const service = {
+      vacuum_start: 'start',
+      vacuum_pause: 'pause',
+      vacuum_return: 'return_to_base',
+    }[action.command as string];
+    if (service) return result(service);
+  }
+  if (tile.kind === 'timer') {
+    const service = { timer_start: 'start', timer_pause: 'pause', timer_cancel: 'cancel' }[
+      action.command as string
+    ];
+    if (service) return result(service);
+  }
+  if (
+    tile.kind === 'media' &&
+    action.command === 'favorite' &&
+    'mediaFavorite' in tile &&
+    tile.mediaFavorite
+  )
+    return result('play_media', {
+      media_content_id: tile.mediaFavorite.id,
+      media_content_type: tile.mediaFavorite.type,
+    });
   if (tile.kind === 'media') {
     const services = {
       play_pause: 'media_play_pause',
@@ -582,6 +713,8 @@ export function resolveAction(document: Dashboard, action: Action) {
     if (action.command === 'open') return result('open_cover');
     if (action.command === 'close') return result('close_cover');
     if (action.command === 'stop') return result('stop_cover');
+    if (action.command === 'tilt')
+      return result('set_cover_tilt_position', { tilt_position: Math.round(value(0, 100)) });
     if (action.command === 'position')
       return result('set_cover_position', { position: Math.round(value(0, 100)) });
   }

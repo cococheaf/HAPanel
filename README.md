@@ -24,7 +24,23 @@
 
 HAPanel verbindet großzügige, abgerundete Kacheln, ruhige Farben und direkte Touch-Bedienung mit einem visuellen Layout-Editor. Es läuft als eigene Home Assistant App (Add-on) oder als lokaler Node.js-Prozess. Bestehende Lovelace-Dashboards und HA-Konfigurationsdateien bleiben unverändert.
 
-**Version: 1.5.0.** Die Vorschau, der Editor und die API sind implementiert. Die HA-Anbindung ist gegen einen simulierten WebSocket-Server geprüft. Installation, Update, Ingress und Live-Daten sind auf HA OS 18.4 / Core 2026.10.4 (amd64) geprüft. Tests auf physischer iPad-Hardware stehen noch aus.
+**Version: 2.0.0.** Die Vorschau, der Editor und die API sind implementiert. Die HA-Anbindung ist gegen einen simulierten WebSocket-Server geprüft. Installation, Update, Ingress und Live-Daten sind auf HA OS 18.4 / Core 2026.10.4 (amd64) geprüft. Tests auf physischer iPad-Hardware stehen noch aus.
+
+![Adaptive iPad-Ansicht](docs/images/adaptive-light-v2.png)
+
+![Displays und Zugriffe](docs/images/devices-v2.png)
+
+## Neu in 2.0
+
+- Displayzuordnung, Bildschirmmessung, Identifikation und zusätzliche Zugriffsregeln je Gerät oder HA-Benutzer.
+- Adaptive Layouts, Hell-/Dunkelmodus, Nachtzeiten, Ruheansicht, Startseite und Wisch-Navigation.
+- Mehrfachauswahl, Ausrichten, Kopieren/Einfügen, Positionssperre, Vorlagen und Layoutprüfung.
+- Konfigurierbare Tipp-/Halteaktionen, Sichtbarkeitsbedingungen, Icons, Farben und Zusatztexte.
+- Timer, Auswahlfelder, Zahlenregler, Ventilatoren, Staubsauger, Tasten und erweiterte Licht-/Klimabedienung.
+- Meldungen aus Zustandswechseln oder HA-Ereignissen, getrennte Kameravorschauquellen und ein einstellbares Streamlimit.
+- Energie-Statistiken für 24 Stunden, 7 und 30 Tage; Zählerquellen und feste Tarife sind explizit konfigurierbar.
+
+[Bedienung der neuen Funktionen](docs/experience.md) · [Widget-Modell](docs/widgets.md)
 
 ## Ausprobieren
 

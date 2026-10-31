@@ -182,3 +182,7 @@ PIN requirements and format come from the HA alarm entity. Leading zeros are ret
 | No authentication/pairing | No              | No             | No                | No       |
 
 For standalone installs, use `HAPANEL_ALARM_ACCESS=authenticated`. Sharing changes no HA user roles and does not replicate individual HA entity permissions.
+
+## HAPanel 2.0
+
+See the [2.0 user guide](docs/experience.en.md) for designer, display, camera, alert and energy features.

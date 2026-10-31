@@ -1,3 +1,10 @@
+import { StreamBudgetContext } from './stream-budget';
+import { EnergyStatistics } from './EnergyStatistics';
+import { conditionMatches, isNight } from '../../shared/experience';
+import { iconChoices } from './widget-icons';
+import { AdvancedControls } from './AdvancedControls';
+import { Modal } from './Modal';
+import { HistoryChart } from './Insights';
 import { localizeSampleDocument, localizedSampleTile } from '../../shared/demo';
 import { useI18n } from '../i18n';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
@@ -142,8 +149,21 @@ export function TileView({
   const [details, setDetails] = useState(false);
   const [actionError, setActionError] = useState('');
   const [metric, setMetric] = useState<{ entityId: string; label: string }>();
+  const [feedback, setFeedback] = useState('');
+  const [confirmation, setConfirmation] = useState<'tap' | 'hold'>();
+  const entityRef = useRef(snapshot.entities[configuredTile.entityId]);
+  entityRef.current = snapshot.entities[configuredTile.entityId];
+  const holdTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const held = useRef(false);
+  const pointerStart = useRef<{ x: number; y: number } | undefined>(undefined);
+  useEffect(() => () => clearTimeout(holdTimer.current), []);
   const [pending, setPending] = useState(false);
   const inFlight = useRef(false);
+  useEffect(() => {
+    if (pending || !feedback) return;
+    const timer = setTimeout(() => setFeedback(''), 5000);
+    return () => clearTimeout(timer);
+  }, [pending, feedback]);
 
   const tile = localizedSampleTile(configuredTile, language);
   const entity = snapshot.entities[tile.entityId];
@@ -153,36 +173,64 @@ export function TileView({
     !tile.contacts &&
     (!entity ||
       entity.state === 'unavailable' ||
-      (entity.state === 'unknown' && tile.kind !== 'scene'));
+      (entity.state === 'unknown' && !['scene', 'button'].includes(tile.kind)));
   const disabled =
     !onAction ||
     snapshot.deviceControl === false ||
     unavailable ||
     snapshot.status === 'reconnecting' ||
     pending;
-  const Icon = tile.room ? roomIcons[tile.room.icon] : tile.energy ? Zap : kindIcons[tile.kind];
-  const act = async (command: Action['command'], value?: number) => {
+  const Icon =
+    (tile.experience?.icon && iconChoices[tile.experience.icon]) ||
+    (tile.room ? roomIcons[tile.room.icon] : tile.energy ? Zap : kindIcons[tile.kind]);
+  const send = async (action: Omit<Action, 'tileId'>) => {
     if (disabled || inFlight.current) return;
     inFlight.current = true;
     setPending(true);
+    setFeedback(t('v2.waiting'));
+    const before = JSON.stringify(entityRef.current);
     try {
-      await onAction?.({ tileId: tile.id, command, ...(value !== undefined ? { value } : {}) });
+      await onAction?.({ tileId: tile.id, ...action });
       setActionError('');
-      if (command === 'activate') setActivated(true);
+      if (action.command === 'activate') setActivated(true);
+      const deadline = Date.now() + 4000;
+      while (JSON.stringify(entityRef.current) === before && Date.now() < deadline)
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      setFeedback(t(JSON.stringify(entityRef.current) === before ? 'v2.received' : 'v2.confirmed'));
     } catch (error) {
       setActionError(describeError(error));
+      setFeedback('');
     } finally {
       inFlight.current = false;
       setPending(false);
     }
   };
-  const open = () => {
-    if (tile.navigateTo && onNavigate) {
+  const act = (command: Action['command'], value?: number) =>
+    send({ command, ...(value !== undefined ? { value } : {}) });
+  const open = (navigate = true) => {
+    if (navigate && tile.navigateTo && onNavigate) {
       onNavigate(tile.navigateTo);
       return;
     }
     setMetric(undefined);
     setDetails(true);
+  };
+  const gesture = (key: 'tap' | 'hold', confirmed = false) => {
+    const binding = tile.experience?.[key];
+    if (binding?.type === 'none') return;
+    if (binding?.type === 'navigate') {
+      if (binding.pageId) onNavigate?.(binding.pageId);
+      return;
+    }
+    if (binding?.type === 'command') {
+      if (binding.confirm && !confirmed) {
+        setConfirmation(key);
+        return;
+      }
+      void act(key);
+      return;
+    }
+    open(binding?.type !== 'details' && key !== 'hold');
   };
   const active = tile.kind === 'light' && entity?.state === 'on';
   const [activated, setActivated] = useState(false);
@@ -205,7 +253,7 @@ export function TileView({
           tile={tile}
           snapshot={snapshot}
           base={mediaBase.replace(/media\/$/, 'camera/')}
-          onOpen={detailsEnabled ? open : undefined}
+          onOpen={detailsEnabled ? () => open() : undefined}
         />
       );
     if (tile.contacts) return <ContactsSummary tile={tile} snapshot={snapshot} />;
@@ -213,30 +261,60 @@ export function TileView({
       return alarmExpanded ? (
         <AlarmControls tile={tile} snapshot={snapshot} onAction={onAction} />
       ) : (
-        <AlarmStatus tile={tile} snapshot={snapshot} onChoose={detailsEnabled ? open : undefined} />
+        <AlarmStatus
+          tile={tile}
+          snapshot={snapshot}
+          onChoose={detailsEnabled ? () => open() : undefined}
+        />
       );
     if (tile.room) return <RoomSummary room={tile.room} snapshot={snapshot} />;
     if (tile.energy)
       return (
-        <EnergyPanel
-          config={tile.energy}
-          snapshot={snapshot}
-          compact={Boolean(tile.navigateTo)}
-          onInspect={
-            detailsEnabled
-              ? (entityId, label) => {
-                  setMetric({ entityId, label });
-                  setDetails(true);
-                }
-              : undefined
-          }
-        />
+        <>
+          <EnergyPanel
+            config={tile.energy}
+            snapshot={snapshot}
+            compact={Boolean(tile.navigateTo)}
+            onInspect={
+              detailsEnabled
+                ? (entityId, label) => {
+                    setMetric({ entityId, label });
+                    setDetails(true);
+                  }
+                : undefined
+            }
+          />
+          {detailsEnabled && !tile.navigateTo && (
+            <EnergyStatistics
+              config={tile.energy}
+              snapshot={snapshot}
+              base={mediaBase.replace(/media\/$/, 'statistics/')}
+            />
+          )}
+        </>
       );
     if (unavailable)
       return (
         <div className="tile-unavailable">
           <WifiOff size={24} />
           <span>{t('common.unavailable')}</span>
+        </div>
+      );
+    if (['timer', 'select', 'number', 'fan', 'vacuum', 'button'].includes(tile.kind))
+      return <AdvancedControls tile={tile} entity={entity} disabled={disabled} send={send} />;
+    if (tile.experience?.presentation === 'graph')
+      return (
+        <HistoryChart
+          entityId={tile.entityId}
+          snapshot={snapshot}
+          historyBase={mediaBase.replace(/media\/$/, 'history/')}
+        />
+      );
+    if (tile.experience?.presentation === 'value')
+      return (
+        <div className="sensor-main">
+          <span className="big-value">{entity.state}</span>
+          <span>{String(entity.attributes.unit_of_measurement ?? '')}</span>
         </div>
       );
     if (tile.kind === 'weather') {
@@ -369,10 +447,10 @@ export function TileView({
       );
     }
     if (tile.kind === 'climate') {
-      const temperature = numberAttr(entity, 'temperature', 22),
+      const temperature = numberAttr(entity, 'temperature', NaN),
         step = numberAttr(entity, 'target_temp_step', 0.5);
       const min = numberAttr(entity, 'min_temp', 5),
-        max = Math.min(35, numberAttr(entity, 'max_temp', 35));
+        max = numberAttr(entity, 'max_temp', 35);
       return (
         <>
           <div className="climate-main">
@@ -385,23 +463,46 @@ export function TileView({
             </span>
             <span className="climate-label">{t('dashboard.roomTemperature')}</span>
           </div>
-          <div className="temperature-control">
-            <button
-              aria-label={t('dashboard.decreaseTemperature')}
-              disabled={disabled || temperature <= min}
-              onClick={() => act('temperature', Math.max(min, temperature - step))}
-            >
-              <Minus size={18} />
-            </button>
-            <span>{temperature.toLocaleString(intlLocale)}°</span>
-            <button
-              aria-label={t('dashboard.increaseTemperature')}
-              disabled={disabled || temperature >= max}
-              onClick={() => act('temperature', Math.min(max, temperature + step))}
-            >
-              <Plus size={18} />
-            </button>
-          </div>
+          {Number.isFinite(temperature) &&
+          Boolean(Number(entity.attributes.supported_features) & 1) ? (
+            <div className="temperature-control">
+              <button
+                aria-label={t('dashboard.decreaseTemperature')}
+                disabled={
+                  disabled ||
+                  !(Number(entity.attributes.supported_features) & 1) ||
+                  temperature <= min
+                }
+                onClick={() => act('temperature', Math.max(min, temperature - step))}
+              >
+                <Minus size={18} />
+              </button>
+              <span>{temperature.toLocaleString(intlLocale)}°</span>
+              <button
+                aria-label={t('dashboard.increaseTemperature')}
+                disabled={
+                  disabled ||
+                  !(Number(entity.attributes.supported_features) & 1) ||
+                  temperature >= max
+                }
+                onClick={() => act('temperature', Math.min(max, temperature + step))}
+              >
+                <Plus size={18} />
+              </button>
+            </div>
+          ) : (
+            <div className="temperature-control">
+              <span>
+                {typeof entity.attributes.target_temp_low === 'number' &&
+                typeof entity.attributes.target_temp_high === 'number'
+                  ? entity.attributes.target_temp_low.toLocaleString(intlLocale) +
+                    '–' +
+                    entity.attributes.target_temp_high.toLocaleString(intlLocale) +
+                    '°'
+                  : entity.state}
+              </span>
+            </div>
+          )}
           <div className="tile-caption climate-caption">
             <i />{' '}
             {entity.attributes.hvac_action === 'heating'
@@ -437,7 +538,7 @@ export function TileView({
             <div className="media-controls">
               <button
                 aria-label={t('dashboard.previousTrack')}
-                disabled={disabled}
+                disabled={disabled || !(Number(entity.attributes.supported_features) & 16)}
                 onClick={() => act('previous')}
               >
                 <ChevronLeft size={28} />
@@ -456,7 +557,7 @@ export function TileView({
               </button>
               <button
                 aria-label={t('dashboard.nextTrack')}
-                disabled={disabled}
+                disabled={disabled || !(Number(entity.attributes.supported_features) & 32)}
                 onClick={() => act('next')}
               >
                 <ChevronRight size={28} />
@@ -470,7 +571,7 @@ export function TileView({
                 max={1}
                 step={0.01}
                 onCommit={(v) => act('volume', v)}
-                disabled={disabled}
+                disabled={disabled || !(Number(entity.attributes.supported_features) & 4)}
               />
             </div>
           </div>
@@ -594,9 +695,45 @@ export function TileView({
             detailsEnabled &&
             event.target instanceof Element &&
             !event.target.closest('button, input, select, a')
-          )
-            open();
+          ) {
+            if (held.current) {
+              held.current = false;
+              return;
+            }
+            gesture('tap');
+          }
         }}
+        onPointerDown={(event) => {
+          if (
+            !detailsEnabled ||
+            !(event.target instanceof Element) ||
+            event.target.closest('button,input,select,a')
+          )
+            return;
+          held.current = false;
+          holdTimer.current = setTimeout(() => {
+            held.current = true;
+            gesture('hold');
+          }, 600);
+        }}
+        onPointerUp={() => clearTimeout(holdTimer.current)}
+        onPointerCancel={() => clearTimeout(holdTimer.current)}
+        onPointerMove={(event) => {
+          if (
+            pointerStart.current &&
+            Math.hypot(
+              event.clientX - pointerStart.current.x,
+              event.clientY - pointerStart.current.y,
+            ) > 12
+          )
+            clearTimeout(holdTimer.current);
+        }}
+        onContextMenu={(event) => {
+          if (detailsEnabled) event.preventDefault();
+        }}
+        data-background={tile.experience?.background ?? 'default'}
+        data-presentation={tile.experience?.presentation ?? 'auto'}
+        data-secondary={tile.experience?.secondary ?? 'auto'}
         className={`tile tile-${tile.kind} accent-${tile.accent} ${active ? 'is-active' : ''} ${unavailable ? 'is-unavailable' : ''}`}
       >
         <div className="tile-heading">
@@ -606,7 +743,7 @@ export function TileView({
           {detailsEnabled ? (
             <button
               className="tile-detail-trigger"
-              onClick={open}
+              onClick={() => open()}
               aria-label={t('detail.open', { title: tile.title })}
             >
               {tile.title}
@@ -624,12 +761,60 @@ export function TileView({
           )}
         </div>
         {body()}
+        {!detailsEnabled &&
+          alarmExpanded &&
+          entity &&
+          !['timer', 'select', 'number', 'fan', 'vacuum', 'button'].includes(tile.kind) && (
+            <AdvancedControls
+              tile={tile}
+              entity={entity}
+              disabled={
+                disabled ||
+                (tile.kind === 'light' &&
+                  (tile.light?.allowTurnOn === false || tile.light?.allowTurnOff === false))
+              }
+              send={send}
+              details
+            />
+          )}
+        {['text', 'attribute'].includes(tile.experience?.secondary ?? '') && (
+          <div className="tile-caption v2-secondary">
+            {tile.experience?.secondary === 'text'
+              ? tile.experience.secondaryText
+              : String(entity?.attributes[tile.experience?.secondaryText ?? ''] ?? '—')}
+          </div>
+        )}
+        {feedback && (
+          <span className="v2-action-feedback" role="status">
+            {feedback}
+          </span>
+        )}
         {actionError && !details && (
           <p className="tile-action-error" role="alert">
             {actionError}
           </p>
         )}
       </article>
+      {confirmation && (
+        <Modal title={t('v2.confirmAction')} onClose={() => setConfirmation(undefined)}>
+          <p>{tile.title}</p>
+          <div className="v2-button-row">
+            <button className="button" onClick={() => setConfirmation(undefined)}>
+              {t('common.cancel')}
+            </button>
+            <button
+              className="button primary"
+              onClick={() => {
+                const key = confirmation;
+                setConfirmation(undefined);
+                gesture(key, true);
+              }}
+            >
+              {t('v2.run')}
+            </button>
+          </div>
+        </Modal>
+      )}
       {details && (
         <TileDetails
           tile={tile}
@@ -684,29 +869,31 @@ export function StaticGrid({
       pagesForProfile(document, profile.id)[0];
   return (
     <div className="static-grid" style={{ width: g.width, height: g.height }}>
-      {page.tiles.map((tile) => {
-        const r = tile.layouts[profile.id];
-        return (
-          <div
-            key={tile.id}
-            className="static-tile"
-            style={{
-              left: Math.round(r.x * (g.cellWidth + profile.gap)),
-              top: Math.round(r.y * (g.rowHeight + profile.gap)),
-              width: Math.round(r.w * g.cellWidth + (r.w - 1) * profile.gap),
-              height: Math.round(r.h * g.rowHeight + (r.h - 1) * profile.gap),
-            }}
-          >
-            <TileView
-              tile={tile}
-              snapshot={snapshot}
-              onAction={onAction}
-              mediaBase={mediaBase}
-              onNavigate={onNavigate}
-            />
-          </div>
-        );
-      })}
+      {page.tiles
+        .filter((tile) => conditionMatches(tile.experience?.visibleWhen, snapshot))
+        .map((tile) => {
+          const r = tile.layouts[profile.id];
+          return (
+            <div
+              key={tile.id}
+              className="static-tile"
+              style={{
+                left: Math.round(r.x * (g.cellWidth + profile.gap)),
+                top: Math.round(r.y * (g.rowHeight + profile.gap)),
+                width: Math.round(r.w * g.cellWidth + (r.w - 1) * profile.gap),
+                height: Math.round(r.h * g.rowHeight + (r.h - 1) * profile.gap),
+              }}
+            >
+              <TileView
+                tile={tile}
+                snapshot={snapshot}
+                onAction={onAction}
+                mediaBase={mediaBase}
+                onNavigate={onNavigate}
+              />
+            </div>
+          );
+        })}
       {page.tiles.length === 0 && (
         <div className="empty-dashboard">
           <Layers3 size={34} />
@@ -741,6 +928,14 @@ export function DashboardFrame({
 
   const document = localizeSampleDocument(configuredDocument, language);
   const visiblePages = pagesForProfile(document, profile.id);
+  const navigationPages = visiblePages.filter((page) => !page.hidden);
+  const previousPage = useRef<string | undefined>(undefined);
+  const lastPage = useRef(pageId);
+  if (lastPage.current !== pageId) {
+    previousPage.current = lastPage.current;
+    lastPage.current = pageId;
+  }
+  const touch = useRef<{ x: number; y: number } | undefined>(undefined);
   const activePage = visiblePages.find((page) => page.id === pageId) ?? visiblePages[0];
   const [now, setNow] = useState(new Date());
   useEffect(() => {
@@ -748,71 +943,124 @@ export function DashboardFrame({
     return () => clearInterval(timer);
   }, []);
   return (
-    <section
-      data-small={profile.height < 600}
-      className={`dashboard-frame theme-${profile.theme ?? document.theme} ${profile.width < 900 ? 'compact-dashboard' : ''}`}
-      style={{ width: profile.width, height: profile.height, padding: profile.margin }}
-    >
-      <header className="dashboard-header" style={{ height: profile.headerHeight }}>
-        <div>
-          <div className="dashboard-home-label">
-            <Home size={14} /> {document.name}
+    <StreamBudgetContext.Provider value={profile.experience?.maxLiveStreams ?? 2}>
+      <section
+        data-small={profile.height < 600}
+        data-density={profile.experience?.density ?? 'normal'}
+        data-color-mode={
+          profile.experience?.colorMode === 'auto'
+            ? isNight(profile.experience, now.getHours())
+              ? 'dark'
+              : 'light'
+            : (profile.experience?.colorMode ?? 'dark')
+        }
+        data-background={profile.experience?.background ?? 'gradient'}
+        onTouchStart={(event) => {
+          if (
+            !profile.experience?.swipe ||
+            (event.target instanceof Element && event.target.closest('input,button,select,video'))
+          )
+            return;
+          touch.current = {
+            x: event.changedTouches[0].clientX,
+            y: event.changedTouches[0].clientY,
+          };
+        }}
+        onTouchEnd={(event) => {
+          if (!touch.current) return;
+          const dx = event.changedTouches[0].clientX - touch.current.x,
+            dy = event.changedTouches[0].clientY - touch.current.y;
+          touch.current = undefined;
+          if (Math.abs(dx) > 80 && Math.abs(dy) < 50) {
+            const i = navigationPages.findIndex((p) => p.id === activePage.id);
+            const target = navigationPages[i + (dx < 0 ? 1 : -1)];
+            if (target) setPageId(target.id);
+          }
+        }}
+        className={`dashboard-frame theme-${profile.theme ?? document.theme} ${profile.width < 900 ? 'compact-dashboard' : ''}`}
+        style={{
+          width: profile.width,
+          height: profile.height,
+          padding: profile.margin,
+          paddingTop: profile.margin + (profile.experience?.safeTop ?? 0),
+          paddingBottom: profile.margin + (profile.experience?.safeBottom ?? 0),
+        }}
+      >
+        <header className="dashboard-header" style={{ height: profile.headerHeight }}>
+          <div>
+            <div className="dashboard-home-label">
+              <Home size={14} /> {document.name}
+            </div>
+            <h1>
+              {activePage.heading ??
+                (activePage.id === visiblePages[0].id
+                  ? (profile.greeting ?? document.greeting)
+                  : activePage.name)}
+            </h1>
+            <p>
+              {snapshot.status === 'reconnecting'
+                ? t('dashboard.disconnected')
+                : (activePage.subtitle ?? profile.subtitle ?? document.subtitle)}
+            </p>
           </div>
-          <h1>
-            {activePage.heading ??
-              (activePage.id === visiblePages[0].id
-                ? (profile.greeting ?? document.greeting)
-                : activePage.name)}
-          </h1>
-          <p>
-            {snapshot.status === 'reconnecting'
-              ? t('dashboard.disconnected')
-              : (activePage.subtitle ?? profile.subtitle ?? document.subtitle)}
-          </p>
-        </div>
-        <div className="dashboard-clock">
-          <strong>
-            {now.toLocaleTimeString(intlLocale, { hour: '2-digit', minute: '2-digit' })}
-          </strong>
-          <span>
-            {now.toLocaleDateString(intlLocale, { weekday: 'long', day: 'numeric', month: 'long' })}
-          </span>
-        </div>
-      </header>
-      {children ?? (
-        <StaticGrid
-          document={document}
-          profile={profile}
-          pageId={pageId}
-          snapshot={{ ...snapshot, contactSources: documentContacts(document, snapshot) }}
-          onAction={onAction}
-          mediaBase={mediaBase}
-          onNavigate={setPageId}
-        />
-      )}
-      <footer className="dashboard-footer" style={{ height: profile.footerHeight }}>
-        <nav aria-label={t('dashboard.pages')}>
-          {visiblePages.map((page, index) => (
-            <button
-              key={page.id}
-              className={pageId === page.id ? 'active' : ''}
-              onClick={() => setPageId(page.id)}
-            >
-              {index === 0 ? (
-                <Home size={17} />
-              ) : (page.originId ?? page.id) === 'energy' ? (
-                <Zap size={17} />
-              ) : (page.originId ?? page.id) === 'surveillance' ? (
-                <CameraIcon size={17} />
-              ) : (
-                <Layers3 size={17} />
-              )}
-              {page.name}
-            </button>
-          ))}
-        </nav>
-      </footer>
-    </section>
+          <div className="dashboard-clock">
+            <strong>
+              {now.toLocaleTimeString(intlLocale, { hour: '2-digit', minute: '2-digit' })}
+            </strong>
+            <span>
+              {now.toLocaleDateString(intlLocale, {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+              })}
+            </span>
+          </div>
+        </header>
+        {children ?? (
+          <StaticGrid
+            document={document}
+            profile={profile}
+            pageId={pageId}
+            snapshot={{ ...snapshot, contactSources: documentContacts(document, snapshot) }}
+            onAction={onAction}
+            mediaBase={mediaBase}
+            onNavigate={setPageId}
+          />
+        )}
+        <footer className="dashboard-footer" style={{ height: profile.footerHeight }}>
+          <nav aria-label={t('dashboard.pages')}>
+            {activePage.hidden && (
+              <button
+                onClick={() =>
+                  setPageId(previousPage.current ?? navigationPages[0]?.id ?? visiblePages[0].id)
+                }
+              >
+                <ChevronLeft size={18} />
+                {t('v2.back')}
+              </button>
+            )}
+            {navigationPages.map((page, index) => (
+              <button
+                key={page.id}
+                className={pageId === page.id ? 'active' : ''}
+                onClick={() => setPageId(page.id)}
+              >
+                {index === 0 ? (
+                  <Home size={17} />
+                ) : (page.originId ?? page.id) === 'energy' ? (
+                  <Zap size={17} />
+                ) : (page.originId ?? page.id) === 'surveillance' ? (
+                  <CameraIcon size={17} />
+                ) : (
+                  <Layers3 size={17} />
+                )}
+                {page.name}
+              </button>
+            ))}
+          </nav>
+        </footer>
+      </section>
+    </StreamBudgetContext.Provider>
   );
 }
 

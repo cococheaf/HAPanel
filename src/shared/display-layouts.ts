@@ -135,6 +135,10 @@ export function independentDisplayViews(input: Dashboard): Dashboard {
           if (destination) tile.navigateTo = destination;
           else delete tile.navigateTo;
         }
+    for (const page of copies) remapGestures(page, mapping);
+    const copiedProfile = result.profiles.find((p) => p.id === profile.id);
+    if (copiedProfile?.experience?.homePageId)
+      copiedProfile.experience.homePageId = mapping.get(copiedProfile.experience.homePageId);
     result.pages.push(...copies);
   }
   return dashboardSchema.parse(result);
@@ -149,7 +153,7 @@ export function createDisplay(
   const document = independentDisplayViews(input);
   if (document.profiles.length >= 8) throw new UserError('error.displayLimit');
   const source = document.profiles.find((profile) => profile.id === sourceId)!;
-  const profile = { ...source, id: layoutId('display'), name: name.trim() };
+  const profile = { ...structuredClone(source), id: layoutId('display'), name: name.trim() };
   document.profiles.push(profile);
   if (copyViews) {
     const mapping = new Map<string, string>();
@@ -165,6 +169,9 @@ export function createDisplay(
           if (destination) tile.navigateTo = destination;
           else delete tile.navigateTo;
         }
+    for (const page of copies) remapGestures(page, mapping);
+    if (profile.experience?.homePageId)
+      profile.experience.homePageId = mapping.get(profile.experience.homePageId);
     document.pages.push(...copies);
   } else
     document.pages.push({
@@ -196,6 +203,17 @@ export function duplicateView(input: Dashboard, pageId: string, targetId: string
       if (match) tile.navigateTo = match.id;
       else delete tile.navigateTo;
     }
+  const gestures = new Map<string, string>();
+  for (const original of document.pages) {
+    const match =
+      original.id === page.id
+        ? copy
+        : targetPages.find(
+            (item) => (item.originId ?? item.id) === (original.originId ?? original.id),
+          );
+    if (match) gestures.set(original.id, match.id);
+  }
+  remapGestures(copy, gestures);
   document.pages.push(copy);
   return { document: dashboardSchema.parse(document), pageId: copy.id, profileId: targetId };
 }
@@ -205,6 +223,10 @@ export function deleteView(input: Dashboard, pageId: string) {
   if (pagesForProfile(document, page.profileIds![0]).length === 1)
     throw new UserError('error.lastView');
   document.pages = document.pages.filter((page) => page.id !== pageId);
+  for (const profile of document.profiles)
+    if (profile.experience?.homePageId === pageId) delete profile.experience.homePageId;
+  for (const page of document.pages)
+    remapGestures(page, new Map(document.pages.map((p) => [p.id, p.id])));
   for (const tile of document.pages.flatMap((page) => page.tiles))
     if (tile.navigateTo === pageId) delete tile.navigateTo;
   return dashboardSchema.parse(document);
@@ -217,6 +239,10 @@ export function deleteDisplay(input: Dashboard, profileId: string) {
     document.pages.filter((page) => page.profileIds!.includes(profileId)).map((page) => page.id),
   );
   document.pages = document.pages.filter((page) => !removed.has(page.id));
+  for (const page of document.pages)
+    remapGestures(page, new Map(document.pages.map((p) => [p.id, p.id])));
+  for (const alert of document.alerts ?? [])
+    if (alert.profileIds) alert.profileIds = alert.profileIds.filter((id) => id !== profileId);
   for (const tile of document.pages.flatMap((page) => page.tiles))
     if (tile.navigateTo && removed.has(tile.navigateTo)) delete tile.navigateTo;
   return dashboardSchema.parse(document);
@@ -240,4 +266,18 @@ export function resizeDisplay(input: Dashboard, profileId: string, patch: Partia
   Object.assign(target, patch, { id: profileId });
   for (const page of pagesForProfile(document, profileId)) fitPage(page, source, target);
   return dashboardSchema.parse(document);
+}
+
+/** Repair page references consistently when views are copied or removed. */
+function remapGestures(page: Page, mapping: Map<string, string>) {
+  for (const tile of page.tiles)
+    for (const key of ['tap', 'hold'] as const) {
+      const gesture = tile.experience?.[key];
+      if (gesture?.type === 'navigate') {
+        const destination = mapping.get(gesture.pageId ?? '');
+        tile.experience![key] = destination
+          ? { ...gesture, pageId: destination }
+          : { type: 'details' };
+      }
+    }
 }

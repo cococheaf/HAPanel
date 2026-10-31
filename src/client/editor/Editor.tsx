@@ -1,3 +1,9 @@
+import { TileExperienceSettings, ProfileExperienceSettings } from './ExperienceSettings';
+import { ReviewDialog, TemplateDialog, AlertSettings } from './WorkspaceTools';
+import { DeviceManager } from './DeviceManager';
+import { reviewDashboard } from '../../shared/experience';
+import { transformSelection, pasteTiles } from '../../shared/designer';
+import { domainKinds } from '../../shared/widgets';
 import { localizeSampleDocument, localizedSampleTile, sampleEntityName } from '../../shared/demo';
 import { useI18n, LanguageSwitcher } from '../i18n';
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
@@ -56,22 +62,18 @@ import { InsightSettings } from './InsightSettings';
 import { TextInput } from './TextInput';
 
 const freshId = layoutId;
-type Dialog = 'preview' | 'devices' | 'displays' | 'history' | 'import' | 'export' | null;
-const domainKinds: Record<string, TileKind> = {
-  light: 'light',
-  switch: 'light',
-  climate: 'climate',
-  media_player: 'media',
-  weather: 'weather',
-  scene: 'scene',
-  script: 'scene',
-  sensor: 'sensor',
-  binary_sensor: 'sensor',
-  cover: 'cover',
-  automation: 'automation',
-  alarm_control_panel: 'alarm',
-  camera: 'camera',
-};
+type Dialog =
+  | 'preview'
+  | 'devices'
+  | 'displays'
+  | 'history'
+  | 'import'
+  | 'export'
+  | 'review'
+  | 'template'
+  | 'alerts'
+  | 'diagnostics'
+  | null;
 
 export default function Editor({
   service,
@@ -125,6 +127,7 @@ function Studio({
 }) {
   const { t, language, intlLocale, describeError } = useI18n();
 
+  const [catalog, setCatalog] = useState(bootstrap.catalog);
   const [workspace, setWorkspace] = useState(bootstrap.workspace);
   const [document, setDocument] = useState(bootstrap.workspace.draft.document);
   const documentRef = useRef(document),
@@ -148,8 +151,47 @@ function Studio({
   const [inspector, setInspector] = useState<'tile' | 'display'>('tile');
   const [leftOpen, setLeftOpen] = useState(false),
     [rightOpen, setRightOpen] = useState(false);
-  const [search, setSearch] = useState('');
   const [status, setStatus] = useState<'saved' | 'saving' | 'dirty' | 'error'>('saved');
+  const [search, setSearch] = useState('');
+  const [areaFilter, setAreaFilter] = useState(''),
+    [kindFilter, setKindFilter] = useState(''),
+    [unplaced, setUnplaced] = useState(false);
+  const [selection, setSelection] = useState<string[]>([]);
+  const clipboard = useRef<Tile[]>([]);
+  const [simple, setSimple] = useState(false);
+  useEffect(() => {
+    setSelection([]);
+  }, [profileId, pageId]);
+  const [diagnostics, setDiagnostics] = useState<Record<string, unknown>>();
+  const [recovery, setRecovery] = useState<Dashboard>();
+  const recoveryKey = 'hapanel-recovery:' + window.location.pathname;
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(recoveryKey);
+      if (raw) {
+        const stored = JSON.parse(raw);
+        if (
+          stored.revision === bootstrap.workspace.draft.revision &&
+          JSON.stringify(stored.document) !== JSON.stringify(bootstrap.workspace.draft.document)
+        )
+          setRecovery(dashboardSchema.parse(stored.document));
+      }
+    } catch {}
+  }, []);
+  useEffect(() => {
+    if (status === 'dirty' || status === 'saving') {
+      try {
+        localStorage.setItem(
+          recoveryKey,
+          JSON.stringify({ document, revision: workspaceRef.current.draft.revision }),
+        );
+      } catch {}
+    } else if (status === 'saved' && saved.current === JSON.stringify(document))
+      try {
+        localStorage.removeItem(recoveryKey);
+      } catch {}
+  }, [document, status]);
+
   const [toast, setToast] = useState(''),
     [dialog, setDialog] = useState<Dialog>(null);
   const [displayIntent, setDisplayIntent] = useState<DisplayIntent>();
@@ -160,11 +202,6 @@ function Studio({
   const [testMode, setTestMode] = useState(false),
     [grid, setGrid] = useState(true),
     [zoom, setZoom] = useState(1);
-  const [code, setCode] = useState(''),
-    [devices, setDevices] = useState<
-      { id: string; name: string; createdAt?: string; expires?: number }[]
-    >([]);
-  const [revoking, setRevoking] = useState<string>();
   const [importText, setImportText] = useState(''),
     [format, setFormat] = useState<'json' | 'yaml'>('json');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -276,6 +313,40 @@ function Studio({
     setFuture((f) => f.slice(1));
     setStatus('dirty');
   };
+  const bulk = (operation: 'left' | 'top' | 'space' | 'size' | 'move', dx = 0, dy = 0) => {
+    try {
+      commit(
+        transformSelection(
+          documentRef.current,
+          page.id,
+          profile.id,
+          selection.length ? selection : selectedId ? [selectedId] : [],
+          operation,
+          dx,
+          dy,
+        ),
+      );
+    } catch (e) {
+      notify(describeError(e));
+    }
+  };
+  const copySelection = () => {
+    clipboard.current = structuredClone(
+      page.tiles.filter((tile) => (selection.length ? selection : [selectedId]).includes(tile.id)),
+    );
+  };
+  const pasteSelection = () => {
+    try {
+      if (!clipboard.current.length) return;
+      const result = pasteTiles(documentRef.current, page.id, profile.id, clipboard.current);
+      if (commit(result.document)) {
+        setSelection(result.ids);
+        setSelectedId(result.ids[0]);
+      }
+    } catch (e) {
+      notify(describeError(e));
+    }
+  };
   const updateTile = (patch: Partial<Tile>) =>
     change((d) => {
       const tile = d.pages.find((p) => p.id === page.id)!.tiles.find((t) => t.id === selectedId);
@@ -289,29 +360,36 @@ function Studio({
         event.preventDefault();
         event.shiftKey ? redo() : undo();
       }
-      if (
-        selected &&
-        event.altKey &&
-        ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)
-      ) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'c') {
         event.preventDefault();
-        const r = selected.layouts[profile.id];
-        updateTile({
-          layouts: {
-            ...selected.layouts,
-            [profile.id]: {
-              ...r,
-              x: r.x + (event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0),
-              y: r.y + (event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0),
-            },
-          },
-        });
+        copySelection();
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'v') {
+        event.preventDefault();
+        pasteSelection();
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setLeftOpen(true);
+        window.document.querySelector<HTMLInputElement>('.search-field input')?.focus();
+      }
+      if (selected && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+        event.preventDefault();
+        bulk(
+          'move',
+          event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0,
+          event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0,
+        );
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   });
-  const publish = async () => {
+  const publish = async (reviewed = false) => {
+    if (!reviewed && reviewDashboard(documentRef.current, catalog).length) {
+      setDialog('review');
+      return;
+    }
     try {
       const latest = await flush();
       const result = await service.publish(latest.draft.revision);
@@ -324,8 +402,8 @@ function Studio({
   };
   const addTile = (kind: TileKind, entityId?: string, drop?: { x: number; y: number }) => {
     const entity =
-      bootstrap.catalog.find((e) => e.entity_id === entityId) ??
-      bootstrap.catalog.find((e) =>
+      catalog.find((e) => e.entity_id === entityId) ??
+      catalog.find((e) =>
         kind === 'contacts'
           ? e.entity_id.startsWith('binary_sensor.') &&
             ['door', 'window', 'opening'].includes(String(e.attributes.device_class))
@@ -419,18 +497,14 @@ function Studio({
     a.click();
     URL.revokeObjectURL(url);
   };
-  const loadDevices = async () => {
+  const loadDevices = () => {
     if (service.local) {
-      notify(t('editor.demoPairingInfo'));
+      notify(t('editor.displayPortDisabled'));
       return;
     }
-    try {
-      setDevices(await api('api/editor/devices'));
-      setDialog('devices');
-    } catch (e) {
-      notify(describeError(e));
-    }
+    setDialog('devices');
   };
+
   const profileUpdate = (patch: Partial<Profile>) => {
     try {
       commit(resizeDisplay(documentRef.current, profile.id, patch));
@@ -442,17 +516,29 @@ function Studio({
     change((d) => {
       for (const tile of d.pages.find((p) => p.id === page.id)!.tiles) {
         const r = layout.find((item) => item.i === tile.id);
-        if (r) tile.layouts[profile.id] = { x: r.x, y: r.y, w: r.w, h: r.h };
+        if (r && !tile.experience?.locked)
+          tile.layouts[profile.id] = { x: r.x, y: r.y, w: r.w, h: r.h };
       }
     });
-  const matchingEntities = bootstrap.catalog.filter(
+  const matchingEntities = catalog.filter(
     (e) =>
       domainKinds[e.entity_id.split('.')[0]] &&
-      `${e.entity_id} ${e.attributes.friendly_name} ${entityName(e)}`
+      (!areaFilter || e.area?.id === areaFilter) &&
+      (!kindFilter || domainKinds[e.entity_id.split('.')[0]] === kindFilter) &&
+      (!unplaced ||
+        !visiblePages.some((page) => page.tiles.some((tile) => tile.entityId === e.entity_id))) &&
+      `${e.entity_id} ${e.attributes.friendly_name} ${entityName(e)} ${e.area?.name ?? ''} ${e.area?.floor ?? ''} ${e.deviceName ?? ''}`
         .toLowerCase()
         .includes(search.toLowerCase()),
   );
-  const layout = page.tiles.map((t) => ({ i: t.id, ...t.layouts[profile.id], minW: 1, minH: 1 }));
+  const layout = page.tiles.map((t) => ({
+    i: t.id,
+    ...t.layouts[profile.id],
+    minW: 1,
+    minH: 1,
+    isDraggable: !t.experience?.locked,
+    isResizable: !t.experience?.locked,
+  }));
   const isPublished =
     saved.current === JSON.stringify(document) &&
     workspace.draft.revision === workspace.published.revision;
@@ -466,7 +552,7 @@ function Studio({
           : t('editor.saved');
 
   return (
-    <div className="studio">
+    <div className={`studio ${simple ? 'v2-simple-editor' : ''}`}>
       <header className="studio-header">
         <div className="brand">
           <img src="./mark.svg" alt="" />
@@ -479,6 +565,9 @@ function Studio({
           <ChevronDown size={14} />
         </div>
         <div className="header-spacer" />
+        <button className="button v2-simple-toggle" onClick={() => setSimple(!simple)}>
+          {t(simple ? 'v2.fullEditor' : 'v2.simpleEditor')}
+        </button>
         <LanguageSwitcher />
         {bootstrap.mode === 'demo' && (
           <span className="demo-badge">
@@ -524,7 +613,7 @@ function Studio({
           <Eye size={16} />
           {t('editor.preview')}
         </button>
-        <button className="button primary publish-button" onClick={publish}>
+        <button className="button primary publish-button" onClick={() => void publish()}>
           <CheckCheck size={17} />
           <span>{isPublished ? t('editor.published') : t('editor.publish')}</span>
         </button>
@@ -552,6 +641,62 @@ function Studio({
             />
             <kbd>⌕</kbd>
           </label>
+          <button
+            className="button full-width"
+            onClick={async () => {
+              try {
+                setCatalog(
+                  service.local ? (await service.load()).catalog : await api('api/editor/catalog'),
+                );
+              } catch (e) {
+                notify(describeError(e));
+              }
+            }}
+          >
+            {t('v2.refreshCatalog')}
+          </button>
+          <div className="v2-library-filters">
+            <select
+              aria-label={t('v2.allRooms')}
+              value={areaFilter}
+              onChange={(e) => setAreaFilter(e.target.value)}
+            >
+              <option value="">{t('v2.allRooms')}</option>
+              {[
+                ...new Map(
+                  catalog.filter((e) => e.area).map((e) => [e.area!.id, e.area!]),
+                ).values(),
+              ].map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.floor ? a.floor + ' · ' : ''}
+                  {a.name}
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label={t('v2.allKinds')}
+              value={kindFilter}
+              onChange={(e) => setKindFilter(e.target.value)}
+            >
+              <option value="">{t('v2.allKinds')}</option>
+              {tileKinds.map((kind) => (
+                <option key={kind} value={kind}>
+                  {t(kindLabelKeys[kind])}
+                </option>
+              ))}
+            </select>
+            <label className="v2-check">
+              <input
+                type="checkbox"
+                checked={unplaced}
+                onChange={(e) => setUnplaced(e.target.checked)}
+              />
+              {t('v2.unplaced')}
+            </label>
+          </div>
+          <button className="button full-width" onClick={() => setDialog('template')}>
+            {t('v2.wizard')}
+          </button>
           <div className="library-label">{t('editor.tilesHeading')}</div>
           <div className="tile-library">
             {tileKinds.map((kind) => {
@@ -576,6 +721,35 @@ function Studio({
               );
             })}
           </div>
+          {search && (
+            <div className="v2-search-navigation">
+              {document.profiles
+                .filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
+                .map((p) => (
+                  <button
+                    className="button full-width"
+                    key={p.id}
+                    onClick={() => setProfileId(p.id)}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              {document.pages
+                .filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
+                .map((p) => (
+                  <button
+                    className="button full-width"
+                    key={p.id}
+                    onClick={() => {
+                      if (p.profileIds?.[0]) setProfileId(p.profileIds[0]);
+                      setPageId(p.id);
+                    }}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+            </div>
+          )}
           <div className="library-label entity-heading">
             {t('editor.entitiesHeading')}
             <span>{matchingEntities.length}</span>
@@ -728,6 +902,32 @@ function Studio({
               {t('editor.properties')}
             </button>
           </div>
+          <div className="v2-bulk-toolbar">
+            <span>
+              {t('v2.selection')}: {selection.length || Number(Boolean(selected))}
+            </span>
+            <button className="button" onClick={() => bulk('left')}>
+              {t('v2.alignLeft')}
+            </button>
+            <button className="button" onClick={() => bulk('top')}>
+              {t('v2.alignTop')}
+            </button>
+            <button className="button" onClick={() => bulk('space')}>
+              {t('v2.spaceHorizontal')}
+            </button>
+            <button className="button" onClick={() => bulk('size')}>
+              {t('v2.sameSize')}
+            </button>
+            <button className="button" onClick={copySelection}>
+              {t('v2.copy')}
+            </button>
+            <button className="button" onClick={pasteSelection}>
+              {t('v2.paste')}
+            </button>
+            <button className="button" onClick={() => setDialog('review')}>
+              {t('v2.review')}
+            </button>
+          </div>
           <div className="canvas-workspace">
             <ScaledCanvas profile={profile} zoom={zoom}>
               {(scale) => (
@@ -770,7 +970,24 @@ function Studio({
                       positionStrategy={{ ...transformStrategy, scale }}
                       compactor={getCompactor(null, false, true)}
                       onDragStop={(next) => {
-                        layoutChanged(next);
+                        const old = page.tiles.find(
+                          (t) =>
+                            selection.includes(t.id) &&
+                            next.some(
+                              (n) =>
+                                n.i === t.id &&
+                                (n.x !== t.layouts[profile.id].x ||
+                                  n.y !== t.layouts[profile.id].y),
+                            ),
+                        );
+                        if (selection.length > 1 && old) {
+                          const moved = next.find((n) => n.i === old.id)!;
+                          bulk(
+                            'move',
+                            moved.x - old.layouts[profile.id].x,
+                            moved.y - old.layouts[profile.id].y,
+                          );
+                        } else layoutChanged(next);
                       }}
                       onResizeStop={(next) => {
                         layoutChanged(next);
@@ -787,8 +1004,17 @@ function Studio({
                       {page.tiles.map((tile) => (
                         <div
                           key={tile.id}
-                          className={`editor-tile ${selectedId === tile.id ? 'is-selected' : ''}`}
-                          onPointerDown={() => {
+                          className={`editor-tile ${(selection.length ? selection : [selectedId]).includes(tile.id) ? 'is-selected' : ''}`}
+                          onPointerDown={(event) => {
+                            setSelection(
+                              event.shiftKey
+                                ? selection.includes(tile.id)
+                                  ? selection.filter((id) => id !== tile.id)
+                                  : [...selection, tile.id]
+                                : selection.includes(tile.id)
+                                  ? selection
+                                  : [tile.id],
+                            );
                             setSelectedId(tile.id);
                             setInspector('tile');
                           }}
@@ -940,7 +1166,7 @@ function Studio({
                         value={selected.entityId}
                         onChange={(e) => updateTile({ entityId: e.target.value })}
                       >
-                        {!bootstrap.catalog.some(
+                        {!catalog.some(
                           (e) =>
                             e.entity_id === selected.entityId &&
                             domainKinds[e.entity_id.split('.')[0]] === selected.kind,
@@ -949,7 +1175,7 @@ function Studio({
                             {t('common.unavailable')} · {selected.entityId}
                           </option>
                         )}
-                        {bootstrap.catalog
+                        {catalog
                           .filter((e) => domainKinds[e.entity_id.split('.')[0]] === selected.kind)
                           .sort((a, b) => entityName(a).localeCompare(entityName(b), intlLocale))
                           .map((e) => (
@@ -961,9 +1187,15 @@ function Studio({
                     </label>
                     <span className="field-hint">{selected.entityId}</span>
                   </div>
+                  <TileExperienceSettings
+                    tile={selected}
+                    catalog={catalog}
+                    pages={visiblePages}
+                    update={updateTile}
+                  />
                   <InsightSettings
                     tile={selected}
-                    catalog={bootstrap.catalog}
+                    catalog={catalog}
                     pages={pagesForProfile(viewDocument, profile.id)}
                     update={updateTile}
                   />
@@ -981,7 +1213,18 @@ function Studio({
                     </label>
                     <label>{t('editor.accent')}</label>
                     <div className="color-options">
-                      {(['amber', 'mint', 'blue', 'rose'] as const).map((color) => (
+                      {(
+                        [
+                          'amber',
+                          'mint',
+                          'blue',
+                          'rose',
+                          'purple',
+                          'orange',
+                          'red',
+                          'gray',
+                        ] as const
+                      ).map((color) => (
                         <button
                           key={color}
                           className={`swatch swatch-${color} ${selected.accent === color ? 'active' : ''}`}
@@ -1126,6 +1369,19 @@ function Studio({
                       }
                     />
                   </label>
+                  <label className="v2-check">
+                    <input
+                      type="checkbox"
+                      disabled={!page.hidden && visiblePages.filter((p) => !p.hidden).length === 1}
+                      checked={page.hidden ?? false}
+                      onChange={(e) =>
+                        change((d) => {
+                          d.pages.find((p) => p.id === page.id)!.hidden = e.target.checked;
+                        })
+                      }
+                    />
+                    {t('v2.hidden')}
+                  </label>
                   <div className="view-management-actions">
                     <button
                       className="button"
@@ -1160,6 +1416,11 @@ function Studio({
                   </div>
                 </div>
                 <DisplayFields profile={viewProfile} onChange={profileUpdate} />
+                <ProfileExperienceSettings
+                  profile={profile}
+                  pages={visiblePages}
+                  update={profileUpdate}
+                />
                 <button
                   className="button full-width"
                   onClick={() => {
@@ -1223,6 +1484,30 @@ function Studio({
             )}
           </div>
           <div className="inspector-bottom">
+            <button className="button full-width" onClick={() => setDialog('alerts')}>
+              {t('v2.alerts')}
+            </button>
+            <button
+              className="button full-width"
+              onClick={async () => {
+                try {
+                  setDiagnostics(
+                    service.local
+                      ? {
+                          mode: 'preview',
+                          profiles: document.profiles.length,
+                          publishedRevision: workspace.published.revision,
+                        }
+                      : await api('api/editor/diagnostics'),
+                  );
+                  setDialog('diagnostics');
+                } catch (e) {
+                  notify(describeError(e));
+                }
+              }}
+            >
+              {t('v2.diagnostics')}
+            </button>
             <button className="button full-width" onClick={loadDevices}>
               <Monitor size={16} />
               {t('editor.connectDisplays')}
@@ -1370,79 +1655,97 @@ function Studio({
         />
       )}
       {dialog === 'devices' && (
-        <Modal
-          message={toast}
-          onDismissMessage={() => setToast('')}
-          title={t('editor.devicesTitle')}
+        <DeviceManager
+          document={document}
+          enabled={bootstrap.displayEnabled}
           onClose={() => setDialog(null)}
-        >
-          <p className="muted">{t('editor.pairingHint')}</p>
-          {!bootstrap.displayEnabled && <p className="notice">{t('editor.displayPortDisabled')}</p>}
-          <button
-            className="button primary"
-            onClick={async () => {
-              try {
-                const result = await api<{ code: string }>('api/editor/pair-code', {});
-                setCode(result.code);
-              } catch (e) {
-                notify(describeError(e));
-              }
-            }}
-          >
-            {t('editor.createCode')}
-          </button>
-          {code && (
-            <div className="pair-code">
-              {code.slice(0, 5)}-{code.slice(5)}
-            </div>
-          )}
-          {revoking && (
-            <div className="device-revoke-confirm">
-              <h3>
-                {t('display.revokeTitle', {
-                  name: devices.find((device) => device.id === revoking)?.name ?? '',
-                })}
-              </h3>
-              <p>{t('display.revokeHint')}</p>
-              <div className="display-manager-form-actions">
-                <button className="button" onClick={() => setRevoking(undefined)}>
-                  {t('common.cancel')}
-                </button>
-                <button
-                  className="button danger"
-                  onClick={async () => {
-                    try {
-                      await api(`api/editor/devices/${revoking}`, {}, 'DELETE');
-                      setDevices((current) => current.filter((device) => device.id !== revoking));
-                      setRevoking(undefined);
-                    } catch (error) {
-                      notify(describeError(error));
-                    }
-                  }}
-                >
-                  {t('editor.revoke')}
-                </button>
-              </div>
-            </div>
-          )}
-          <div className="revision-list">
-            {devices.map((device) => (
-              <div key={device.id}>
-                <div className="device-pair-details">
-                  <strong>{device.name}</strong>
-                  {device.expires && (
-                    <small>
-                      {t('display.deviceExpiry', {
-                        date: new Date(device.expires).toLocaleDateString(intlLocale),
-                      })}
-                    </small>
-                  )}
-                </div>
-                <button className="button danger" onClick={() => setRevoking(device.id)}>
-                  {t('editor.revoke')}
-                </button>
+          onCalibrate={(id, patch) => {
+            if (!commit(resizeDisplay(documentRef.current, id, patch)))
+              throw new Error(t('error.requestFailed'));
+          }}
+        />
+      )}
+      {dialog === 'review' && (
+        <ReviewDialog
+          focusProfileId={profile.id}
+          document={document}
+          catalog={catalog}
+          onChange={commit}
+          onClose={() => setDialog(null)}
+          onLocate={(profile, page, tile) => {
+            setProfileId(profile);
+            setPageId(page);
+            setSelectedId(tile);
+            setSelection([tile]);
+            setDialog(null);
+          }}
+          onPublish={() => {
+            setDialog(null);
+            void publish(true);
+          }}
+        />
+      )}
+      {dialog === 'template' && (
+        <TemplateDialog
+          document={document}
+          profileId={profile.id}
+          catalog={catalog}
+          onClose={() => setDialog(null)}
+          onChange={(next, page) => {
+            if (commit(next)) {
+              setPageId(page);
+              setDialog(null);
+            }
+          }}
+        />
+      )}
+      {dialog === 'alerts' && (
+        <Modal title={t('v2.alerts')} wide onClose={() => setDialog(null)}>
+          <AlertSettings document={document} catalog={catalog} update={commit} />
+        </Modal>
+      )}
+      {dialog === 'diagnostics' && (
+        <Modal title={t('v2.diagnostics')} onClose={() => setDialog(null)}>
+          <dl className="v2-diagnostics">
+            {Object.entries(diagnostics ?? {}).map(([key, value]) => (
+              <div key={key}>
+                <dt>{key}</dt>
+                <dd>{String(value)}</dd>
               </div>
             ))}
+          </dl>
+          <button
+            className="button"
+            onClick={() => {
+              const url = URL.createObjectURL(
+                new Blob([JSON.stringify(diagnostics, null, 2)], { type: 'application/json' }),
+              );
+              const a = window.document.createElement('a');
+              a.href = url;
+              a.download = 'hapanel-diagnostics.json';
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            {t('v2.downloadDiagnostics')}
+          </button>
+        </Modal>
+      )}
+      {recovery && (
+        <Modal title={t('v2.restoreHint')} onClose={() => setRecovery(undefined)}>
+          <div className="v2-button-row">
+            <button
+              className="button primary"
+              onClick={() => {
+                commit(recovery);
+                setRecovery(undefined);
+              }}
+            >
+              {t('v2.restore')}
+            </button>
+            <button className="button" onClick={() => setRecovery(undefined)}>
+              {t('v2.discard')}
+            </button>
           </div>
         </Modal>
       )}
