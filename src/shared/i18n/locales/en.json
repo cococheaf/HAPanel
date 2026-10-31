@@ -815,6 +815,5 @@
   "mode.sleep": "Sleep",
   "mode.boost": "Boost",
   "mode.none": "None",
-  "v2.importCost": "Import cost",
-  "v2.settings": "Settings"
+  "v2.importCost": "Import cost"
 }

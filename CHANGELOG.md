@@ -3,7 +3,8 @@
 ## 2.0.1
 
 - Detailfenster werden außerhalb der skalierten Dashboard-Kacheln gerendert, damit Schließen-Flächen in Safari nicht von Skalierung und Clipping der Karten abhängen.
-- Größere, beschriftete Schließen- und Einstellungen-Schaltflächen mit eindeutigen Touch-Zielen und sicheren Bildschirmrändern.
+- Größere, beschriftete Schließen-Schaltflächen mit eindeutigen Touch-Zielen.
+- Reine Displays zeigen keine Einstellungen oder Einrichtungsleiste. Im HA-Add-on bleibt für Administratoren nur „Designer öffnen“.
 - Wisch-Navigation ignoriert geöffnete Dialoge und setzt abgebrochene Gesten zurück.
 
 ## 2.0.0

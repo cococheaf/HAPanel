@@ -85,11 +85,11 @@ Ein isoliertes Backend mit ausschließlich synthetischen Daten und dem Produktio
 
 Die veröffentlichten neuen Screenshots enthalten ausschließlich Beispieldaten. Es wurden keine echten Lampen, Beschattungen, Automationen, Alarmzustände oder HA-Benutzerrollen für die Prüfung verändert. Physische iPad-, reale Benutzeranmeldung-, HTTPS-Proxy-, vollständige Supervisor-Wiederherstellungs- und mehrtägige ARM-Prüfungen bleiben offen. Ein Simulator und eine Browsergrößenprüfung ersetzen diese Abnahmen nicht.
 
-
 ## 2.0.1 · Einstellungen und Detailfenster
 
 - Browserkontrolle mit gekoppeltem Testdisplay und synthetischen Daten bei 1080×810 und 375×812 CSS-Pixeln.
-- Einstellungen wiederholt ein-/ausgeblendet; Wetterdetails geöffnet, nach Scrollen geschlossen und erneut geöffnet; Escape geprüft.
+- Wetterdetails geöffnet, nach Scrollen geschlossen und erneut geöffnet; Escape geprüft.
+- Gekoppelte Displays ohne Einrichtungsleiste; administrativer Designerzugang wird gesondert geprüft.
 - Detaildialog direkt unter `body`; Schließen-Fläche im sichtbaren Bereich, mindestens 48 Pixel hoch und beim Hit-Test erreichbar.
-- Zusätzlich Bildschirmklicks auf Einstellungen und Schließen in macOS Safari geprüft.
+- Zusätzlich Bildschirmklicks auf Schließen in macOS Safari geprüft.
 - Die konkret gemeldete Touch-Störung ließ sich auf dem Desktop nicht zuverlässig reproduzieren. Die Korrektur entfernt die Abhängigkeit der Dialoge von skalierten und begrenzten Kacheln; die Prüfung am physischen iPad bleibt offen.

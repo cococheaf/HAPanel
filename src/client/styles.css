@@ -2064,7 +2064,7 @@ label + label {
   touch-action: manipulation;
 }
 .modal-close > *,
-.v2-toolbar-toggle > * {
+.player-edit > * {
   pointer-events: none;
 }
 .modal-close span {
@@ -4646,32 +4646,6 @@ input[aria-invalid='true'] {
 .tile[data-secondary='attribute'] > .tile-caption:not(.v2-secondary) {
   display: none;
 }
-.v2-toolbar-toggle {
-  position: absolute;
-  right: max(12px, env(safe-area-inset-right));
-  top: max(12px, env(safe-area-inset-top));
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-width: 48px;
-  min-height: 48px;
-  padding: 10px 14px;
-  z-index: 30;
-  border: 1px solid #c8e4d43d;
-  border-radius: 24px;
-  background: #243c35f2;
-  color: #e2ece6;
-  font-size: 13px;
-  touch-action: manipulation;
-}
-.player-shell:has(> .v2-toolbar-toggle) > .player-toolbar {
-  padding-right: 170px;
-  overflow-x: auto;
-}
-.player-shell:has(> .v2-toolbar-toggle) > .player-toolbar > * {
-  flex-shrink: 0;
-}
 .player-shell[data-toolbar-hidden='true'] > .player-toolbar {
   display: none;
 }
@@ -5118,4 +5092,16 @@ input[aria-invalid='true'] {
   .v2-form-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Configuration is available only through the administrator's add-on view. */
+.player-toolbar .player-edit {
+  min-height: 48px;
+  padding: 10px 16px;
+  font-size: 13px;
+  flex-shrink: 0;
+  touch-action: manipulation;
+}
+.player-toolbar .player-edit > span {
+  display: inline;
 }

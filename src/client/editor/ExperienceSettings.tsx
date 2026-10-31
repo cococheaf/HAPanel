@@ -332,7 +332,7 @@ export function ProfileExperienceSettings({
           </select>
         </label>
       ))}
-      {(['adaptive', 'hideToolbar', 'swipe'] as const).map((key) => (
+      {(['adaptive', 'swipe'] as const).map((key) => (
         <label className="v2-check" key={key}>
           <input
             type="checkbox"

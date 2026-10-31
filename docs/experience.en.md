@@ -16,9 +16,9 @@ Shift-click selects multiple tiles. Arrow keys move the selection; ⌘/Ctrl C an
 
 **Connect displays → Displays & access** assigns a layout, home view and language to each paired tablet. Multiple tablets may share one layout. Layout deletion and revoking a device session remain separate operations.
 
-Measurements show browser CSS pixels, device pixel ratio and last contact. Identify displays the layout name for 15 seconds. Applying a measured viewport changes the draft and hides its toolbar; publish afterwards. Measure in the final browser/PWA mode, since browser chrome and the HA sidebar affect available space.
+Measurements show browser CSS pixels, device pixel ratio and last contact. Identify displays the layout name for 15 seconds. Applying a measured viewport changes the draft; publish afterwards. Measure in the final browser/PWA mode, since browser chrome and the HA sidebar affect available space.
 
-Display appearance settings include density, light/dark/automatic colours, adaptive arrangement, safe insets, swipe navigation, home view, automatic return and idle view. Adaptive rendering preserves stored positions and may scroll vertically. A floating gear reveals the toolbar. Night hours use the browser clock. Webpage idle/night modes cannot change iPad hardware brightness or wake a locked operating system.
+Display appearance settings include density, light/dark/automatic colours, adaptive arrangement, safe insets, swipe navigation, home view, automatic return and idle view. Adaptive rendering preserves stored positions and may scroll vertically. Paired displays show only the dashboard and its controls. Configure language and layout assignment in the designer. Administrators see **Open designer** in the HA add-on. Night hours use the browser clock. Webpage idle/night modes cannot change iPad hardware brightness or wake a locked operating system.
 
 ## Restrict access
 

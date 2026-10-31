@@ -17,11 +17,11 @@ HAPanel ist ein Vibe-Coding-Projekt mit KI-Unterstützung. Diese Anleitung besch
 
 **Geräte koppeln** öffnet **Displays & Zugriffe**. Eine Layoutvorlage kann mehreren Tablets zugeordnet werden. Das Löschen einer Vorlage und der Widerruf eines Gerätezugangs sind getrennte Vorgänge.
 
-Pro Gerät werden Layout, Startansicht, Sprache und zusätzliche Einschränkungen gespeichert. Die letzte gemessene Browserfläche und der letzte Kontakt werden angezeigt. **Display identifizieren** zeigt den Namen 15 Sekunden auf dem verbundenen Display. **Gemessene Fläche übernehmen** ändert nur den Layoutentwurf und blendet dort die Werkzeugleiste aus; anschließend veröffentlichen.
+Pro Gerät werden Layout, Startansicht, Sprache und zusätzliche Einschränkungen gespeichert. Die letzte gemessene Browserfläche und der letzte Kontakt werden angezeigt. **Display identifizieren** zeigt den Namen 15 Sekunden auf dem verbundenen Display. **Gemessene Fläche übernehmen** ändert nur den Layoutentwurf; anschließend veröffentlichen.
 
 Die Messung erfasst CSS-Pixel, Pixelverhältnis und Kontaktzeit. Hardwareauflösung und die tatsächlich verfügbare Browserfläche bleiben unterschiedliche Werte. Safari-Leisten und eine HA-Seitenleiste können die Fläche verändern. Kalibriere deshalb in dem Betriebsmodus, in dem das Tablet später verwendet wird.
 
-Unter **Display → Gestaltung & Bedienung**: Dichte, hell/dunkel/automatisch, Hintergrund, adaptive Anordnung, sichere Ränder, Wischen, Startseite, Rückkehrzeit und Ruheansicht. Adaptive Anordnung verändert nur die Darstellung und erhält die gespeicherten Rasterpositionen. Bei wenig Höhe darf die Ansicht scrollen. Die Werkzeugleiste lässt sich über das schwebende Zahnrad wieder einblenden.
+Unter **Display → Gestaltung & Bedienung**: Dichte, hell/dunkel/automatisch, Hintergrund, adaptive Anordnung, sichere Ränder, Wischen, Startseite, Rückkehrzeit und Ruheansicht. Adaptive Anordnung verändert nur die Darstellung und erhält die gespeicherten Rasterpositionen. Bei wenig Höhe darf die Ansicht scrollen. Gekoppelte Displays zeigen ausschließlich das Dashboard und seine Bedienelemente. Einrichtung, Sprache und Layoutzuweisung erfolgen im Designer. Im HA-Add-on führt für Administratoren **Designer öffnen** direkt zur Einrichtung.
 
 Nachtzeiten verwenden die Uhr des Browsers. Ruheansicht und Nachtfarben steuern die Webseite; sie ändern weder iPad-Helligkeit noch Gerätesperre. Ein gesperrtes iPad wird dadurch nicht aufgeweckt.
 

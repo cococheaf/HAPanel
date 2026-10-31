@@ -1,9 +1,9 @@
 import { adaptiveDocument } from '../../shared/experience';
 import { DisplayAlerts, useDisplayIdle } from './DisplayExperience';
 import { localizeSampleDocument } from '../../shared/demo';
-import { useI18n, LanguageSwitcher } from '../i18n';
+import { useI18n } from '../i18n';
 import { useEffect, useState, useRef } from 'react';
-import { Expand, Info, Settings2, X } from 'lucide-react';
+import { Settings2, X } from 'lucide-react';
 import { pagesForProfile, type Action, type Revision, type Snapshot } from '../../shared/model';
 import { DashboardFrame, ScaledCanvas } from '../ui/Dashboard';
 
@@ -40,7 +40,6 @@ export default function Player({
     );
     return () => clearTimeout(timer);
   }, [identifyUntil]);
-  const [toolbarOpen, setToolbarOpen] = useState(false);
   const [profileId, setProfileId] = useState(() => {
     let saved: string | null = null;
     try {
@@ -57,7 +56,6 @@ export default function Player({
         : document.profiles[0].id;
   });
   const [pageId, setPageId] = useState(document.pages[0].id),
-    [info, setInfo] = useState(false),
     [message, setMessage] = useState('');
   const [viewport, setViewport] = useState({
     width: window.innerWidth,
@@ -108,88 +106,22 @@ export default function Player({
   return (
     <div
       className={`player-shell ${demo ? 'demo-player' : ''} ${profile.experience?.adaptive ? 'adaptive-player' : ''}`}
-      data-toolbar-hidden={Boolean(profile.experience?.hideToolbar && !toolbarOpen)}
+      data-toolbar-hidden={!onEdit}
     >
-      {profile.experience?.hideToolbar && (
-        <button
-          type="button"
-          className="v2-toolbar-toggle"
-          aria-label={t('v2.experience')}
-          aria-expanded={toolbarOpen}
-          aria-controls="player-toolbar"
-          onClick={() => setToolbarOpen((open) => !open)}
-        >
-          {toolbarOpen ? <X size={20} /> : <Settings2 size={20} />}
-          <span>{t(toolbarOpen ? 'common.close' : 'v2.settings')}</span>
-        </button>
-      )}
       {snapshot.status === 'reconnecting' && (
         <div className="v2-connection-banner" role="status">
           {t('v2.reconnect')}
         </div>
       )}
-      <div className="player-toolbar" id="player-toolbar">
-        <a className="player-brand" href={onEdit ? './' : './display.html'} aria-label="HAPanel">
-          <img src="./mark.svg" alt="" />
-          <span>HAPanel</span>
-        </a>
-        {demo && <span className="player-demo-tag">{t('player.interactiveDemo')}</span>}
-        {(!onAction || snapshot.deviceControl === false) && (
-          <span className="player-demo-tag">
-            {t(
-              snapshot.alarmControl && onAction
-                ? 'player.alarmOnlyAccess'
-                : 'player.readOnlyAccess',
-            )}
-          </span>
-        )}
-        <div className="header-spacer" />
-        <LanguageSwitcher />
-        <select
-          aria-label={t('editor.displayProfile')}
-          value={profile.id}
-          onChange={(e) => {
-            setProfileId(e.target.value);
-            try {
-              localStorage.setItem('hapanel-display-profile', e.target.value);
-            } catch {
-              /* session-only selection */
-            }
-          }}
-        >
-          {document.profiles.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-        <button
-          className="player-icon"
-          aria-label={t('player.information')}
-          title={t('player.information')}
-          onClick={() => setInfo(!info)}
-        >
-          <Info size={18} />
-        </button>
-        <button
-          className="player-icon"
-          aria-label={t('player.fullscreen')}
-          title={t('player.fullscreen')}
-          onClick={async () => {
-            try {
-              if (window.document.fullscreenElement) await window.document.exitFullscreen();
-              else if (window.document.documentElement.requestFullscreen)
-                await window.document.documentElement.requestFullscreen();
-              else setMessage(t('player.homeScreenHint'));
-            } catch {
-              setMessage(t('player.homeScreenFallback'));
-            }
-          }}
-        >
-          <Expand size={18} />
-        </button>
-        {onEdit && (
+      {onEdit && (
+        <div className="player-toolbar">
+          <div className="player-brand">
+            <img src="./mark.svg" alt="" />
+            <span>HAPanel</span>
+          </div>
+          <div className="header-spacer" />
           <button
+            type="button"
             className="player-edit"
             onClick={() => {
               try {
@@ -199,37 +131,9 @@ export default function Player({
             }}
             aria-label={t('player.exploreStudio')}
           >
-            <Settings2 size={15} />
+            <Settings2 size={18} />
             <span>{t('player.exploreStudio')}</span>
           </button>
-        )}
-      </div>
-      {info && (
-        <div className="display-info">
-          <strong>{profile.name}</strong>
-          <span>
-            {t('player.browserInfo', {
-              width: viewport.width,
-              height: viewport.height,
-              dpr: window.devicePixelRatio,
-            })}
-          </span>
-          <span>
-            {t('player.layoutInfo', {
-              width: profile.width,
-              height: profile.height,
-              columns: profile.columns,
-              rows: profile.rows,
-            })}
-          </span>
-          <span>
-            {demo
-              ? t('player.sampleData')
-              : t('player.publishedVersion', { number: published.revision })}
-          </span>
-          {viewport.width < profile.width && profile.mode === 'exact' && (
-            <span>{t('player.layoutTooLarge')}</span>
-          )}
         </div>
       )}
       <main className="player-canvas" ref={canvasRef}>
