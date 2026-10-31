@@ -1,5 +1,6 @@
 import { useI18n } from '../i18n';
 import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 export function Modal({
@@ -32,20 +33,35 @@ export function Modal({
       window.dispatchEvent(new Event('hapanel:modal'));
     };
   }, []);
-  return (
+  // Dialogs must not inherit the dashboard's scale, clipping or container context.
+  // Keep their hit targets in viewport coordinates, including in Safari.
+  return createPortal(
     <dialog
       ref={ref}
       aria-labelledby={titleId}
       className={'modal ' + (wide ? 'wide-modal ' : '') + className}
-      onCancel={onClose}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+      onPointerDown={(event) => event.stopPropagation()}
+      onTouchStart={(event) => event.stopPropagation()}
+      onTouchEnd={(event) => event.stopPropagation()}
       onClick={(e) => {
+        e.stopPropagation();
         if (e.target === ref.current) onClose();
       }}
     >
       <div className="modal-heading">
         <h2 id={titleId}>{title}</h2>
-        <button className="icon-button" aria-label={t('common.close')} onClick={onClose}>
+        <button
+          type="button"
+          className="icon-button modal-close"
+          aria-label={t('common.close')}
+          onClick={onClose}
+        >
           <X size={20} />
+          <span>{t('common.close')}</span>
         </button>
       </div>
       {children}
@@ -61,6 +77,7 @@ export function Modal({
           </button>
         </div>
       )}
-    </dialog>
+    </dialog>,
+    document.body,
   );
 }

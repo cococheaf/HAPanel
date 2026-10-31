@@ -815,5 +815,6 @@
   "mode.sleep": "Schlafen",
   "mode.boost": "Boost",
   "mode.none": "Keine",
-  "v2.importCost": "Bezugskosten"
+  "v2.importCost": "Bezugskosten",
+  "v2.settings": "Einstellungen"
 }

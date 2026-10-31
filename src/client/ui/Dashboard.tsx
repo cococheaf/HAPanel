@@ -956,8 +956,11 @@ export function DashboardFrame({
         }
         data-background={profile.experience?.background ?? 'gradient'}
         onTouchStart={(event) => {
+          touch.current = undefined;
           if (
             !profile.experience?.swipe ||
+            event.touches.length !== 1 ||
+            window.document.querySelector('dialog[open]') ||
             (event.target instanceof Element && event.target.closest('input,button,select,video'))
           )
             return;
@@ -968,6 +971,10 @@ export function DashboardFrame({
         }}
         onTouchEnd={(event) => {
           if (!touch.current) return;
+          if (window.document.querySelector('dialog[open]')) {
+            touch.current = undefined;
+            return;
+          }
           const dx = event.changedTouches[0].clientX - touch.current.x,
             dy = event.changedTouches[0].clientY - touch.current.y;
           touch.current = undefined;
@@ -976,6 +983,9 @@ export function DashboardFrame({
             const target = navigationPages[i + (dx < 0 ? 1 : -1)];
             if (target) setPageId(target.id);
           }
+        }}
+        onTouchCancel={() => {
+          touch.current = undefined;
         }}
         className={`dashboard-frame theme-${profile.theme ?? document.theme} ${profile.width < 900 ? 'compact-dashboard' : ''}`}
         style={{

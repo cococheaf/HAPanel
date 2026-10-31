@@ -112,11 +112,15 @@ export default function Player({
     >
       {profile.experience?.hideToolbar && (
         <button
+          type="button"
           className="v2-toolbar-toggle"
           aria-label={t('v2.experience')}
-          onClick={() => setToolbarOpen(!toolbarOpen)}
+          aria-expanded={toolbarOpen}
+          aria-controls="player-toolbar"
+          onClick={() => setToolbarOpen((open) => !open)}
         >
-          <Settings2 size={20} />
+          {toolbarOpen ? <X size={20} /> : <Settings2 size={20} />}
+          <span>{t(toolbarOpen ? 'common.close' : 'v2.settings')}</span>
         </button>
       )}
       {snapshot.status === 'reconnecting' && (
@@ -124,7 +128,7 @@ export default function Player({
           {t('v2.reconnect')}
         </div>
       )}
-      <div className="player-toolbar">
+      <div className="player-toolbar" id="player-toolbar">
         <a className="player-brand" href={onEdit ? './' : './display.html'} aria-label="HAPanel">
           <img src="./mark.svg" alt="" />
           <span>HAPanel</span>

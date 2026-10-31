@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.1
+
+- Detailfenster werden außerhalb der skalierten Dashboard-Kacheln gerendert, damit Schließen-Flächen in Safari nicht von Skalierung und Clipping der Karten abhängen.
+- Größere, beschriftete Schließen- und Einstellungen-Schaltflächen mit eindeutigen Touch-Zielen und sicheren Bildschirmrändern.
+- Wisch-Navigation ignoriert geöffnete Dialoge und setzt abgebrochene Gesten zurück.
+
 ## 2.0.0
 
 - Displayverwaltung mit Layoutzuweisung, Messung, Identifikation und zusätzlichen Geräte-/Benutzerregeln.

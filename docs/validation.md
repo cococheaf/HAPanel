@@ -1,4 +1,4 @@
-# Prüfstand für 2.0.0
+# Prüfstand für 2.0.1
 
 ## Automatisiert
 
@@ -84,3 +84,12 @@ Im Browser geprüft: Mehrfachauswahl und Kopieren in eine neue leere Vorlage, Im
 Ein isoliertes Backend mit ausschließlich synthetischen Daten und dem Produktionsbuild prüft die normale Kopplung, Messung, Identifikation und Layout-/Sprachzuweisung. Änderungen auf Nur-anzeigen und auf ein einziges erlaubtes Layout erschienen ohne Reload auf dem gekoppelten Testdisplay. Rücknahme der Einschränkung, Übernahme der Messung als Entwurf und Undo wurden ebenfalls geprüft. Timer, Auswahl, Zahlenregler, Staubsauger und Tasten lieferten bestätigte simulierte Zustandsänderungen. Ein veröffentlichtes Testereignis zeigte eine Klingelmeldung. Fehlende statistische Daten wurden als unbekannt dargestellt.
 
 Die veröffentlichten neuen Screenshots enthalten ausschließlich Beispieldaten. Es wurden keine echten Lampen, Beschattungen, Automationen, Alarmzustände oder HA-Benutzerrollen für die Prüfung verändert. Physische iPad-, reale Benutzeranmeldung-, HTTPS-Proxy-, vollständige Supervisor-Wiederherstellungs- und mehrtägige ARM-Prüfungen bleiben offen. Ein Simulator und eine Browsergrößenprüfung ersetzen diese Abnahmen nicht.
+
+
+## 2.0.1 · Einstellungen und Detailfenster
+
+- Browserkontrolle mit gekoppeltem Testdisplay und synthetischen Daten bei 1080×810 und 375×812 CSS-Pixeln.
+- Einstellungen wiederholt ein-/ausgeblendet; Wetterdetails geöffnet, nach Scrollen geschlossen und erneut geöffnet; Escape geprüft.
+- Detaildialog direkt unter `body`; Schließen-Fläche im sichtbaren Bereich, mindestens 48 Pixel hoch und beim Hit-Test erreichbar.
+- Zusätzlich Bildschirmklicks auf Einstellungen und Schließen in macOS Safari geprüft.
+- Die konkret gemeldete Touch-Störung ließ sich auf dem Desktop nicht zuverlässig reproduzieren. Die Korrektur entfernt die Abhängigkeit der Dialoge von skalierten und begrenzten Kacheln; die Prüfung am physischen iPad bleibt offen.
