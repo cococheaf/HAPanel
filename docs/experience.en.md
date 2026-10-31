@@ -47,3 +47,7 @@ Self-consumption needs complete solar/export measurements. Self-sufficiency need
 ## Recovery and diagnostics
 
 First startup with existing files preserves immutable `dashboard-before-2.0.json` and `devices-before-2.0.json` backups in private add-on storage. Existing schema-1 documents remain valid; unknown schema versions are rejected. Diagnostics include version, connection, revisions, subscription count and aggregate proxied bytes, without tokens, alarm codes, session secrets, camera images or entity names. Supervisor backups and revision history remain complementary recovery methods.
+
+### Tile size and content
+
+Reducing a tile automatically scales its text, icons, spacing and controls together. Both width and height are considered; larger tiles return to their normal content size. The designer and published display use the same renderer. Long headings can wrap. Very small tiles work best as summaries; tap to open details with normal-sized controls. Extensive energy statistics remain scrollable.

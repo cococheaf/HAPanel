@@ -1085,6 +1085,48 @@ label + label {
   position: absolute;
   container-type: size;
 }
+.tile-fit-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 26px;
+}
+.tile-fit-inner {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 100%;
+  container-type: size;
+  transform-origin: top left;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+.tile-fit-inner .tile-heading,
+.tile-fit-inner .media-info h2 {
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+.tile-fit-inner .tile-heading > span:nth-child(2) {
+  overflow: visible;
+  max-width: none;
+}
+.tile-fit-inner .tile-detail-trigger {
+  overflow-wrap: anywhere;
+}
+.tile-fit-inner .tile-media {
+  display: flex;
+  flex-direction: column;
+}
+.tile-fit-inner .tile-media .media-content {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
 .tile {
   width: 100%;
   height: 100%;

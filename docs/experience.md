@@ -72,3 +72,7 @@ Eigenverbrauch benötigt vollständige Erzeugung und Einspeisung, Autarkie einen
 Beim ersten Start mit vorhandenen Daten werden `dashboard-before-2.0.json` und `devices-before-2.0.json` im privaten Add-on-Verzeichnis angelegt. Die erste Sicherung wird nicht überschrieben. Bestehende Schema-1-Konfigurationen bleiben gültig. Unbekannte Schemaversionen werden weiterhin abgelehnt.
 
 **Diagnose** zeigt Version, Verbindung, abonnierte Entitäten, Revisionen und zusammengefasste Proxy-Datenmenge. Der Download enthält keine HA-Tokens, Alarmcodes, Geräte-Sitzungsschlüssel, Kamerabilder oder Entitätsnamen. Ein Supervisor-Backup und die HAPanel-Revisionshistorie ergänzen diese Sicherungen.
+
+### Kachelgröße und Inhalt
+
+Beim Verkleinern einer Kachel skalieren Texte, Icons, Abstände und Bedienelemente automatisch mit. Breite und Höhe werden berücksichtigt; größere Kacheln kehren zur normalen Inhaltsgröße zurück. Das gilt im Designer und auf dem Display. Lange Überschriften dürfen umbrechen. Sehr kleine Kacheln eignen sich vor allem für die Übersicht; per Tipp erreichst du die Details mit normal großen Bedienelementen. Umfangreiche Energieauswertungen bleiben scrollbar.

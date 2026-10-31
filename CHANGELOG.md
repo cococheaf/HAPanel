@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.2
+
+- Kachelinhalte passen sich automatisch an Breite und Höhe der Kachel an: Schrift, Icons, Abstände und Bedienelemente skalieren gemeinsam.
+- Identische Darstellung beim Verkleinern im Designer und auf veröffentlichten Displays. Lange Überschriften dürfen umbrechen.
+- Medienkacheln passen Album-Art und Bedienung an; umfangreiche Energieauswertungen bleiben scrollbar. Geöffnete Details bleiben in normaler Größe.
+
 ## 2.0.1
 
 - Detailfenster werden außerhalb der skalierten Dashboard-Kacheln gerendert, damit Schließen-Flächen in Safari nicht von Skalierung und Clipping der Karten abhängen.

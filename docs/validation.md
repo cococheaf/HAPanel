@@ -1,4 +1,4 @@
-# Prüfstand für 2.0.1
+# Prüfstand für 2.0.2
 
 ## Automatisiert
 
@@ -93,3 +93,13 @@ Die veröffentlichten neuen Screenshots enthalten ausschließlich Beispieldaten.
 - Detaildialog direkt unter `body`; Schließen-Fläche im sichtbaren Bereich, mindestens 48 Pixel hoch und beim Hit-Test erreichbar.
 - Zusätzlich Bildschirmklicks auf Schließen in macOS Safari geprüft.
 - Die konkret gemeldete Touch-Störung ließ sich auf dem Desktop nicht zuverlässig reproduzieren. Die Korrektur entfernt die Abhängigkeit der Dialoge von skalierten und begrenzten Kacheln; die Prüfung am physischen iPad bleibt offen.
+
+## 2.0.2 · Skalierende Kachelinhalte
+
+- Isolierte Konfiguration mit 17 verschiedenen Kacheln und langen Überschriften bei 1080×810 CSS-Pixeln. Alle wichtigen Inhaltsbereiche liegen innerhalb der sehr kleinen Kacheln (etwa 156×80 Pixel).
+- Tatsächliche Größenänderung im Designer: Wetterkachel auf 70×80 Pixel verkleinert und anschließend auf 328×271 Pixel vergrößert. Inhaltsfaktor passt sich von 0,286 auf 0,968 an; kein Überlauf der Wetterinhalte.
+- Veröffentlichung des Testentwurfs übernimmt denselben Inhaltsfaktor ohne Neuladen in die gekoppelte Anzeige. Details werden außerhalb der Skalierung geöffnet.
+- Medien-Überlauf beim ersten Test erkannt und über ein flexibles Innenlayout korrigiert.
+- Auch bei 375×812 CSS-Pixeln liegen die geprüften Inhaltsbereiche aller 17 Kacheln innerhalb ihrer Grenzen.
+- Zusätzlich Darstellung und Bildschirmklick auf einen verkleinerten Schalter in macOS Safari geprüft. Die anfängliche CSS-Zoom-Variante zeigte dort abweichende Schriftgrößen und wurde durch gemeinsame Transform-Skalierung ersetzt.
+- Browserprüfung ersetzt keinen Test am physischen iPad.

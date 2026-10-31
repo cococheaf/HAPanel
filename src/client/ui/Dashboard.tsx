@@ -1,4 +1,5 @@
 import { StreamBudgetContext } from './stream-budget';
+import { FittedTile } from './FittedTile';
 import { EnergyStatistics } from './EnergyStatistics';
 import { conditionMatches, isNight } from '../../shared/experience';
 import { iconChoices } from './widget-icons';
@@ -684,117 +685,148 @@ export function TileView({
   };
   return (
     <>
-      <article
-        aria-busy={pending || undefined}
-        data-view={
-          tile.room ? 'room' : tile.energy ? 'energy' : tile.contacts ? 'contacts' : 'device'
+      <FittedTile
+        enabled={!alarmExpanded && !cameraExpanded}
+        minWidth={tile.energy ? 340 : tile.kind === 'media' ? 400 : 240}
+        minHeight={
+          tile.energy
+            ? 280
+            : tile.room
+              ? 200
+              : {
+                  weather: 280,
+                  media: 320,
+                  sensor: 180,
+                  light: 220,
+                  climate: 240,
+                  cover: 240,
+                  automation: 210,
+                  alarm: 200,
+                  contacts: 220,
+                  camera: 200,
+                  timer: 180,
+                  select: 160,
+                  number: 180,
+                  fan: 240,
+                  vacuum: 220,
+                  button: 140,
+                  scene: 220,
+                }[tile.kind]
         }
-        data-drillable={detailsEnabled}
-        onClick={(event) => {
-          if (
-            detailsEnabled &&
-            event.target instanceof Element &&
-            !event.target.closest('button, input, select, a')
-          ) {
-            if (held.current) {
-              held.current = false;
-              return;
-            }
-            gesture('tap');
-          }
-        }}
-        onPointerDown={(event) => {
-          if (
-            !detailsEnabled ||
-            !(event.target instanceof Element) ||
-            event.target.closest('button,input,select,a')
-          )
-            return;
-          held.current = false;
-          holdTimer.current = setTimeout(() => {
-            held.current = true;
-            gesture('hold');
-          }, 600);
-        }}
-        onPointerUp={() => clearTimeout(holdTimer.current)}
-        onPointerCancel={() => clearTimeout(holdTimer.current)}
-        onPointerMove={(event) => {
-          if (
-            pointerStart.current &&
-            Math.hypot(
-              event.clientX - pointerStart.current.x,
-              event.clientY - pointerStart.current.y,
-            ) > 12
-          )
-            clearTimeout(holdTimer.current);
-        }}
-        onContextMenu={(event) => {
-          if (detailsEnabled) event.preventDefault();
-        }}
-        data-background={tile.experience?.background ?? 'default'}
-        data-presentation={tile.experience?.presentation ?? 'auto'}
-        data-secondary={tile.experience?.secondary ?? 'auto'}
-        className={`tile tile-${tile.kind} accent-${tile.accent} ${active ? 'is-active' : ''} ${unavailable ? 'is-unavailable' : ''}`}
+        scrollable={Boolean(tile.energy && !tile.navigateTo)}
       >
-        <div className="tile-heading">
-          <span className="tile-icon">
-            <Icon size={18} strokeWidth={1.8} />
-          </span>
-          {detailsEnabled ? (
-            <button
-              className="tile-detail-trigger"
-              onClick={() => open()}
-              aria-label={t('detail.open', { title: tile.title })}
-            >
-              {tile.title}
-              <ArrowUpRight size={13} />
-            </button>
-          ) : (
-            <span>{tile.title}</span>
+        <article
+          aria-busy={pending || undefined}
+          data-view={
+            tile.room ? 'room' : tile.energy ? 'energy' : tile.contacts ? 'contacts' : 'device'
+          }
+          data-drillable={detailsEnabled}
+          onClick={(event) => {
+            if (
+              detailsEnabled &&
+              event.target instanceof Element &&
+              !event.target.closest('button, input, select, a')
+            ) {
+              if (held.current) {
+                held.current = false;
+                return;
+              }
+              gesture('tap');
+            }
+          }}
+          onPointerDown={(event) => {
+            if (
+              !detailsEnabled ||
+              !(event.target instanceof Element) ||
+              event.target.closest('button,input,select,a')
+            )
+              return;
+            held.current = false;
+            holdTimer.current = setTimeout(() => {
+              held.current = true;
+              gesture('hold');
+            }, 600);
+          }}
+          onPointerUp={() => clearTimeout(holdTimer.current)}
+          onPointerCancel={() => clearTimeout(holdTimer.current)}
+          onPointerMove={(event) => {
+            if (
+              pointerStart.current &&
+              Math.hypot(
+                event.clientX - pointerStart.current.x,
+                event.clientY - pointerStart.current.y,
+              ) > 12
+            )
+              clearTimeout(holdTimer.current);
+          }}
+          onContextMenu={(event) => {
+            if (detailsEnabled) event.preventDefault();
+          }}
+          data-background={tile.experience?.background ?? 'default'}
+          data-presentation={tile.experience?.presentation ?? 'auto'}
+          data-secondary={tile.experience?.secondary ?? 'auto'}
+          className={`tile tile-${tile.kind} accent-${tile.accent} ${active ? 'is-active' : ''} ${unavailable ? 'is-unavailable' : ''}`}
+        >
+          <div className="tile-heading">
+            <span className="tile-icon">
+              <Icon size={18} strokeWidth={1.8} />
+            </span>
+            {detailsEnabled ? (
+              <button
+                className="tile-detail-trigger"
+                onClick={() => open()}
+                aria-label={t('detail.open', { title: tile.title })}
+              >
+                {tile.title}
+                <ArrowUpRight size={13} />
+              </button>
+            ) : (
+              <span>{tile.title}</span>
+            )}
+            {tile.kind === 'media' && (
+              <span className="playing-dots">
+                <i />
+                <i />
+                <i />
+              </span>
+            )}
+          </div>
+          {body()}
+          {!detailsEnabled &&
+            alarmExpanded &&
+            entity &&
+            !['timer', 'select', 'number', 'fan', 'vacuum', 'button'].includes(tile.kind) && (
+              <AdvancedControls
+                tile={tile}
+                entity={entity}
+                disabled={
+                  disabled ||
+                  (tile.kind === 'light' &&
+                    (tile.light?.allowTurnOn === false || tile.light?.allowTurnOff === false))
+                }
+                send={send}
+                details
+              />
+            )}
+          {['text', 'attribute'].includes(tile.experience?.secondary ?? '') && (
+            <div className="tile-caption v2-secondary">
+              {tile.experience?.secondary === 'text'
+                ? tile.experience.secondaryText
+                : String(entity?.attributes[tile.experience?.secondaryText ?? ''] ?? '—')}
+            </div>
           )}
-          {tile.kind === 'media' && (
-            <span className="playing-dots">
-              <i />
-              <i />
-              <i />
+          {feedback && (
+            <span className="v2-action-feedback" role="status">
+              {feedback}
             </span>
           )}
-        </div>
-        {body()}
-        {!detailsEnabled &&
-          alarmExpanded &&
-          entity &&
-          !['timer', 'select', 'number', 'fan', 'vacuum', 'button'].includes(tile.kind) && (
-            <AdvancedControls
-              tile={tile}
-              entity={entity}
-              disabled={
-                disabled ||
-                (tile.kind === 'light' &&
-                  (tile.light?.allowTurnOn === false || tile.light?.allowTurnOff === false))
-              }
-              send={send}
-              details
-            />
+          {actionError && !details && (
+            <p className="tile-action-error" role="alert">
+              {actionError}
+            </p>
           )}
-        {['text', 'attribute'].includes(tile.experience?.secondary ?? '') && (
-          <div className="tile-caption v2-secondary">
-            {tile.experience?.secondary === 'text'
-              ? tile.experience.secondaryText
-              : String(entity?.attributes[tile.experience?.secondaryText ?? ''] ?? '—')}
-          </div>
-        )}
-        {feedback && (
-          <span className="v2-action-feedback" role="status">
-            {feedback}
-          </span>
-        )}
-        {actionError && !details && (
-          <p className="tile-action-error" role="alert">
-            {actionError}
-          </p>
-        )}
-      </article>
+        </article>
+      </FittedTile>
       {confirmation && (
         <Modal title={t('v2.confirmAction')} onClose={() => setConfirmation(undefined)}>
           <p>{tile.title}</p>
