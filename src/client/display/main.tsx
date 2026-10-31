@@ -120,7 +120,7 @@ function Display() {
       <Player
         published={data.published}
         snapshot={data.snapshot}
-        onAction={data.canControl === false ? undefined : act}
+        onAction={data.canControl === false && !data.snapshot.alarmControl ? undefined : act}
         onEdit={
           data.canEdit ? () => window.location.assign(new URL('./', document.baseURI)) : undefined
         }

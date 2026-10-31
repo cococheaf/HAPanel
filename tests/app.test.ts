@@ -10,7 +10,8 @@ import type { CameraSignalEvent } from '../src/shared/camera';
 import { createApp, type AppOptions } from '../src/server/app';
 import { DocumentStore, PairingStore } from '../src/server/store';
 import { HomeAssistantHub } from '../src/server/hub';
-import { roomSchema } from '../src/shared/model';
+import { roomSchema, type Action, type Dashboard, type Snapshot } from '../src/shared/model';
+import { applyDemoAction } from '../src/shared/demo';
 
 async function fixture(t: { after: (fn: () => unknown) => void }, extra: Partial<AppOptions> = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'hapanel-'));
@@ -22,6 +23,7 @@ async function fixture(t: { after: (fn: () => unknown) => void }, extra: Partial
   const app = await createApp({ mode: 'demo', surface: 'editor', store, pairings, hub, ...extra });
   await app.ready();
   t.after(async () => {
+    for (const client of app.websocketServer.clients) client.terminate();
     await app.close();
     await hub.stop();
     await rm(dir, { recursive: true, force: true });
@@ -677,6 +679,216 @@ test('authenticated alarm actions sanitise HA errors and throttle repeated attem
   const data = (await app.inject({ url: '/api/display/bootstrap', headers, remoteAddress })).json();
   assert.equal(data.snapshot.alarmControl, true);
   assert.equal(data.snapshot.cameraView, true);
+});
+test('shared alarm access permits only configured alarm modes for active HA viewers and does not grant cameras, devices or the editor', async (t) => {
+  const { showcaseDocument, showcaseSnapshot } = await import('../src/shared/showcase');
+  const { app, store, hub } = await fixture(t, {
+    mode: 'ingress',
+    alarmAccess: 'authenticated',
+    isAdmin: async (id) => id === 'admin',
+    isActiveUser: async (id) => id === 'viewer',
+  });
+  const document = structuredClone(showcaseDocument);
+  document.pages
+    .flatMap((page) => page.tiles)
+    .find((tile) => tile.id === 'demo_alarm')!.alarm!.modes = ['disarmed', 'armed_home'];
+  const draft = await store.save(document, 1);
+  await store.publish(draft.draft.revision);
+  let snapshot = showcaseSnapshot();
+  Object.assign(snapshot.entities['alarm_control_panel.demo_home'].attributes, {
+    code_format: 'number',
+    code_arm_required: true,
+  });
+  t.mock.method(hub, 'getSnapshot', (ids?: string[]): Snapshot => ({
+    ...snapshot,
+    entities: Object.fromEntries(
+      Object.entries(snapshot.entities).filter(([id]) => !ids || ids.includes(id)),
+    ),
+  }));
+  const act = t.mock.method(hub, 'act', async (doc: Dashboard, action: Action) => {
+    snapshot = applyDemoAction(snapshot, doc, action);
+  });
+  const context = { headers: { 'x-remote-user-id': 'viewer' }, remoteAddress: '172.30.32.2' };
+  const data = (await app.inject({ url: '/api/display/bootstrap', ...context })).json();
+  assert.equal(data.snapshot.alarmControl, true);
+  assert.equal(data.snapshot.cameraView, false);
+  assert.equal(data.snapshot.deviceControl, false);
+  assert.equal(data.canControl, false);
+  assert.equal(data.canEdit, false);
+  assert.deepEqual(
+    (
+      await app.inject({
+        url: '/api/editor/bootstrap',
+        remoteAddress: context.remoteAddress,
+        headers: { 'x-remote-user-id': 'admin' },
+      })
+    ).json().access,
+    { camera: 'admin', alarm: 'authenticated' },
+  );
+  const invoke = (payload: object) =>
+    app.inject({ method: 'POST', url: '/api/display/action', payload, ...context });
+  const command = { tileId: 'demo_alarm', command: 'alarm', mode: 'armed_home' };
+  assert.equal((await invoke(command)).json().messageKey, 'error.alarmCodeRequired');
+  assert.equal(
+    (await invoke({ ...command, code: 'invalid' })).json().messageKey,
+    'error.alarmCodeFormat',
+  );
+  const success = await invoke({ ...command, code: '0007' });
+  assert.equal(success.statusCode, 200);
+  assert.doesNotMatch(success.body, /0007/);
+  assert.equal(snapshot.entities['alarm_control_panel.demo_home'].state, 'armed_home');
+  assert.equal(act.mock.calls.at(-1)!.arguments[1].code, '0007');
+  assert.equal((await invoke({ ...command, mode: 'disarmed', code: '0007' })).statusCode, 200);
+  assert.equal(snapshot.entities['alarm_control_panel.demo_home'].state, 'disarmed');
+  const calls = act.mock.callCount();
+  assert.equal((await invoke({ ...command, mode: 'armed_away' })).statusCode, 400);
+  assert.equal((await invoke({ ...command, tileId: 'unpublished_alarm' })).statusCode, 400);
+  assert.equal((await invoke({ tileId: 'demo_general', command: 'turn_on' })).statusCode, 403);
+  assert.equal(act.mock.callCount(), calls);
+  for (const url of [
+    '/api/editor/bootstrap',
+    '/api/editor/devices',
+    '/api/editor/camera/sample_camera_entrance/still',
+  ])
+    assert.equal((await app.inject({ url, ...context })).statusCode, 403);
+  for (const suffix of [
+    'still',
+    'capabilities',
+    'stream.m3u8',
+    'assets/' + 'a'.repeat(32) + '.m4s',
+  ])
+    assert.equal(
+      (
+        await app.inject({
+          url: '/api/display/camera/sample_camera_entrance/' + suffix,
+          ...context,
+        })
+      ).statusCode,
+      403,
+    );
+  let cameraClosed!: Promise<any[]>;
+  const camera = await app.injectWS(
+    '/api/display/camera/sample_camera_entrance/webrtc',
+    { headers: context.headers, socket: { remoteAddress: context.remoteAddress } as Socket },
+    {
+      onInit: (ws) => {
+        cameraClosed = once(ws, 'close');
+      },
+    },
+  );
+  t.after(() => camera.terminate());
+  assert.equal((await cameraClosed)[0], 1008);
+  assert.equal(
+    (
+      await app.inject({
+        url: '/api/display/bootstrap',
+        remoteAddress: context.remoteAddress,
+        headers: { 'x-remote-user-id': 'inactive' },
+      })
+    ).statusCode,
+    403,
+  );
+});
+test('shared alarms on paired tablets still require valid pairing and preserve ordinary controls without granting cameras or editor access', async (t) => {
+  const { showcaseDocument, showcaseSnapshot } = await import('../src/shared/showcase');
+  const { app, store, hub, pairings } = await fixture(t, {
+    surface: 'display',
+    mode: 'ingress',
+    alarmAccess: 'authenticated',
+  });
+  const draft = await store.save(showcaseDocument, 1);
+  await store.publish(draft.draft.revision);
+  let snapshot = showcaseSnapshot();
+  t.mock.method(hub, 'getSnapshot', (ids?: string[]): Snapshot => ({
+    ...snapshot,
+    entities: Object.fromEntries(
+      Object.entries(snapshot.entities).filter(([id]) => !ids || ids.includes(id)),
+    ),
+  }));
+  t.mock.method(hub, 'act', async (doc: Dashboard, action: Action) => {
+    snapshot = applyDemoAction(snapshot, doc, action);
+  });
+  const pairing = await pairings.pair((await pairings.createCode()).code, 'Tablet');
+  const headers = { cookie: 'hapanel_device=' + pairing.token };
+  const data = (await app.inject({ url: '/api/display/bootstrap', headers })).json();
+  assert.equal(data.canEdit, false);
+  assert.equal(data.canControl, true);
+  assert.equal(data.snapshot.deviceControl, true);
+  assert.equal(data.snapshot.alarmControl, true);
+  assert.equal(data.snapshot.cameraView, false);
+  const payload = { tileId: 'demo_alarm', command: 'alarm', mode: 'armed_home' };
+  assert.equal(
+    (await app.inject({ method: 'POST', url: '/api/display/action', headers, payload })).statusCode,
+    200,
+  );
+  assert.equal(snapshot.entities['alarm_control_panel.demo_home'].state, 'armed_home');
+  assert.equal(
+    (
+      await app.inject({
+        method: 'POST',
+        url: '/api/display/action',
+        headers,
+        payload: { tileId: 'demo_general', command: 'toggle' },
+      })
+    ).statusCode,
+    200,
+  );
+  assert.equal(
+    (await app.inject({ url: '/api/display/camera/sample_camera_entrance/still', headers }))
+      .statusCode,
+    403,
+  );
+  assert.equal(
+    (
+      await app.inject({
+        method: 'POST',
+        url: '/api/display/action',
+        headers: { ...headers, origin: 'https://evil.example' },
+        payload,
+      })
+    ).statusCode,
+    403,
+  );
+  assert.equal(
+    (await app.inject({ method: 'POST', url: '/api/display/action', payload })).statusCode,
+    401,
+  );
+  assert.equal((await app.inject({ url: '/api/editor/bootstrap', headers })).statusCode, 404);
+  await pairings.revoke(pairing.device.id);
+  assert.equal(
+    (await app.inject({ method: 'POST', url: '/api/display/action', headers, payload })).statusCode,
+    401,
+  );
+});
+test('alarm throttling and sanitised HA errors apply independently to paired devices sharing an IP address', async (t) => {
+  const { showcaseDocument } = await import('../src/shared/showcase');
+  const { app, store, hub, pairings } = await fixture(t, {
+    surface: 'display',
+    mode: 'ingress',
+    alarmAccess: 'authenticated',
+  });
+  const draft = await store.save(showcaseDocument, 1);
+  await store.publish(draft.draft.revision);
+  const a = await pairings.pair((await pairings.createCode()).code, 'Tablet A'),
+    b = await pairings.pair((await pairings.createCode()).code, 'Tablet B');
+  t.mock.method(hub, 'act', async () => {
+    throw new Error('secret PIN 0007 and private details');
+  });
+  const invoke = (token: string) =>
+    app.inject({
+      method: 'POST',
+      url: '/api/display/action',
+      headers: { cookie: 'hapanel_device=' + token },
+      payload: { tileId: 'demo_alarm', command: 'alarm', mode: 'armed_home', code: '0007' },
+    });
+  for (let index = 0; index < 5; index++) {
+    const response = await invoke(a.token);
+    assert.equal(response.statusCode, 400);
+    assert.equal(response.json().messageKey, 'error.alarmRejected');
+    assert.doesNotMatch(response.body, /0007|private details/);
+  }
+  assert.equal((await invoke(a.token)).statusCode, 429);
+  assert.equal((await invoke(b.token)).statusCode, 400);
 });
 test('camera routes enforce draft versus publication bindings and strip private camera attributes', async (t) => {
   const { showcaseDocument, showcaseSnapshot } = await import('../src/shared/showcase');

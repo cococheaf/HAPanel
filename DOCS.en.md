@@ -38,6 +38,7 @@ The add-on reads `/data/options.json` and writes only to `/data/hapanel`. It req
 | `display_enabled` | `false` | Start the separate display endpoint on container port 8098.                                                                                       |
 | `public_origin`   | empty   | Exact public HTTPS origin, e.g. `https://panel.example.net`; enables Secure cookies.                                                              |
 | `camera_access`   | `admin` | `admin`: existing administrator access; `authenticated`: published view with cameras for active HA users, plus cameras for valid paired displays. |
+| `alarm_access`    | `admin` | `authenticated` additionally permits configured alarm commands for active HA users and valid paired displays.                                     |
 
 Changing modes does not trigger device actions. In live mode, example entities may initially be unavailable; select your own entities in Studio.
 
@@ -102,7 +103,7 @@ Light groups use an existing HA light entity. Automation cards show whether trig
 
 The alarm card shows live status and opens its mode picker directly inside HAPanel. In the Designer, enable and reorder the desired modes: Disarmed, Home, Away, Night, Vacation and Custom bypass. Unsupported integration modes remain disabled. Every command requires confirmation. Open and unavailable configured contacts are listed before arming. When required by HA, enter the code in a password field; it is used only for that request and is never stored in the layout or on the server. The visible alarm state always comes from HA, rather than an optimistic command result.
 
-Alarm commands remain restricted to the HA administrator Ingress session. Camera images can additionally be shared with active HA users and valid paired displays through `camera_access: authenticated`. The default `admin` preserves existing access.
+Alarm commands default to the HA administrator Ingress session; `alarm_access: authenticated` additionally allows active HA users and valid paired displays. Camera images can additionally be shared with active HA users and valid paired displays through `camera_access: authenticated`. The default `admin` preserves existing access.
 
 ## Surveillance
 
@@ -159,10 +160,25 @@ The extension retains schema 1 and reads existing configurations with their prev
 
 ## Camera sharing for users and tablets
 
-The add-on option **Camera viewing** (`camera_access`) accepts `admin` (default) or `authenticated`. With `authenticated`, active HA-authenticated users may read the published dashboard and cameras. They receive no device controls, Designer, drafts, device management or alarm commands. Valid paired tablets receive camera images in addition to their existing controls. Snapshots, HLS resources and WebRTC always require HA authentication or a valid pairing.
+The add-on option **Camera viewing** (`camera_access`) accepts `admin` (default) or `authenticated`. With `authenticated`, active HA-authenticated users may read the published dashboard and cameras. Designer, drafts and device management remain blocked. Other device controls remain blocked; alarm commands may be shared separately through `alarm_access`. Valid paired tablets receive camera images in addition to their existing controls. Snapshots, HLS resources and WebRTC always require HA authentication or a valid pairing.
 
 The published configuration acts as the sharing allowlist. All cameras bound there are shared with these viewers; clients cannot choose arbitrary camera targets or HA services. This is an explicit HAPanel administrator sharing policy; individual HA entity permissions are not replicated. Camera tokens and private stream URLs stay on the server.
 
 Save changes and restart the app. The sidebar entry is visible to non-administrators, but the data API remains blocked until sharing is enabled. Revoking a pairing closes active camera WebRTC sessions. HA accounts are revalidated (30-second role cache, 20-second session check). Selecting `admin` disables camera sharing for paired and non-admin viewers again.
 
 For standalone deployment, `HAPANEL_CAMERA_ACCESS=authenticated` enables the same sharing policy; the default is `admin`.
+
+## Alarm controls for non-administrators
+
+The **Alarm controls** option (`alarm_access`) is independent of camera sharing: `admin` is the default; `authenticated` permits active HA users and valid paired tablets. Save changes and restart. Only alarm entities and modes bound in the published HAPanel configuration can be used. Ordinary HA viewers receive alarm controls alongside their view; other device commands, Designer, drafts and device management remain blocked.
+
+PIN requirements and format come from the HA alarm entity. Leading zeros are retained; codes are cleared from the input on submission and are neither stored nor echoed in errors. Mode confirmation, connectivity checks, contact warnings and a limit of five alarm attempts per minute per HA user or paired device remain active.
+
+| Access                    | Camera viewing  | Alarm controls | Other devices     | Designer |
+| ------------------------- | --------------- | -------------- | ----------------- | -------- |
+| HA administrator          | Yes             | Yes            | Yes               | Yes      |
+| Active HA user            | `camera_access` | `alarm_access` | View only         | No       |
+| Paired tablet             | `camera_access` | `alarm_access` | Existing controls | No       |
+| No authentication/pairing | No              | No             | No                | No       |
+
+For standalone installs, use `HAPANEL_ALARM_ACCESS=authenticated`. Sharing changes no HA user roles and does not replicate individual HA entity permissions.

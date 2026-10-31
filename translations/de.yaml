@@ -10,6 +10,9 @@ configuration:
     description: Exakte HTTPS-Origin des Displayservers, z. B. https://panel.example.net. Aktiviert sichere Cookies.
   camera_access:
     name: Kameraanzeige
-    description: 'admin: Nur Administratoren. authenticated: Veröffentlichte Kameras auch für aktive HA-Benutzer und alle gültig gekoppelten Displays. Designer und Alarm bleiben Administratoren vorbehalten; neue HA-Betrachter erhalten keine Gerätebedienung.'
+    description: 'admin: Nur Administratoren. authenticated: Veröffentlichte Kameras auch für aktive HA-Benutzer und alle gültig gekoppelten Displays. Designer und Geräteverwaltung bleiben auf Administratoren begrenzt; Alarmbedienung wird separat freigegeben.'
+  alarm_access:
+    name: Alarmbedienung
+    description: 'admin: Nur Administratoren. authenticated: Scharf- und Unscharfschalten mit den veröffentlichten Modi auch für aktive HA-Benutzer und alle gültig gekoppelten Displays. HA-Codeabfragen und die Bestätigung bleiben erhalten. Designer und Geräteverwaltung bleiben auf Administratoren begrenzt.'
 network:
   8098/tcp: Optionaler Displayserver für gekoppelte Geräte; HTTPS-Reverse-Proxy verwenden.

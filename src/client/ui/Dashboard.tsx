@@ -154,7 +154,12 @@ export function TileView({
     (!entity ||
       entity.state === 'unavailable' ||
       (entity.state === 'unknown' && tile.kind !== 'scene'));
-  const disabled = !onAction || unavailable || snapshot.status === 'reconnecting' || pending;
+  const disabled =
+    !onAction ||
+    snapshot.deviceControl === false ||
+    unavailable ||
+    snapshot.status === 'reconnecting' ||
+    pending;
   const Icon = tile.room ? roomIcons[tile.room.icon] : tile.energy ? Zap : kindIcons[tile.kind];
   const act = async (command: Action['command'], value?: number) => {
     if (disabled || inFlight.current) return;

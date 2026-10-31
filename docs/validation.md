@@ -1,8 +1,8 @@
-# Prüfstand für 1.4.0
+# Prüfstand für 1.5.0
 
 ## Automatisiert
 
-65 Tests mit Node.js-Test-Runner: Geometrie aller Beispielprofile, Schema- und Domänenvalidierung, Rastergrenzen und Überlappungen, Revisionskonflikte, Entwurf/Veröffentlichung/Wiederherstellung, persistente Sitzungen, einmalige Kopplungscodes, Zugriffsschutz für Ingress und lokale Verwaltung, eingeschränkte Display-API, YAML-Import und aktiver WebSocket-Widerruf.
+68 Tests mit Node.js-Test-Runner: Geometrie aller Beispielprofile, Schema- und Domänenvalidierung, Rastergrenzen und Überlappungen, Revisionskonflikte, Entwurf/Veröffentlichung/Wiederherstellung, persistente Sitzungen, einmalige Kopplungscodes, Zugriffsschutz für Ingress und lokale Verwaltung, eingeschränkte Display-API, YAML-Import und aktiver WebSocket-Widerruf.
 
 Der HA-Adapter wird mit einem lokalen WebSocket-Simulator geprüft: Authentifizierung, gefilterte Abonnements, komprimierte Attribut-Deltas, Prognosen, Administratorprüfung, typisierte Serviceaufrufe und Unterbrechung. Es werden keine echten HA-Geräte angesteuert.
 
@@ -62,3 +62,13 @@ Im Browser wurden alle vier Licht-Schaltmodi mit Beispieldaten durchgespielt, Di
 API- und WebSocket-Tests prüfen aktive normale HA-Benutzer, deaktivierte/unbekannte Konten, gefälschte Ingress-Header, Origin-Prüfung und die Standardoption ohne zusätzliche Freigabe. Nach ausdrücklicher Freigabe sind Standbilder, HLS-Ressourcen, Fähigkeiten und WebRTC auf veröffentlichte Kamera-IDs begrenzt. Normale HA-Betrachter können keine Geräteaktionen, Alarmbefehle, Entwürfe, Veröffentlichungen oder Kopplungsverwaltung aufrufen.
 
 Gekoppelte Kameraansichten verlangen weiterhin eine gültige Sitzung; Widerruf beendet WebRTC und entzieht nachfolgende HTTP-Abrufe. Eine deaktivierte HA-Identität beendet aktive Viewer- und Kamera-Sockets nach erneuter Prüfung. Administrator- und Viewerprüfung teilen denselben Rollen-Cache. Eine Anmeldung mit einem tatsächlichen Nicht-Administrator-Account und ein physischer Tablet-Test sind nicht durch den Simulator ersetzt.
+
+## 1.5.0 · Getrennte Alarmfreigabe
+
+Regressionstests prüfen Alarmzugang für normale HA-Benutzer und gekoppelte Tablets bei gesperrter Kameraanzeige. Nur veröffentlichte Alarmziele und konfigurierte Modi werden akzeptiert; PIN-Pflicht, numerisches Format und führende Nullen bleiben erhalten. Andere Geräteaktionen, Designer und Kopplungsverwaltung bleiben für normale HA-Betrachter gesperrt. Fehlende, fremde oder widerrufene Sitzungen bleiben abgewiesen.
+
+Standbilder, HLS-Ressourcen, Fähigkeiten und Kamera-WebRTC bleiben ohne Kamerafreigabe auch bei aktiver Alarmfreigabe gesperrt. Zwei gekoppelte Geräte hinter derselben IP erhalten unabhängige Alarm-Versuchslimits; private HA-Fehler werden weiterhin bereinigt. Die Prüfungen verwenden ausschließlich synthetische Alarme. Die reale Alarmanlage wird zur Abnahme nicht scharf oder unscharf geschaltet.
+
+Im Browser wurde der gebaute Player mit einem lokalen, synthetischen Nicht-Administrator geprüft: Designer ausgeblendet, normale Licht-/Automationsbefehle deaktiviert, Alarmmodi bedienbar. PIN-Abfrage, Bestätigung, Rückmeldung und das Leeren des Codefelds wurden durchgespielt; der Beispielalarm wurde anschließend wieder deaktiviert. Deutsch und Englisch wurden bei 1080 × 810 geprüft. Die Testumgebung besitzt weder eine echte HA-Adresse noch HA-Zugangsdaten.
+
+Der Abhängigkeitscheck berücksichtigt die neuen Meldungen [GHSA-3g3m-2fjr-6pw4](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4) und [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249). Ein auf `@fastify/static` begrenzter Override verwendet `glob` 14.0.3 und darüber `minimatch` 11.0.3. Die von HAPanel verwendete statische Auslieferung wird nach dem Update am Produktionsbuild geprüft. Der Override kann entfallen, sobald die direkte Bibliothek selbst einen gepatchten Versionsbereich verwendet.

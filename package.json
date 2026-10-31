@@ -1,6 +1,6 @@
 {
   "name": "hapanel",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
   "description": "An independent, touch-first Home Assistant dashboard and visual editor.",
   "license": "MIT",
@@ -9,7 +9,10 @@
     "node": ">=22.12.0"
   },
   "overrides": {
-    "esbuild": "^0.28.2"
+    "esbuild": "^0.28.2",
+    "@fastify/static": {
+      "glob": "^14.0.3"
+    }
   },
   "scripts": {
     "format": "prettier --write src tests scripts .github *.json *.yaml *.html *.ts *.md docs",

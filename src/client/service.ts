@@ -25,6 +25,7 @@ export type Bootstrap = {
   catalog: EntityState[];
   mode: 'demo' | 'live';
   displayEnabled: boolean;
+  access?: { camera: 'admin' | 'authenticated'; alarm: 'admin' | 'authenticated' };
 };
 export type LiveMessage = {
   snapshot?: Snapshot;

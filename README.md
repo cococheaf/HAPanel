@@ -24,7 +24,7 @@
 
 HAPanel verbindet großzügige, abgerundete Kacheln, ruhige Farben und direkte Touch-Bedienung mit einem visuellen Layout-Editor. Es läuft als eigene Home Assistant App (Add-on) oder als lokaler Node.js-Prozess. Bestehende Lovelace-Dashboards und HA-Konfigurationsdateien bleiben unverändert.
 
-**Version: 1.4.0.** Die Vorschau, der Editor und die API sind implementiert. Die HA-Anbindung ist gegen einen simulierten WebSocket-Server geprüft. Installation, Update, Ingress und Live-Daten sind auf HA OS 18.4 / Core 2026.10.4 (amd64) geprüft. Tests auf physischer iPad-Hardware stehen noch aus.
+**Version: 1.5.0.** Die Vorschau, der Editor und die API sind implementiert. Die HA-Anbindung ist gegen einen simulierten WebSocket-Server geprüft. Installation, Update, Ingress und Live-Daten sind auf HA OS 18.4 / Core 2026.10.4 (amd64) geprüft. Tests auf physischer iPad-Hardware stehen noch aus.
 
 ## Ausprobieren
 
@@ -129,6 +129,14 @@ Seitennamen, Seitenüberschriften und eigene Beschriftungen behalten Leerzeichen
 
 Unter **Einstellungen → Apps → HAPanel → Konfiguration → Kameraanzeige** die Option `authenticated` wählen, speichern und neu starten. Der Standard `admin` erhält die bisherige Freigabe.
 
-Mit `authenticated` sehen **aktive, angemeldete HA-Benutzer** die veröffentlichte HAPanel-Ansicht einschließlich Kameras als **Nur Anzeige**. **Gültig gekoppelte Tablets** erhalten ebenfalls Kamerabilder und behalten ihre bisherigen Bedienrechte. Designer, Entwürfe, Kopplungsverwaltung und Alarmbefehle bleiben Administratoren vorbehalten. Ohne HA-Anmeldung oder gültige Kopplung gibt es keinen Kamerazugriff.
+Mit `authenticated` sehen **aktive, angemeldete HA-Benutzer** die veröffentlichte HAPanel-Ansicht einschließlich Kameras als **Nur Anzeige**. **Gültig gekoppelte Tablets** erhalten ebenfalls Kamerabilder und behalten ihre bisherigen Bedienrechte. Designer, Entwürfe und Kopplungsverwaltung bleiben Administratoren vorbehalten. Alarmbefehle können getrennt über `alarm_access` freigegeben werden. Ohne HA-Anmeldung oder gültige Kopplung gibt es keinen Kamerazugriff.
 
 Die Freigabe gilt für alle Kameras in der veröffentlichten HAPanel-Konfiguration, nicht für beliebige HA-Entitäten. Sie ist eine eigene HAPanel-Freigabe und keine Übernahme individueller HA-Entitätsberechtigungen.
+
+## Alarmpanel ohne Administratorrolle
+
+Unter **Einstellungen → Apps → HAPanel → Konfiguration → Alarmbedienung** `authenticated` wählen, speichern und neu starten. Damit dürfen aktive HA-Benutzer und gültig gekoppelte Tablets die veröffentlichten Alarmmodi direkt in HAPanel bedienen. Kameraanzeige und Alarmbedienung werden unabhängig freigegeben; beide stehen standardmäßig auf `admin`.
+
+Ob eine PIN nötig ist, bestimmt die HA-Alarm-Entität. HAPanel übernimmt diese Vorgabe und verlangt weiterhin die Bestätigung des gewählten Modus. Wiederholte Versuche sind begrenzt; Alarmcodes werden nicht gespeichert. Der Designer und die Geräteverwaltung bleiben geschützt. Andere Geräteaktionen bleiben für normale HA-Betrachter gesperrt; gekoppelte Tablets behalten ihre bisherigen Bedienrechte.
+
+![Beispielansicht mit freigegebener Alarmbedienung](docs/images/alarm-viewer.png)

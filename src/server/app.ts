@@ -35,6 +35,7 @@ export interface AppOptions {
   isAdmin?: (id: string) => Promise<boolean>;
   isActiveUser?: (id: string) => Promise<boolean>;
   cameraAccess?: 'admin' | 'authenticated';
+  alarmAccess?: 'admin' | 'authenticated';
 }
 const localHosts = new Set(['localhost', '127.0.0.1', '[::1]']);
 const isLoopback = (address: string) => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(address);
@@ -44,12 +45,18 @@ export async function createApp(options: AppOptions) {
   const { store, pairings, hub } = options;
   const alarmAttempts = new Map<string, number[]>();
   const sharedCameras = options.cameraAccess === 'authenticated';
+  const sharedAlarms = options.alarmAccess === 'authenticated';
   const displayRoles = new WeakMap<FastifyRequest, boolean>();
   const isAdmin = options.isAdmin ?? ((id: string) => hub.isAdmin(id));
   const isActiveUser = options.isActiveUser ?? ((id: string) => hub.isActiveUser(id));
   const isSupervisor = (request: FastifyRequest) =>
     ['172.30.32.2', '::ffff:172.30.32.2'].includes(request.ip);
-  const snapshotFor = (document: Dashboard, alarmControl: boolean, cameraView = alarmControl) => {
+  const snapshotFor = (
+    document: Dashboard,
+    alarmControl: boolean,
+    cameraView = alarmControl,
+    deviceControl = true,
+  ) => {
     const snapshot = hub.getSnapshot(entityIds(document));
     snapshot.entities = Object.fromEntries(
       Object.entries(snapshot.entities).map(([id, entity]) => [id, publicEntity(entity)]),
@@ -58,6 +65,7 @@ export async function createApp(options: AppOptions) {
       ...snapshot,
       alarmControl,
       cameraView,
+      deviceControl,
       contactSources: documentContacts(document, snapshot),
     };
   };
@@ -163,7 +171,7 @@ export async function createApp(options: AppOptions) {
     if (ingressDisplay) {
       const user = ingressUser(request);
       const admin = await isAdmin(user);
-      if (!admin && (!sharedCameras || !(await isActiveUser(user))))
+      if (!admin && (!(sharedCameras || sharedAlarms) || !(await isActiveUser(user))))
         throw new HttpError(403, 'error.displayAccessRequired');
       displayRoles.set(request, admin);
       return;
@@ -172,6 +180,12 @@ export async function createApp(options: AppOptions) {
       throw new HttpError(401, 'error.pairRequired');
     displayRoles.set(request, false);
   };
+  const canControlDevices = (request: FastifyRequest) =>
+    !ingressDisplay || displayRoles.get(request) === true;
+  const canControlAlarm = (request: FastifyRequest) =>
+    displayRoles.get(request) === true || sharedAlarms;
+  const canViewCameras = (request: FastifyRequest) =>
+    displayRoles.get(request) === true || sharedCameras;
 
   app.addHook('onSend', async (_request, reply) => {
     reply.header('X-Content-Type-Options', 'nosniff');
@@ -225,6 +239,10 @@ export async function createApp(options: AppOptions) {
           catalog: (await hub.getCatalog()).map(publicEntity),
           mode: hub.getSnapshot([]).status === 'demo' ? 'demo' : 'live',
           displayEnabled: options.displayEnabled ?? false,
+          access: {
+            camera: sharedCameras ? 'authenticated' : 'admin',
+            alarm: sharedAlarms ? 'authenticated' : 'admin',
+          },
         }));
         admin.put('/draft', async (request) => {
           const body = z
@@ -369,22 +387,27 @@ export async function createApp(options: AppOptions) {
         published: store.getRevision('published'),
         snapshot: snapshotFor(
           store.getRevision('published').document,
-          displayRoles.get(request) === true,
-          ingressDisplay || sharedCameras,
+          canControlAlarm(request),
+          canViewCameras(request),
+          canControlDevices(request),
         ),
         canEdit: displayRoles.get(request) === true,
-        canControl: !ingressDisplay || displayRoles.get(request) === true,
+        canControl: canControlDevices(request),
       }));
       display.post(
         '/action',
         { config: { rateLimit: { max: 20, timeWindow: 1000 } } },
         async (request) => {
-          if (ingressDisplay && displayRoles.get(request) !== true)
+          const action = actionSchema.parse(request.body);
+          if (
+            !canControlDevices(request) &&
+            (action.command !== 'alarm' || !canControlAlarm(request))
+          )
             throw new HttpError(403, 'error.viewerReadOnly');
           await performAction(
             store.getRevision('published').document,
-            actionSchema.parse(request.body),
-            displayRoles.get(request) === true,
+            action,
+            canControlAlarm(request),
             actor(request),
           );
           return { ok: true };
@@ -424,11 +447,12 @@ export async function createApp(options: AppOptions) {
               type: 'snapshot',
               snapshot: snapshotFor(
                 published.document,
-                displayRoles.get(request) === true,
-                ingressDisplay || sharedCameras,
+                canControlAlarm(request),
+                canViewCameras(request),
+                canControlDevices(request),
               ),
               canEdit: displayRoles.get(request) === true,
-              canControl: !ingressDisplay || displayRoles.get(request) === true,
+              canControl: canControlDevices(request),
               ...(changed ? { published } : {}),
             }),
           );
@@ -460,7 +484,7 @@ export async function createApp(options: AppOptions) {
       prefix: '/api/display/camera',
       document: () => store.getRevision('published').document,
       authorize: requireDisplay,
-      allowed: ingressDisplay || sharedCameras,
+      allowed: canViewCameras,
     },
     ...(options.surface === 'editor'
       ? [
@@ -468,7 +492,7 @@ export async function createApp(options: AppOptions) {
             prefix: '/api/editor/camera',
             document: () => store.getRevision('draft').document,
             authorize: requireEditor,
-            allowed: true,
+            allowed: (_request: FastifyRequest) => true,
           },
         ]
       : []),
@@ -481,7 +505,7 @@ export async function createApp(options: AppOptions) {
       context.prefix + '/:id/capabilities',
       { onRequest: context.authorize, config: { rateLimit: { max: 120, timeWindow: 60_000 } } },
       async (request, reply) => {
-        if (!context.allowed) throw new HttpError(403, 'error.cameraAdminRequired');
+        if (!context.allowed(request)) throw new HttpError(403, 'error.cameraAdminRequired');
         reply.header('Cache-Control', 'no-store');
         const tile = boundCamera(request.params.id);
         if (!tile) throw new HttpError(404, 'error.tileNotAllowed');
@@ -499,7 +523,7 @@ export async function createApp(options: AppOptions) {
         const tile = boundCamera(request.params.id),
           identity = actor(request);
         if (
-          !context.allowed ||
+          !context.allowed(request) ||
           !tile ||
           cameraPeers.size >= 32 ||
           [...cameraPeers.values()].filter((value) => value === identity).length >= 16
@@ -531,6 +555,7 @@ export async function createApp(options: AppOptions) {
           try {
             await context.authorize(request);
             if (
+              !context.allowed(request) ||
               boundCamera(request.params.id)?.entityId !== tile.entityId ||
               hub.getSnapshot([]).status === 'reconnecting'
             ) {
@@ -585,7 +610,7 @@ export async function createApp(options: AppOptions) {
           },
         },
         async (request, reply) => {
-          if (!context.allowed) throw new HttpError(403, 'error.cameraAdminRequired');
+          if (!context.allowed(request)) throw new HttpError(403, 'error.cameraAdminRequired');
           const tile = allControls(context.document()).find(
             (tile) => tile.id === request.params.id && tile.kind === 'camera',
           );

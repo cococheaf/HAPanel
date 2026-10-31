@@ -41,6 +41,7 @@ Das Add-on liest `/data/options.json` und schreibt ausschließlich in `/data/hap
 | `display_enabled` | `false`  | Separaten Displayserver auf Container-Port 8098 starten.                                                                                                          |
 | `public_origin`   | leer     | Exakte externe HTTPS-Origin des Displayservers, z. B. `https://panel.example.net`. Aktiviert Secure-Cookies.                                                      |
 | `camera_access`   | `admin`  | `admin`: bisheriger Administratorzugang; `authenticated`: veröffentlichte Ansicht samt Kameras für aktive HA-Benutzer und Kameras für gültig gekoppelte Displays. |
+| `alarm_access`    | `admin`  | `authenticated` erlaubt konfigurierte Alarmbefehle zusätzlich für aktive HA-Benutzer und gültig gekoppelte Displays.                                              |
 
 Ein geänderter Modus startet nicht automatisch Geräteaktionen. Im Live-Modus sind die Beispielentitäten zunächst möglicherweise nicht verfügbar; im Editor eigene Entitäten wählen.
 
@@ -106,7 +107,7 @@ Lichtgruppen verwenden die vorhandene HA-Lichtentität. Automationskacheln zeige
 
 Das Alarmpanel zeigt den Live-Zustand und öffnet die Moduswahl direkt in HAPanel. Im Designer unter **Alarmmodi** lassen sich die angebotenen Modi aktivieren und sortieren. Unterstützt werden Unscharf, Zuhause, Abwesend, Nacht, Urlaub und benutzerdefinierter Bypass, soweit die HA-Integration diese unterstützt. Nicht unterstützte Modi sind deaktiviert. Vor jedem Befehl erscheint eine Bestätigung; offene und unbekannte Tür-/Fensterkontakte werden vor dem Scharfschalten angezeigt. Wenn HA einen Code verlangt, fragt HAPanel ihn als Passwort ab. Codes werden weder im Layout noch auf dem Server gespeichert. Ein bestätigter Befehl ersetzt keine Rückmeldung: Der angezeigte Alarmzustand stammt weiterhin aus HA.
 
-Alarmbefehle bleiben dem HA-Administratorzugang über Ingress vorbehalten. Kamerabilder können zusätzlich unter `camera_access: authenticated` für aktive HA-Benutzer und gültig gekoppelte Displays freigegeben werden. Der Standard `admin` erweitert bestehende Freigaben nicht.
+Alarmbefehle sind standardmäßig dem HA-Administratorzugang über Ingress vorbehalten; `alarm_access: authenticated` erlaubt sie zusätzlich für aktive HA-Benutzer und gültig gekoppelte Displays. Kamerabilder können zusätzlich unter `camera_access: authenticated` für aktive HA-Benutzer und gültig gekoppelte Displays freigegeben werden. Der Standard `admin` erweitert bestehende Freigaben nicht.
 
 ## Überwachung
 
@@ -163,10 +164,25 @@ Die Erweiterung bleibt in Schema 1 und liest vorhandene Konfigurationen mit bish
 
 ## Kamerafreigabe für Benutzer und Tablets
 
-Die Add-on-Option **Kameraanzeige** (`camera_access`) bietet `admin` (Standard) und `authenticated`. Bei `authenticated` dürfen aktive, über HA angemeldete Benutzer die veröffentlichte Ansicht samt Kameras lesen. Sie erhalten keine Gerätebedienung, keinen Designer, keine Entwürfe, keine Geräteverwaltung und keine Alarmbefehle. Gültig gekoppelte Tablets erhalten Kamerabilder zusätzlich zu ihren bisherigen Bedienrechten. Ohne Anmeldung oder gültige Kopplung sind Standbilder, HLS-Dateien und WebRTC gesperrt.
+Die Add-on-Option **Kameraanzeige** (`camera_access`) bietet `admin` (Standard) und `authenticated`. Bei `authenticated` dürfen aktive, über HA angemeldete Benutzer die veröffentlichte Ansicht samt Kameras lesen. Designer, Entwürfe und Geräteverwaltung bleiben gesperrt. Andere Gerätebedienung bleibt gesperrt; Alarmbefehle sind separat über `alarm_access` freigebbar. Gültig gekoppelte Tablets erhalten Kamerabilder zusätzlich zu ihren bisherigen Bedienrechten. Ohne Anmeldung oder gültige Kopplung sind Standbilder, HLS-Dateien und WebRTC gesperrt.
 
 Die Veröffentlichung bildet die Freigabeliste. Alle dort gebundenen Kameras sind für die genannten Betrachter sichtbar; Kamera-Ziele oder HA-Services können nicht frei angegeben werden. Dies ist eine eigene Freigabe durch den HAPanel-Administrator; individuelle HA-Entitätsrechte werden nicht nachgebildet. Kameratokens und private Streamadressen bleiben serverseitig.
 
 Nach einer Änderung speichern und die App neu starten. Die Sidebar ist auch für Nicht-Administratoren sichtbar; ohne die Freigabe bleibt die Daten-API für sie gesperrt. Kopplungswiderruf beendet aktive Kamera-WebRTC-Sitzungen. Aktive HA-Konten werden nachgeprüft (30 Sekunden Rollen-Cache, 20 Sekunden Sitzungsprüfung). Die Option `admin` sperrt gekoppelte und nicht administrative Kameraansichten wieder.
 
 Im eigenständigen Betrieb entspricht `HAPANEL_CAMERA_ACCESS=authenticated` dieser Freigabe; ohne die Variable bleibt `admin` aktiv.
+
+## Alarmpanel für Nicht-Administratoren
+
+Die Option **Alarmbedienung** (`alarm_access`) ist unabhängig von der Kameraanzeige: `admin` ist der Standard, `authenticated` erlaubt aktive HA-Benutzer und gültig gekoppelte Tablets. Nach einer Änderung speichern und neu starten. Es werden nur Alarm-Entitäten und Modi bedient, die in der veröffentlichten HAPanel-Konfiguration gebunden sind. Ein normaler HA-Betrachter erhält dadurch ausschließlich Alarmbedienung zusätzlich zu seiner Ansicht; andere Gerätebefehle, Designer, Entwürfe und Geräteverwaltung bleiben gesperrt.
+
+PIN-Pflicht und PIN-Format stammen von der HA-Alarm-Entität. Führende Nullen bleiben erhalten; Codes werden nach dem Absenden im Eingabefeld gelöscht und nicht gespeichert oder in Fehlern ausgegeben. Die Modusbestätigung, Verbindungsprüfung, Hinweise zu Kontakten und die Begrenzung auf fünf Alarmversuche pro Minute und Benutzer beziehungsweise gekoppeltem Gerät bleiben aktiv.
+
+| Zugang                  | Kameraanzeige   | Alarmbedienung | Andere Geräte          | Designer |
+| ----------------------- | --------------- | -------------- | ---------------------- | -------- |
+| HA-Administrator        | Ja              | Ja             | Ja                     | Ja       |
+| Aktiver HA-Benutzer     | `camera_access` | `alarm_access` | Nur Anzeige            | Nein     |
+| Gekoppeltes Tablet      | `camera_access` | `alarm_access` | Bisherige Bedienrechte | Nein     |
+| Ohne Anmeldung/Kopplung | Nein            | Nein           | Nein                   | Nein     |
+
+Für eigenständige Installationen entspricht `HAPANEL_ALARM_ACCESS=authenticated` dieser Freigabe. Die Freigabe verändert keine HA-Benutzerrollen und bildet individuelle HA-Entitätsrechte nicht nach.

@@ -65,7 +65,15 @@ export default function Player({
           <span>HAPanel</span>
         </a>
         {demo && <span className="player-demo-tag">{t('player.interactiveDemo')}</span>}
-        {!onAction && <span className="player-demo-tag">{t('player.readOnlyAccess')}</span>}
+        {(!onAction || snapshot.deviceControl === false) && (
+          <span className="player-demo-tag">
+            {t(
+              snapshot.alarmControl && onAction
+                ? 'player.alarmOnlyAccess'
+                : 'player.readOnlyAccess',
+            )}
+          </span>
+        )}
         <div className="header-spacer" />
         <LanguageSwitcher />
         <select

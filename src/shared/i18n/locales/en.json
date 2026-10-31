@@ -432,7 +432,7 @@
   "error.alarmCodeRequired": "An alarm code is required for this mode.",
   "error.alarmCodeFormat": "The alarm code must contain digits only.",
   "error.alarmRejected": "The alarm system did not confirm the command. Check the code and current state.",
-  "error.alarmAdminRequired": "Alarm controls are available to the existing HA administrator session. Separately paired displays are not authorised for alarm controls.",
+  "error.alarmAdminRequired": "Alarm controls are not enabled for this access.",
   "error.alarmRateLimit": "Too many alarm commands. Please wait one minute.",
   "kind.camera": "Camera",
   "camera.refresh": "Preview refresh · seconds",
@@ -542,7 +542,8 @@
   "error.lightNotDimmable": "This light or group does not fully support dimming.",
   "error.requiredText": "Please enter some text.",
   "editor.requiredTextHint": "Please enter some text. Leaving an empty required field restores its saved text.",
-  "error.displayAccessRequired": "This account is not authorised for HAPanel. An administrator can enable camera viewing for signed-in users in the HAPanel app options.",
-  "error.viewerReadOnly": "This Home Assistant account may view HAPanel but cannot control devices.",
-  "player.readOnlyAccess": "View only"
+  "error.displayAccessRequired": "This account is not authorised for HAPanel. An administrator can enable camera or alarm sharing in the HAPanel app options.",
+  "error.viewerReadOnly": "This device control is not enabled for this access.",
+  "player.readOnlyAccess": "View only",
+  "player.alarmOnlyAccess": "View & alarm controls"
 }

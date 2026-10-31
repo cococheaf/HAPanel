@@ -18,7 +18,7 @@
 
 HAPanel combines rounded tiles, calm colours and direct touch controls with a visual layout editor. It runs as a Home Assistant app (add-on) or a local Node.js process. Existing Lovelace dashboards and HA configuration files are preserved.
 
-**Version: 1.4.0.** The preview, editor and API are implemented. The HA adapter is tested against a simulated WebSocket server. Installation, updates, Ingress and live data are verified on HA OS 18.4 / Core 2026.10.4 (amd64). Testing on physical iPad hardware remains pending.
+**Version: 1.5.0.** The preview, editor and API are implemented. The HA adapter is tested against a simulated WebSocket server. Installation, updates, Ingress and live data are verified on HA OS 18.4 / Core 2026.10.4 (amd64). Testing on physical iPad hardware remains pending.
 
 ## Try it
 
@@ -125,6 +125,14 @@ Page names, headings and custom labels preserve spaces while typing and saving. 
 
 In **Settings → Apps → HAPanel → Configuration → Camera viewing**, select `authenticated`, save and restart. The default `admin` retains the existing access policy.
 
-With `authenticated`, **active, signed-in HA users** can view the published HAPanel dashboard including cameras in **View only** mode. **Valid paired tablets** also receive camera images while retaining their previous device controls. Designer, drafts, pairing management and alarm commands remain administrator-only. Camera access always requires HA sign-in or a valid pairing.
+With `authenticated`, **active, signed-in HA users** can view the published HAPanel dashboard including cameras in **View only** mode. **Valid paired tablets** also receive camera images while retaining their previous device controls. Designer, drafts and pairing management remain administrator-only. Alarm commands can be shared separately through `alarm_access`. Camera access always requires HA sign-in or a valid pairing.
 
 Sharing covers all cameras bound in the published HAPanel configuration, not arbitrary HA entities. This is an explicit HAPanel sharing policy; individual HA entity permissions are not replicated.
+
+## Alarm controls without an administrator role
+
+In **Settings → Apps → HAPanel → Configuration → Alarm controls**, choose `authenticated`, save and restart. Active HA users and valid paired tablets may then use the published alarm modes directly in HAPanel. Camera viewing and alarm controls are shared independently; both default to `admin`.
+
+The HA alarm entity determines whether a PIN is required. HAPanel retains that requirement and confirmation of the selected mode. Repeated attempts are limited and alarm codes are not stored. Designer and device management remain protected. Ordinary HA viewers cannot perform other device actions; paired tablets retain their existing controls.
+
+![Sample view with shared alarm controls](docs/images/alarm-viewer-en.png)

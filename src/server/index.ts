@@ -13,6 +13,7 @@ async function main() {
     display_enabled?: boolean;
     public_origin?: string;
     camera_access?: 'admin' | 'authenticated';
+    alarm_access?: 'admin' | 'authenticated';
   } = {};
   if (mode === 'ingress') addon = JSON.parse(await readFile('/data/options.json', 'utf8'));
   const demo = mode === 'demo' || (mode === 'ingress' && addon.demo_mode === true);
@@ -63,6 +64,9 @@ async function main() {
     cameraAccess:
       addon.camera_access ??
       (process.env.HAPANEL_CAMERA_ACCESS === 'authenticated' ? 'authenticated' : 'admin'),
+    alarmAccess:
+      addon.alarm_access ??
+      (process.env.HAPANEL_ALARM_ACCESS === 'authenticated' ? 'authenticated' : 'admin'),
   };
   const editor = await createApp({ ...common, surface: 'editor' });
   const port = Number(process.env.PORT ?? (mode === 'ingress' ? 8099 : 4310));

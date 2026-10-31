@@ -374,6 +374,7 @@ export type Snapshot = {
   alarmControl?: boolean;
   contactSources?: { entityId: string; label: string }[];
   cameraView?: boolean;
+  deviceControl?: boolean;
 };
 export type Action = {
   tileId: string;

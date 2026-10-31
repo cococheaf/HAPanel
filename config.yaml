@@ -1,5 +1,5 @@
 name: HAPanel
-version: '1.4.0'
+version: '1.5.0'
 slug: hapanel
 description: Independent iOS-inspired wall dashboards with a visual editor
 url: https://github.com/cococheaf/HAPanel
@@ -26,8 +26,10 @@ options:
   display_enabled: false
   public_origin: ''
   camera_access: admin
+  alarm_access: admin
 schema:
   demo_mode: bool
   display_enabled: bool
   public_origin: str
   camera_access: list(admin|authenticated)
+  alarm_access: list(admin|authenticated)

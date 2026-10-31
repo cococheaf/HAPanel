@@ -432,7 +432,7 @@
   "error.alarmCodeRequired": "Für diesen Modus ist ein Alarmcode erforderlich.",
   "error.alarmCodeFormat": "Der Alarmcode muss aus Ziffern bestehen.",
   "error.alarmRejected": "Das Alarmsystem hat den Befehl nicht bestätigt. Prüfe den Code und den aktuellen Zustand.",
-  "error.alarmAdminRequired": "Alarmsteuerung ist für den bestehenden HA-Administratorzugang freigegeben. Separat gekoppelte Displays haben dafür keine Freigabe.",
+  "error.alarmAdminRequired": "Die Alarmbedienung ist für diesen Zugang nicht freigegeben.",
   "error.alarmRateLimit": "Zu viele Alarmbefehle. Bitte warte eine Minute.",
   "kind.camera": "Kamera",
   "camera.refresh": "Vorschaubild aktualisieren · Sekunden",
@@ -542,7 +542,8 @@
   "error.lightNotDimmable": "Dieses Licht oder diese Gruppe ist nicht vollständig dimmbar.",
   "error.requiredText": "Bitte einen Text eingeben.",
   "editor.requiredTextHint": "Bitte einen Text eingeben. Ein leeres Pflichtfeld wird beim Verlassen auf den gespeicherten Text zurückgesetzt.",
-  "error.displayAccessRequired": "Dieser Zugang ist für HAPanel nicht freigegeben. Die Kameraanzeige für angemeldete Benutzer kann ein Administrator in den HAPanel-App-Optionen aktivieren.",
-  "error.viewerReadOnly": "Dieser Home-Assistant-Zugang darf HAPanel ansehen, aber keine Geräte bedienen.",
-  "player.readOnlyAccess": "Nur Anzeige"
+  "error.displayAccessRequired": "Dieser Zugang ist für HAPanel nicht freigegeben. Ein Administrator kann die Kamera- oder Alarmfreigabe in den HAPanel-App-Optionen aktivieren.",
+  "error.viewerReadOnly": "Diese Gerätebedienung ist für diesen Zugang nicht freigegeben.",
+  "player.readOnlyAccess": "Nur Anzeige",
+  "player.alarmOnlyAccess": "Ansicht & Alarmpanel"
 }

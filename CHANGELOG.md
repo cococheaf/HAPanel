@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.5.0
+
+- Indirekte Bibliotheken für die statische Dateiauslieferung auf gepatchte Versionen aktualisiert.
+
+- Eigene Option `alarm_access: authenticated` für Alarmbedienung durch aktive HA-Benutzer und gültig gekoppelte Tablets. Standard bleibt `admin`; Kamerafreigabe und Alarmfreigabe sind unabhängig.
+- Nur veröffentlichte Alarm-Entitäten und konfigurierte Modi sind bedienbar. HA-Codeabfragen, Bestätigung und Begrenzung wiederholter Versuche bleiben erhalten.
+- Normale HA-Betrachter können bei Alarmfreigabe das Alarmpanel bedienen; andere Geräte und der Designer bleiben geschützt. Kamera-HTTP und WebRTC prüfen ihre eigene Freigabe auch bei reinem Alarmzugang.
+- Deutsche/englische Hinweise, Rollenübersicht und zusätzliche Tests für PINs, freigegebene Modi, Kopplungen und versuchsweise Rechteüberschreitung ergänzt.
+
 ## 1.4.0
 
 - Explizite Kamerafreigabe für aktive HA-Benutzer ohne Administratorrolle und gültig gekoppelte Tablets über `camera_access: authenticated`. Standard `admin` erhält bestehende Freigaben.
