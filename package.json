@@ -1,6 +1,6 @@
 {
   "name": "hapanel",
-  "version": "2.0.2",
+  "version": "2.1.0",
   "private": true,
   "description": "An independent, touch-first Home Assistant dashboard and visual editor.",
   "license": "MIT",

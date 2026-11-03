@@ -188,6 +188,8 @@ export async function createApp(options: AppOptions) {
         : pairings.authenticate(request.cookies.hapanel_device)?.settings;
   const publishedFor = (request: FastifyRequest) => {
     const revision = store.getRevision('published');
+    // Saved templates belong to the administrator, not to paired display payloads.
+    delete revision.document.designs;
     const allowed = settingsFor(request)?.allowedProfiles;
     if (allowed) {
       const originalCameras = revision.document.pages

@@ -190,3 +190,7 @@ Für eigenständige Installationen entspricht `HAPANEL_ALARM_ACCESS=authenticate
 ## HAPanel 2.0
 
 Die neuen Designer-, Display-, Kamera-, Ereignis- und Energiefunktionen beschreibt die [Bedienungsanleitung für 2.0](docs/experience.md).
+
+## Eigene Designs
+
+Im Designer rechts **Design** öffnen. [Glass, eigene Vorlagen und Design-Austausch](docs/designs.md).

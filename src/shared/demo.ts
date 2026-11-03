@@ -164,6 +164,8 @@ const sampleTileKeys = {
 const showcaseCopy: Record<string, { title: string; key: MessageKey }> = {
   sample_camera_entrance: { title: 'Eingang', key: 'sample.entrance' },
   sample_camera_garden: { title: 'Garten', key: 'sample.garden' },
+  glass_section_eg: { title: 'Erdgeschoss', key: 'sample.floorEG' },
+  glass_section_og: { title: 'Obergeschoss', key: 'sample.floorOG' },
   demo_general: { title: 'General Licht', key: 'sample.generalLight' },
   demo_summer: { title: 'Beschattung Sommer', key: 'sample.summer' },
   demo_alarm: { title: 'Alarmpanel', key: 'kind.alarm' },
@@ -254,49 +256,55 @@ export function localizeSampleDocument(document: Dashboard, language: Language):
               ? sample(page.heading ?? '', 'Dein Energiecockpit.', 'sample.headingEnergy')
               : (page.originId ?? page.id) === 'surveillance'
                 ? sample(page.heading, 'Zuhause im Blick.', 'sample.headingSurveillance')
-                : page.heading,
+                : (page.originId ?? page.id) === 'glass_overview'
+                  ? sample(page.heading, 'Schön, dass du da bist.', 'sample.greeting')
+                  : page.heading,
       subtitle:
-        (page.originId ?? page.id) === 'eg'
-          ? sample(
-              page.subtitle ?? '',
-              'Erdgeschoss · Wohnen, kochen und ankommen.',
-              'sample.subtitleEG',
-            )
-          : (page.originId ?? page.id) === 'og'
+        (page.originId ?? page.id) === 'glass_overview'
+          ? sample(page.subtitle ?? '', demoDocument.subtitle, 'sample.subtitle')
+          : (page.originId ?? page.id) === 'eg'
             ? sample(
                 page.subtitle ?? '',
-                'Obergeschoss · Ruhe, Raum und Wohlbefinden.',
-                'sample.subtitleOG',
+                'Erdgeschoss · Wohnen, kochen und ankommen.',
+                'sample.subtitleEG',
               )
-            : (page.originId ?? page.id) === 'energy'
+            : (page.originId ?? page.id) === 'og'
               ? sample(
                   page.subtitle ?? '',
-                  'Erzeugung, Netz und Speicher auf einen Blick.',
-                  'sample.subtitleEnergy',
+                  'Obergeschoss · Ruhe, Raum und Wohlbefinden.',
+                  'sample.subtitleOG',
                 )
-              : (page.originId ?? page.id) === 'surveillance'
+              : (page.originId ?? page.id) === 'energy'
                 ? sample(
                     page.subtitle ?? '',
-                    'Kameras · Live-Ansichten bei Bedarf.',
-                    'sample.subtitleSurveillance',
+                    'Erzeugung, Netz und Speicher auf einen Blick.',
+                    'sample.subtitleEnergy',
                   )
-                : page.subtitle,
-      name:
-        (page.originId ?? page.id) === 'features'
-          ? sample(page.name, 'Geräte', 'sample.features')
-          : (page.originId ?? page.id) === 'eg'
-            ? sample(page.name, 'EG', 'sample.navEG')
-            : (page.originId ?? page.id) === 'og'
-              ? sample(page.name, 'OG', 'sample.navOG')
-              : (page.originId ?? page.id) === 'energy'
-                ? sample(page.name, 'Energie', 'sample.energy')
                 : (page.originId ?? page.id) === 'surveillance'
-                  ? sample(page.name, 'Überwachung', 'sample.surveillance')
-                  : (page.originId ?? page.id) === 'overview'
-                    ? sample(page.name, 'Zuhause', 'sample.home')
-                    : (page.originId ?? page.id) === 'favorites'
-                      ? sample(page.name, 'Favoriten', 'sample.favourites')
-                      : page.name,
+                  ? sample(
+                      page.subtitle ?? '',
+                      'Kameras · Live-Ansichten bei Bedarf.',
+                      'sample.subtitleSurveillance',
+                    )
+                  : page.subtitle,
+      name:
+        (page.originId ?? page.id) === 'glass_overview'
+          ? sample(page.name, 'Übersicht', 'design.overview')
+          : (page.originId ?? page.id) === 'features'
+            ? sample(page.name, 'Geräte', 'sample.features')
+            : (page.originId ?? page.id) === 'eg'
+              ? sample(page.name, 'EG', 'sample.navEG')
+              : (page.originId ?? page.id) === 'og'
+                ? sample(page.name, 'OG', 'sample.navOG')
+                : (page.originId ?? page.id) === 'energy'
+                  ? sample(page.name, 'Energie', 'sample.energy')
+                  : (page.originId ?? page.id) === 'surveillance'
+                    ? sample(page.name, 'Überwachung', 'sample.surveillance')
+                    : (page.originId ?? page.id) === 'overview'
+                      ? sample(page.name, 'Zuhause', 'sample.home')
+                      : (page.originId ?? page.id) === 'favorites'
+                        ? sample(page.name, 'Favoriten', 'sample.favourites')
+                        : page.name,
       tiles: page.tiles.map((tile) => {
         let view = localizedSampleTile(tile, language);
         if ((tile.originId ?? tile.id) === 'demo_contacts' && tile.contacts) {

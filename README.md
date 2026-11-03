@@ -24,7 +24,7 @@
 
 HAPanel verbindet großzügige, abgerundete Kacheln, ruhige Farben und direkte Touch-Bedienung mit einem visuellen Layout-Editor. Es läuft als eigene Home Assistant App (Add-on) oder als lokaler Node.js-Prozess. Bestehende Lovelace-Dashboards und HA-Konfigurationsdateien bleiben unverändert.
 
-**Version: 2.0.2.** Die Vorschau, der Editor und die API sind implementiert. Die HA-Anbindung ist gegen einen simulierten WebSocket-Server geprüft. Installation, Update, Ingress und Live-Daten sind auf HA OS 18.4 / Core 2026.10.4 (amd64) geprüft. Tests auf physischer iPad-Hardware stehen noch aus.
+**Version: 2.1.0.** Die Vorschau, der Editor und die API sind implementiert. Die HA-Anbindung ist gegen einen simulierten WebSocket-Server geprüft. Installation, Update, Ingress und Live-Daten sind auf HA OS 18.4 / Core 2026.10.4 (amd64) geprüft. Tests auf physischer iPad-Hardware stehen noch aus.
 
 ![Adaptive iPad-Ansicht](docs/images/adaptive-light-v2.png)
 
@@ -41,6 +41,10 @@ HAPanel verbindet großzügige, abgerundete Kacheln, ruhige Farben und direkte T
 - Energie-Statistiken für 24 Stunden, 7 und 30 Tage; Zählerquellen und feste Tarife sind explizit konfigurierbar.
 
 [Bedienung der neuen Funktionen](docs/experience.md) · [Widget-Modell](docs/widgets.md)
+
+## Glass und eigene Designs
+
+Vier frei anpassbare Vorlagen, eine Designbibliothek pro Installation und unabhängige Gestaltung pro Display: Farben, Glas, Hintergrund, Rundung und Textgröße. Designs lassen sich als reine Gestaltungsdateien teilen. Der Designer bietet frei platzierbare Abschnittsüberschriften und ein bearbeitbares Glass-Startlayout. [Anleitung für eigene Designs](docs/designs.md).
 
 ## Ausprobieren
 

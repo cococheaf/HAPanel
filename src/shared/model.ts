@@ -1,5 +1,6 @@
 import { UserError } from './i18n';
 import { z } from 'zod';
+import { designSchema, savedDesignSchema } from './design';
 import {
   commands,
   gestureSchema,
@@ -41,6 +42,7 @@ export const tileKinds = [
   'fan',
   'vacuum',
   'button',
+  'section',
 ] as const;
 export type TileKind = (typeof tileKinds)[number];
 const entityId = z.string().regex(/^[a-z_]+\.[a-z0-9_]+$/);
@@ -171,6 +173,7 @@ export const profileSchema = z
     id,
     name: text(64),
     theme: z.enum(['dusk', 'ocean', 'sand']).optional(),
+    design: designSchema.optional(),
     experience: profileExperienceSchema.optional(),
     greeting: text(80).optional(),
     subtitle: z.string().max(100).optional(),
@@ -195,7 +198,7 @@ export const tileSchema = z
     originId: id.optional(),
     kind: z.enum(tileKinds),
     title: text(64),
-    entityId,
+    entityId: z.union([entityId, z.literal('')]),
     accent: z.enum(['amber', 'mint', 'blue', 'rose', 'purple', 'orange', 'red', 'gray']),
     layouts: z.record(id, rectSchema),
     room: roomSchema.optional(),
@@ -234,6 +237,14 @@ export const dashboardSchema = z
     subtitle: z.string().max(100),
     theme: z.enum(['dusk', 'ocean', 'sand']),
     profiles: z.array(profileSchema).min(1).max(8),
+    designs: z
+      .array(savedDesignSchema)
+      .max(24)
+      .refine(
+        (items) => new Set(items.map((item) => item.id)).size === items.length,
+        'error.uniqueIds',
+      )
+      .optional(),
     alerts: z.array(alertRuleSchema).max(24).optional(),
     pages: z
       .array(
@@ -324,6 +335,7 @@ export const dashboardSchema = z
       }
     }
     const domains: Record<TileKind, string[]> = {
+      section: [''],
       light: ['light', 'switch'],
       climate: ['climate'],
       media: ['media_player'],
@@ -355,6 +367,21 @@ export const dashboardSchema = z
             message: 'error.entityKind',
             path: ['pages', pageIndex, 'tiles', ti],
           });
+        if (
+          tile.kind === 'section' &&
+          (tile.entityId !== '' ||
+            tile.room ||
+            tile.energy ||
+            tile.contacts ||
+            tile.camera ||
+            tile.alarm ||
+            tile.light)
+        )
+          ctx.addIssue({
+            code: 'custom',
+            message: 'error.entityKind',
+            path: ['pages', pageIndex, 'tiles', ti],
+          });
         if ((tile.room && tile.energy) || (tile.energy && tile.kind !== 'sensor')) {
           ctx.addIssue({
             code: 'custom',
@@ -380,6 +407,7 @@ export const dashboardSchema = z
         }
         for (const control of tile.room?.controls ?? []) {
           if (
+            control.kind === 'section' ||
             control.kind === 'contacts' ||
             control.kind === 'camera' ||
             (control.alarm && control.kind !== 'alarm') ||

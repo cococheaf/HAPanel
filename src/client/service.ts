@@ -15,6 +15,7 @@ import {
   legacyShowcaseDocument,
   legacyV1ShowcaseDocument,
   showcaseDocument,
+  glassShowcaseDocument,
   showcaseSnapshot,
 } from '../shared/showcase';
 import { parse, stringify } from 'yaml';
@@ -151,7 +152,7 @@ export class BrowserDemoService implements StudioService {
     const revision = {
       revision: 1,
       savedAt: new Date().toISOString(),
-      document: structuredClone(showcaseDocument),
+      document: structuredClone(glassShowcaseDocument),
     };
     this.workspace = structuredClone({ draft: revision, published: revision, history: [] });
     try {
@@ -164,7 +165,7 @@ export class BrowserDemoService implements StudioService {
           this.workspace =
             data.draft.revision === 1 &&
             data.history.length === 0 &&
-            [demoDocument, legacyShowcaseDocument, legacyV1ShowcaseDocument].some(
+            [demoDocument, showcaseDocument, legacyShowcaseDocument, legacyV1ShowcaseDocument].some(
               (document) =>
                 JSON.stringify(data.draft.document) === JSON.stringify(document) &&
                 JSON.stringify(data.published.document) === JSON.stringify(document),

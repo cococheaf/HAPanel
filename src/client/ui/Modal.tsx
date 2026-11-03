@@ -1,5 +1,6 @@
+import { DesignContext } from './DesignContext';
 import { useI18n } from '../i18n';
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useContext, useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
@@ -21,6 +22,7 @@ export function Modal({
   className?: string;
 }) {
   const { t } = useI18n();
+  const design = useContext(DesignContext);
 
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -39,7 +41,11 @@ export function Modal({
     <dialog
       ref={ref}
       aria-labelledby={titleId}
-      className={'modal ' + (wide ? 'wide-modal ' : '') + className}
+      className={
+        'modal ' + (design ? 'design-modal ' : '') + (wide ? 'wide-modal ' : '') + className
+      }
+      style={design?.style}
+      data-color-mode={design?.scheme}
       onCancel={(event) => {
         event.preventDefault();
         onClose();

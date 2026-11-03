@@ -1,3 +1,4 @@
+import { createGlassOverview } from './glass-layout';
 import { demoDocument, demoSnapshot } from './demo';
 import {
   dashboardSchema,
@@ -450,3 +451,11 @@ export function showcaseSnapshot(): Snapshot {
     };
   return snapshot;
 }
+
+/** Fresh browser previews use the same editable Glass templates as real installations. */
+export const glassShowcaseDocument: Dashboard = (() => {
+  let document = structuredClone(showcaseDocument);
+  for (const profile of document.profiles)
+    document = createGlassOverview(document, profile.id, 'de').document;
+  return document;
+})();

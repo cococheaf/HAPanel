@@ -91,3 +91,7 @@ Der HA-Adapter hält eine feste zusätzliche `subscribe_events`-Subscription auf
 Recorder-Statistiken werden pro Entität und Zeitraum fünf Minuten gecacht, auf abgeschlossene Stunden und maximal 800 Punkte begrenzt. Quellen bleiben auf den jeweiligen Dokumentbereich beschränkt. Energiezähler verwenden `change`, Messwerte `mean`; angeforderte Einheiten passen zur aktuellen Quelle. Fehlende Werte, Tarife und erforderliche Messgrenzen werden nicht ersetzt.
 
 Tablet-Messungen enthalten ausschließlich CSS-Fläche, DPR und Kontaktzeit. Sie bleiben im Arbeitsspeicher; Layoutzuweisung und zusätzliche Einschränkungen werden separat neben gehashten Kopplungen persistiert. Langsame Display-WebSockets werden bei über 1 MiB ausstehender Daten geschlossen und verbinden sich anschließend erneut.
+
+## Konfigurierbare Gestaltung
+
+Optionale `profile.design`-Werte steuern ausschließlich begrenzte CSS-Variablen im gemeinsamen Renderer. Fehlende Designfelder erhalten die klassische Darstellung. `dashboard.designs` speichert unabhängige Vorlagen; Display-Antworten enthalten diese administrative Bibliothek nicht. Designimporte besitzen ein eigenes strikt geprüftes Format, keine HA-Bindungen, URLs oder ausführbares CSS. Lokale SVG-Hintergründe werden mit dem Build gebündelt. Glasfilter sitzen außerhalb der skalierten Kachelinhalte. Ein React-Kontext überträgt die Gestaltung auch in außerhalb des Canvas gerenderte Detaildialoge. Abschnittskacheln besitzen keine Entität und können keine HA-Services auslösen.

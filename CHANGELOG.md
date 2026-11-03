@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.1.0
+
+- Glass-Design mit lokaler Berglandschaft, dunkler/heller Variante, Aurora und deckendem Minimal-Stil. Gemeinsame Darstellung in Designer und Player.
+- Neuer Design-Reiter mit freien Farben, Deckkraft, Unschärfe, Sättigung, Kanten, Schatten, Rundung und Textgröße pro Display.
+- Eigene benannte Designvorlagen speichern, unabhängig anwenden und als validierte Gestaltungsdatei importieren/exportieren. Gespeicherte Bibliotheken werden nicht an gekoppelte Displays ausgeliefert.
+- Frei platzierbare Abschnittsüberschriften und kompakte Schnellzugriffe für Licht, Automation, Alarm und Kontakte.
+- Zusätzliches frei bearbeitbares Glass-Startlayout aus vorhandenen Raum-, Energie- und Wetterkacheln; bestehende Ansichten bleiben erhalten.
+- Passende Detailfenster, unveränderte große Schließen-Flächen und automatische Inhalts-Skalierung. Klassische Layouts behalten ihr Erscheinungsbild.
+- DE-/EN-Oberfläche und Anleitung für eigene Designs; neue Prüfungen für sicheren Import, unabhängige Designs und den Erhalt bestehender Geräte und Ansichten.
+
 ## 2.0.2
 
 - Kachelinhalte passen sich automatisch an Breite und Höhe der Kachel an: Schrift, Icons, Abstände und Bedienelemente skalieren gemeinsam.

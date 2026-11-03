@@ -84,7 +84,10 @@ test('only untouched legacy demo layouts upgrade; personalised layouts and publi
       : delete (globalThis as any).localStorage,
   );
   let service = new BrowserDemoService();
-  assert.equal((await service.load()).workspace.draft.document.pages[0].tiles.length, 8);
+  const upgraded = (await service.load()).workspace.draft.document;
+  assert.equal(upgraded.profiles[0].design?.surface, 'glass');
+  assert.ok(upgraded.pages.some((page) => page.tiles.some((tile) => tile.kind === 'camera')));
+  assert.ok(upgraded.pages.some((page) => page.tiles.some((tile) => tile.kind === 'section')));
   data.draft.document.greeting = 'A custom greeting';
   service = new BrowserDemoService();
   assert.equal((await service.load()).workspace.draft.document.greeting, 'A custom greeting');

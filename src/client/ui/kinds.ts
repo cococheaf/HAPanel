@@ -1,4 +1,5 @@
 import {
+  Heading,
   CloudSun,
   Lightbulb,
   Music2,
@@ -18,6 +19,7 @@ import {
   MousePointerClick,
 } from 'lucide-react';
 export const kindIcons = {
+  section: Heading,
   light: Lightbulb,
   climate: Thermometer,
   media: Music2,
@@ -37,6 +39,7 @@ export const kindIcons = {
   button: MousePointerClick,
 };
 export const kindLabelKeys = {
+  section: 'kind.section',
   light: 'kind.light',
   climate: 'kind.climate',
   media: 'kind.media',

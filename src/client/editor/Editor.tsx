@@ -1,3 +1,4 @@
+import { DesignSettings } from './DesignSettings';
 import { TileExperienceSettings, ProfileExperienceSettings } from './ExperienceSettings';
 import { ReviewDialog, TemplateDialog, AlertSettings } from './WorkspaceTools';
 import { DeviceManager } from './DeviceManager';
@@ -148,7 +149,7 @@ function Studio({
     }),
     [pageId, setPageId] = useState(document.pages[0].id);
   const [selectedId, setSelectedId] = useState('light');
-  const [inspector, setInspector] = useState<'tile' | 'display'>('tile');
+  const [inspector, setInspector] = useState<'tile' | 'display' | 'design'>('tile');
   const [leftOpen, setLeftOpen] = useState(false),
     [rightOpen, setRightOpen] = useState(false);
   const [status, setStatus] = useState<'saved' | 'saving' | 'dirty' | 'error'>('saved');
@@ -409,7 +410,7 @@ function Studio({
             ['door', 'window', 'opening'].includes(String(e.attributes.device_class))
           : domainKinds[e.entity_id.split('.')[0]] === kind,
       );
-    if (!entity) {
+    if (!entity && kind !== 'section') {
       notify(t('editor.noEntityKind'));
       return;
     }
@@ -417,19 +418,31 @@ function Studio({
     for (const target of document.profiles.filter(
       (profile) => !page.profileIds || page.profileIds.includes(profile.id),
     )) {
-      const spot = findSpace(target, page.tiles, 4, 2);
+      const spot = findSpace(
+        target,
+        page.tiles,
+        kind === 'section' ? Math.min(8, target.columns) : 4,
+        kind === 'section' ? 1 : 2,
+      );
       if (!spot) {
         notify(t('editor.noSpace', { name: target.name }));
         return;
       }
-      layouts[target.id] = target.id === profile.id && drop ? { ...spot, ...drop } : spot;
+      layouts[target.id] =
+        target.id === profile.id && drop
+          ? {
+              ...spot,
+              x: Math.max(0, Math.min(drop.x, target.columns - spot.w)),
+              y: Math.max(0, Math.min(drop.y, target.rows - spot.h)),
+            }
+          : spot;
     }
     const id = freshId(kind);
     const tile: Tile = {
       id,
       kind,
-      title: entityName(entity).slice(0, 64),
-      entityId: entity.entity_id,
+      title: kind === 'section' ? t('kind.section') : entityName(entity!).slice(0, 64),
+      entityId: kind === 'section' ? '' : entity!.entity_id,
       accent:
         kind === 'light'
           ? 'amber'
@@ -442,7 +455,7 @@ function Studio({
       ...(kind === 'contacts'
         ? {
             title: t('kind.contacts'),
-            contacts: [{ entityId: entity.entity_id, label: entityName(entity).slice(0, 64) }],
+            contacts: [{ entityId: entity!.entity_id, label: entityName(entity!).slice(0, 64) }],
           }
         : {}),
     };
@@ -1119,6 +1132,12 @@ function Studio({
               {t('common.display')}
             </button>
             <button
+              className={inspector === 'design' ? 'active' : ''}
+              onClick={() => setInspector('design')}
+            >
+              {t('design.title')}
+            </button>
+            <button
               className="icon-button mobile-only"
               onClick={() => setRightOpen(false)}
               aria-label={t('editor.closeProperties')}
@@ -1127,7 +1146,22 @@ function Studio({
             </button>
           </div>
           <div className="inspector-content">
-            {inspector === 'tile' ? (
+            {inspector === 'design' ? (
+              <DesignSettings
+                key={profile.id}
+                profile={profile}
+                document={document}
+                update={profileUpdate}
+                change={change}
+                notify={notify}
+                onOverview={(next, id) => {
+                  if (commit(next)) {
+                    setPageId(id);
+                    setSelectedId('');
+                  }
+                }}
+              />
+            ) : inspector === 'tile' ? (
               selected ? (
                 <>
                   <div className="inspector-tile-title">
@@ -1154,7 +1188,10 @@ function Studio({
                   <div
                     className="form-section"
                     style={
-                      selected.room || selected.energy || selected.contacts
+                      selected.kind === 'section' ||
+                      selected.room ||
+                      selected.energy ||
+                      selected.contacts
                         ? { display: 'none' }
                         : undefined
                     }
@@ -1448,19 +1485,21 @@ function Studio({
                 <div className="form-section">
                   <h3>{t('editor.atmosphereHeading')}</h3>
                   <p className="field-hint">{t('display.appearanceHint')}</p>
-                  <div className="theme-options">
-                    {(['dusk', 'ocean', 'sand'] as const).map((theme) => (
-                      <button
-                        key={theme}
-                        title={t(`theme.${theme}`)}
-                        aria-label={t('editor.theme', { theme: t(`theme.${theme}`) })}
-                        className={`theme-swatch theme-${theme} ${(profile.theme ?? document.theme) === theme ? 'active' : ''}`}
-                        onClick={() => profileUpdate({ theme })}
-                      >
-                        {(profile.theme ?? document.theme) === theme && <Check size={17} />}
-                      </button>
-                    ))}
-                  </div>
+                  {!profile.design && (
+                    <div className="theme-options">
+                      {(['dusk', 'ocean', 'sand'] as const).map((theme) => (
+                        <button
+                          key={theme}
+                          title={t(`theme.${theme}`)}
+                          aria-label={t('editor.theme', { theme: t(`theme.${theme}`) })}
+                          className={`theme-swatch theme-${theme} ${(profile.theme ?? document.theme) === theme ? 'active' : ''}`}
+                          onClick={() => profileUpdate({ theme })}
+                        >
+                          {(profile.theme ?? document.theme) === theme && <Check size={17} />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <label>
                     {t('editor.greeting')}
                     <TextInput

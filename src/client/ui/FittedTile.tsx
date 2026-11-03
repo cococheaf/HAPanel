@@ -35,14 +35,20 @@ export function FittedTile({
         canvas.style.width = `${logicalWidth}px`;
         canvas.style.height = `${logicalHeight}px`;
         canvas.style.transform = `scale(${scale})`;
-        slot.style.borderRadius = `${26 * scale}px`;
+        slot.style.borderRadius = `${(parseFloat(getComputedStyle(slot).getPropertyValue('--tile-radius')) || 26) * scale}px`;
         canvas.dataset.scale = scale.toFixed(3);
         const tile = canvas.firstElementChild as HTMLElement | null;
         if (!tile) break;
-        const requiredWidth = Math.max(logicalWidth, tile.scrollWidth + 2);
+        const requiredWidth = Math.max(
+          logicalWidth,
+          tile.scrollWidth + (tile.scrollWidth > tile.clientWidth + 1 ? 2 : 0),
+        );
         const requiredHeight = scrollable
           ? logicalHeight
-          : Math.max(logicalHeight, tile.scrollHeight + 2);
+          : Math.max(
+              logicalHeight,
+              tile.scrollHeight + (tile.scrollHeight > tile.clientHeight + 1 ? 2 : 0),
+            );
         const next = Math.min(scale, width / requiredWidth, height / requiredHeight);
         if (scale - next < 0.005) break;
         scale = next;
@@ -63,7 +69,10 @@ export function FittedTile({
     });
     const dashboard = slot.closest('.dashboard-frame');
     if (dashboard)
-      changes.observe(dashboard, { attributes: true, attributeFilter: ['data-density'] });
+      changes.observe(dashboard, {
+        attributes: true,
+        attributeFilter: ['data-density', 'style', 'data-design'],
+      });
     fit();
     return () => {
       cancelAnimationFrame(frame);

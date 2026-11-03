@@ -1,8 +1,8 @@
-# Prüfstand für 2.0.2
+# Prüfstand für 2.1.0
 
 ## Automatisiert
 
-84 Tests mit Node.js-Test-Runner: Geometrie aller Beispielprofile, Schema- und Domänenvalidierung, Rastergrenzen und Überlappungen, Revisionskonflikte, Entwurf/Veröffentlichung/Wiederherstellung, persistente Sitzungen, einmalige Kopplungscodes, Zugriffsschutz für Ingress und lokale Verwaltung, eingeschränkte Display-API, YAML-Import und aktiver WebSocket-Widerruf.
+89 Tests mit Node.js-Test-Runner: Geometrie aller Beispielprofile, Schema- und Domänenvalidierung, Rastergrenzen und Überlappungen, Revisionskonflikte, Entwurf/Veröffentlichung/Wiederherstellung, persistente Sitzungen, einmalige Kopplungscodes, Zugriffsschutz für Ingress und lokale Verwaltung, eingeschränkte Display-API, YAML-Import und aktiver WebSocket-Widerruf.
 
 Der HA-Adapter wird mit einem lokalen WebSocket-Simulator geprüft: Authentifizierung, gefilterte Abonnements, komprimierte Attribut-Deltas, Prognosen, Administratorprüfung, typisierte Serviceaufrufe und Unterbrechung. Es werden keine echten HA-Geräte angesteuert.
 
@@ -103,3 +103,13 @@ Die veröffentlichten neuen Screenshots enthalten ausschließlich Beispieldaten.
 - Auch bei 375×812 CSS-Pixeln liegen die geprüften Inhaltsbereiche aller 17 Kacheln innerhalb ihrer Grenzen.
 - Zusätzlich Darstellung und Bildschirmklick auf einen verkleinerten Schalter in macOS Safari geprüft. Die anfängliche CSS-Zoom-Variante zeigte dort abweichende Schriftgrößen und wurde durch gemeinsame Transform-Skalierung ersetzt.
 - Browserprüfung ersetzt keinen Test am physischen iPad.
+
+## 2.1.0 · Glass und eigene Designs
+
+Automatisierte Prüfungen decken begrenzte Gestaltungswerte, Ablehnung von URLs/CSS, Design-Import/Export, unabhängige Display-Kopien, den Erhalt bestehender Ansichten und Entitäten beim Glass-Startlayout sowie das Entfernen administrativer Vorlagen aus Display-Antworten ab. Abschnittskacheln können keine Services auslösen.
+
+Browserprüfungen verwenden ausschließlich synthetische Daten. Physische iPad-Performance und Touch-Eingabe bleiben separat abzunehmen.
+
+Im finalen Produktionsbuild geprüft: gekoppelte Anzeige bei tatsächlich gemessenen 1080×810 und 810×1080 CSS-Pixeln, ohne Einrichtungsleiste oder horizontalen Überlauf. Die vier Schnellzugriffe besitzen 48 Pixel hohe Bedienelemente. Raumdetails im hellen Design sind lesbar und ihre Gerätekarten nicht abgeschnitten; die Schließen-Fläche bleibt 48 Pixel hoch und beim Hit-Test erreichbar. Escape schließt die Wetterdetails.
+
+Ein eigenes benanntes Design mit Leerzeichen wurde gespeichert, als JSON heruntergeladen und wieder importiert. Ein angepasster Kachelradius auf einem anderen Display verändert das ursprüngliche Display nicht. Entwurf und Veröffentlichung sind getrennt; nach Veröffentlichung wechselt die gekoppelte Anzeige ohne Neuladen auf die neue Gestaltung. Deutsche und englische Überschriften, Statuszeilen und Designoptionen sind geprüft. Die öffentlichen Screenshots zeigen ausschließlich synthetische Daten.

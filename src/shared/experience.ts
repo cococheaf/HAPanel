@@ -67,7 +67,7 @@ export const tileExperienceSchema = z
       .string()
       .regex(/^[a-zA-Z0-9_-]{1,40}$/)
       .optional(),
-    presentation: z.enum(['auto', 'value', 'graph']).optional(),
+    presentation: z.enum(['auto', 'value', 'graph', 'compact']).optional(),
     secondary: z.enum(['auto', 'none', 'attribute', 'text']).optional(),
     secondaryText: z.string().max(180).optional(),
     locked: z.boolean().optional(),
@@ -156,7 +156,7 @@ export function reviewDashboard(document: Dashboard, catalog: EntityState[]): La
             profileId: profile.id,
             title: tile.title,
           });
-        if (!tile.room && !tile.energy && !tile.contacts) {
+        if (tile.kind !== 'section' && !tile.room && !tile.energy && !tile.contacts) {
           const entity = known.get(tile.entityId);
           if (!entity) add('missingEntity', 'error');
           else if (
@@ -181,7 +181,16 @@ export function reviewDashboard(document: Dashboard, catalog: EntityState[]): La
               profile.rows) *
               r.h +
             profile.gap * (r.h - 1);
-          if (w < 100 || h < 100) add('smallTile');
+          if (tile.kind === 'section') {
+            if (h < 24) add('smallText');
+          } else if (
+            tile.experience?.presentation === 'compact' &&
+            !tile.room &&
+            ['light', 'automation', 'alarm', 'contacts'].includes(tile.kind)
+          ) {
+            if (w < 180 || h < 80) add('smallTile');
+            else if (w < 220 || h < 88) add('smallText');
+          } else if (w < 100 || h < 100) add('smallTile');
           else if (w < 160 || h < 135) add('smallText');
         }
         for (const gesture of [tile.experience?.tap, tile.experience?.hold])

@@ -1198,3 +1198,33 @@ test('scoped alert cameras resolve to the equivalent permitted camera tile and n
       .some((tile: any) => tile.id === target && tile.entityId === camera.entityId),
   );
 });
+
+test('paired payload excludes administrator design library while retaining the assigned display appearance', async (t) => {
+  const { app, store, pairings } = await fixture(t);
+  const { designPresets } = await import('../src/shared/design');
+  const draft = store.getRevision('draft');
+  draft.document.designs = [
+    { id: 'private_design', name: 'My private design', appearance: designPresets.aurora },
+  ];
+  draft.document.profiles[0].design = designPresets.glassLight;
+  const saved = await store.save(draft.document, draft.revision);
+  await store.publish(saved.draft.revision);
+  const { code } = await pairings.createCode();
+  const paired = await app.inject({
+    method: 'POST',
+    url: '/api/pair',
+    payload: { code, name: 'Glass test' },
+  });
+  const cookie = paired.cookies[0];
+  const response = await app.inject({
+    url: '/api/display/bootstrap',
+    headers: { cookie: `${cookie.name}=${cookie.value}` },
+  });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().published.document.designs, undefined);
+  assert.deepEqual(response.json().published.document.profiles[0].design, designPresets.glassLight);
+  assert.equal(
+    (await app.inject('/api/editor/bootstrap')).json().workspace.draft.document.designs[0].id,
+    'private_design',
+  );
+});

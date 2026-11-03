@@ -181,13 +181,18 @@ export function TileExperienceSettings({
           value={x.presentation ?? 'auto'}
           onChange={(e) => patch({ presentation: e.target.value as typeof x.presentation })}
         >
-          {['auto', 'value', ...(['sensor', 'number'].includes(tile.kind) ? ['graph'] : [])].map(
-            (v) => (
-              <option key={v} value={v}>
-                {t(`v2.${v}` as 'v2.auto')}
-              </option>
-            ),
-          )}
+          {[
+            'auto',
+            'value',
+            ...(['light', 'automation', 'alarm', 'contacts'].includes(tile.kind) && !tile.room
+              ? ['compact']
+              : []),
+            ...(['sensor', 'number'].includes(tile.kind) ? ['graph'] : []),
+          ].map((v) => (
+            <option key={v} value={v}>
+              {t(v === 'compact' ? 'v2.compactQuick' : (`v2.${v}` as 'v2.auto'))}
+            </option>
+          ))}
         </select>
       </label>
       <label>
@@ -227,7 +232,11 @@ export function TileExperienceSettings({
           onChange={(e) =>
             patch({
               visibleWhen: e.target.checked
-                ? { entityId: tile.entityId, operator: 'is', value: 'on' }
+                ? {
+                    entityId: tile.entityId || catalog[0]?.entity_id || 'sensor.example',
+                    operator: 'is',
+                    value: 'on',
+                  }
                 : undefined,
             })
           }
@@ -310,28 +319,30 @@ export function ProfileExperienceSettings({
   return (
     <div className="form-section v2-settings">
       <h3>{t('v2.experience')}</h3>
-      {(['density', 'colorMode', 'background'] as const).map((key) => (
-        <label key={key}>
-          {t(`v2.${key}`)}
-          <select
-            value={
-              x[key] ?? (key === 'density' ? 'normal' : key === 'colorMode' ? 'dark' : 'gradient')
-            }
-            onChange={(e) => patch({ [key]: e.target.value })}
-          >
-            {(key === 'density'
-              ? ['comfortable', 'normal', 'compact']
-              : key === 'colorMode'
-                ? ['dark', 'light', 'auto']
-                : ['gradient', 'plain']
-            ).map((v) => (
-              <option key={v} value={v}>
-                {t(`v2.${v}` as 'v2.normal')}
-              </option>
-            ))}
-          </select>
-        </label>
-      ))}
+      {(['density', 'colorMode', 'background'] as const)
+        .filter((key) => !profile.design || key === 'density')
+        .map((key) => (
+          <label key={key}>
+            {t(`v2.${key}`)}
+            <select
+              value={
+                x[key] ?? (key === 'density' ? 'normal' : key === 'colorMode' ? 'dark' : 'gradient')
+              }
+              onChange={(e) => patch({ [key]: e.target.value })}
+            >
+              {(key === 'density'
+                ? ['comfortable', 'normal', 'compact']
+                : key === 'colorMode'
+                  ? ['dark', 'light', 'auto']
+                  : ['gradient', 'plain']
+              ).map((v) => (
+                <option key={v} value={v}>
+                  {t(`v2.${v}` as 'v2.normal')}
+                </option>
+              ))}
+            </select>
+          </label>
+        ))}
       {(['adaptive', 'swipe'] as const).map((key) => (
         <label className="v2-check" key={key}>
           <input

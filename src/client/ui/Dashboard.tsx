@@ -1,3 +1,5 @@
+import { designVariables } from '../../shared/design';
+import { DesignContext } from './DesignContext';
 import { StreamBudgetContext } from './stream-budget';
 import { FittedTile } from './FittedTile';
 import { EnergyStatistics } from './EnergyStatistics';
@@ -44,7 +46,7 @@ import {
 import { kindIcons } from './kinds';
 import { AlarmStatus, ContactsSummary } from './Security';
 import { AlarmControls } from './AlarmControls';
-import { documentContacts } from '../../shared/security';
+import { alarmStatus, contactValues, documentContacts } from '../../shared/security';
 import { CameraThumbnail, CameraStream } from './CameraView';
 import { lightDimming, lightTapCommand } from '../../shared/lights';
 import {
@@ -169,6 +171,7 @@ export function TileView({
   const tile = localizedSampleTile(configuredTile, language);
   const entity = snapshot.entities[tile.entityId];
   const unavailable =
+    tile.kind !== 'section' &&
     !tile.room &&
     !tile.energy &&
     !tile.contacts &&
@@ -233,6 +236,12 @@ export function TileView({
     }
     open(binding?.type !== 'details' && key !== 'hold');
   };
+  const compact =
+    !alarmExpanded &&
+    !cameraExpanded &&
+    !tile.room &&
+    ['light', 'automation', 'alarm', 'contacts'].includes(tile.kind) &&
+    tile.experience?.presentation === 'compact';
   const active = tile.kind === 'light' && entity?.state === 'on';
   const [activated, setActivated] = useState(false);
   useEffect(() => {
@@ -242,6 +251,65 @@ export function TileView({
     }
   }, [activated]);
   const body = () => {
+    if (tile.kind === 'section') return null;
+    if (compact) {
+      const contacts = tile.contacts ? contactValues(tile.contacts, snapshot) : undefined;
+      const command =
+        tile.kind === 'light'
+          ? lightTapCommand(tile)
+          : tile.kind === 'automation'
+            ? ('toggle' as const)
+            : undefined;
+      const tapDisabled =
+        !command || (command === 'turn_off' && !active) || (command === 'turn_on' && active);
+      const status = contacts
+        ? t(contacts.open.length ? 'contacts.openCount' : 'contacts.noneReported', {
+            count: contacts.open.length,
+          }) +
+          (contacts.unknown.length
+            ? ' · ' + t('contacts.unknownCount', { count: contacts.unknown.length })
+            : '')
+        : tile.kind === 'alarm'
+          ? t(alarmStatus(entity).label)
+          : unavailable
+            ? t('common.unavailable')
+            : t(entity?.state === 'on' ? 'common.on' : 'common.off');
+      return (
+        <div className="quick-tile-body">
+          <span>{status}</span>
+          {command ? (
+            <button
+              className="quick-tile-action"
+              aria-label={
+                tile.kind === 'light'
+                  ? t(
+                      command === 'turn_off' || (command === 'toggle' && active)
+                        ? 'dashboard.turnOff'
+                        : 'dashboard.turnOn',
+                      { title: tile.title },
+                    )
+                  : t(entity?.state === 'on' ? 'automation.disable' : 'automation.enable', {
+                      title: tile.title,
+                    })
+              }
+              disabled={disabled || tapDisabled}
+              onClick={() => act(command)}
+            >
+              <Power size={19} />
+            </button>
+          ) : (
+            <button
+              className="quick-tile-action"
+              disabled={!detailsEnabled}
+              aria-label={t('detail.open', { title: tile.title })}
+              onClick={() => open()}
+            >
+              <ChevronRight size={19} />
+            </button>
+          )}
+        </div>
+      );
+    }
     if (tile.kind === 'camera')
       return cameraExpanded ? (
         <CameraStream
@@ -687,31 +755,44 @@ export function TileView({
     <>
       <FittedTile
         enabled={!alarmExpanded && !cameraExpanded}
-        minWidth={tile.energy ? 340 : tile.kind === 'media' ? 400 : 240}
+        minWidth={
+          compact
+            ? 220
+            : tile.kind === 'section'
+              ? 160
+              : tile.energy
+                ? 340
+                : tile.kind === 'media'
+                  ? 400
+                  : 240
+        }
         minHeight={
-          tile.energy
-            ? 280
-            : tile.room
-              ? 200
-              : {
-                  weather: 280,
-                  media: 320,
-                  sensor: 180,
-                  light: 220,
-                  climate: 240,
-                  cover: 240,
-                  automation: 210,
-                  alarm: 200,
-                  contacts: 220,
-                  camera: 200,
-                  timer: 180,
-                  select: 160,
-                  number: 180,
-                  fan: 240,
-                  vacuum: 220,
-                  button: 140,
-                  scene: 220,
-                }[tile.kind]
+          compact
+            ? 88
+            : tile.energy
+              ? 280
+              : tile.room
+                ? 200
+                : {
+                    weather: 280,
+                    media: 320,
+                    sensor: 180,
+                    light: 220,
+                    climate: 240,
+                    cover: 240,
+                    automation: 210,
+                    alarm: 200,
+                    contacts: 220,
+                    camera: 200,
+                    timer: 180,
+                    select: 160,
+                    number: 180,
+                    fan: 240,
+                    vacuum: 220,
+                    button: 140,
+                    scene: 220,
+                    section: 48,
+                  }[tile.kind]
         }
         scrollable={Boolean(tile.energy && !tile.navigateTo)}
       >
@@ -724,6 +805,7 @@ export function TileView({
           onClick={(event) => {
             if (
               detailsEnabled &&
+              tile.kind !== 'section' &&
               event.target instanceof Element &&
               !event.target.closest('button, input, select, a')
             ) {
@@ -737,6 +819,7 @@ export function TileView({
           onPointerDown={(event) => {
             if (
               !detailsEnabled ||
+              tile.kind === 'section' ||
               !(event.target instanceof Element) ||
               event.target.closest('button,input,select,a')
             )
@@ -765,13 +848,22 @@ export function TileView({
           data-background={tile.experience?.background ?? 'default'}
           data-presentation={tile.experience?.presentation ?? 'auto'}
           data-secondary={tile.experience?.secondary ?? 'auto'}
-          className={`tile tile-${tile.kind} accent-${tile.accent} ${active ? 'is-active' : ''} ${unavailable ? 'is-unavailable' : ''}`}
+          className={`tile ${compact ? 'is-quick' : ''} tile-${tile.kind} accent-${tile.accent} ${active ? 'is-active' : ''} ${unavailable ? 'is-unavailable' : ''}`}
         >
           <div className="tile-heading">
             <span className="tile-icon">
               <Icon size={18} strokeWidth={1.8} />
             </span>
-            {detailsEnabled ? (
+            {tile.kind === 'section' ? (
+              (tile.navigateTo || tile.experience?.tap?.type === 'navigate') && onNavigate ? (
+                <button className="section-link" onClick={() => gesture('tap')}>
+                  {tile.title}
+                  <ChevronRight size={16} />
+                </button>
+              ) : (
+                <span>{tile.title}</span>
+              )
+            ) : detailsEnabled ? (
               <button
                 className="tile-detail-trigger"
                 onClick={() => open()}
@@ -974,135 +1066,142 @@ export function DashboardFrame({
     const timer = setInterval(() => setNow(new Date()), 15_000);
     return () => clearInterval(timer);
   }, []);
+  const design = profile.design;
+  const scheme =
+    (design?.scheme ?? profile.experience?.colorMode) === 'auto'
+      ? isNight(profile.experience, now.getHours())
+        ? 'dark'
+        : 'light'
+      : (design?.scheme ?? profile.experience?.colorMode ?? 'dark');
+  const designStyle = design ? (designVariables(design) as CSSProperties) : {};
   return (
-    <StreamBudgetContext.Provider value={profile.experience?.maxLiveStreams ?? 2}>
-      <section
-        data-small={profile.height < 600}
-        data-density={profile.experience?.density ?? 'normal'}
-        data-color-mode={
-          profile.experience?.colorMode === 'auto'
-            ? isNight(profile.experience, now.getHours())
-              ? 'dark'
-              : 'light'
-            : (profile.experience?.colorMode ?? 'dark')
-        }
-        data-background={profile.experience?.background ?? 'gradient'}
-        onTouchStart={(event) => {
-          touch.current = undefined;
-          if (
-            !profile.experience?.swipe ||
-            event.touches.length !== 1 ||
-            window.document.querySelector('dialog[open]') ||
-            (event.target instanceof Element && event.target.closest('input,button,select,video'))
-          )
-            return;
-          touch.current = {
-            x: event.changedTouches[0].clientX,
-            y: event.changedTouches[0].clientY,
-          };
-        }}
-        onTouchEnd={(event) => {
-          if (!touch.current) return;
-          if (window.document.querySelector('dialog[open]')) {
+    <DesignContext.Provider value={design ? { style: designStyle, scheme } : undefined}>
+      <StreamBudgetContext.Provider value={profile.experience?.maxLiveStreams ?? 2}>
+        <section
+          data-small={profile.height < 600}
+          data-density={profile.experience?.density ?? 'normal'}
+          data-color-mode={scheme}
+          data-design={design?.surface}
+          data-wallpaper={design?.wallpaper}
+          data-background={profile.experience?.background ?? 'gradient'}
+          onTouchStart={(event) => {
             touch.current = undefined;
-            return;
-          }
-          const dx = event.changedTouches[0].clientX - touch.current.x,
-            dy = event.changedTouches[0].clientY - touch.current.y;
-          touch.current = undefined;
-          if (Math.abs(dx) > 80 && Math.abs(dy) < 50) {
-            const i = navigationPages.findIndex((p) => p.id === activePage.id);
-            const target = navigationPages[i + (dx < 0 ? 1 : -1)];
-            if (target) setPageId(target.id);
-          }
-        }}
-        onTouchCancel={() => {
-          touch.current = undefined;
-        }}
-        className={`dashboard-frame theme-${profile.theme ?? document.theme} ${profile.width < 900 ? 'compact-dashboard' : ''}`}
-        style={{
-          width: profile.width,
-          height: profile.height,
-          padding: profile.margin,
-          paddingTop: profile.margin + (profile.experience?.safeTop ?? 0),
-          paddingBottom: profile.margin + (profile.experience?.safeBottom ?? 0),
-        }}
-      >
-        <header className="dashboard-header" style={{ height: profile.headerHeight }}>
-          <div>
-            <div className="dashboard-home-label">
-              <Home size={14} /> {document.name}
+            if (
+              !profile.experience?.swipe ||
+              event.touches.length !== 1 ||
+              window.document.querySelector('dialog[open]') ||
+              (event.target instanceof Element && event.target.closest('input,button,select,video'))
+            )
+              return;
+            touch.current = {
+              x: event.changedTouches[0].clientX,
+              y: event.changedTouches[0].clientY,
+            };
+          }}
+          onTouchEnd={(event) => {
+            if (!touch.current) return;
+            if (window.document.querySelector('dialog[open]')) {
+              touch.current = undefined;
+              return;
+            }
+            const dx = event.changedTouches[0].clientX - touch.current.x,
+              dy = event.changedTouches[0].clientY - touch.current.y;
+            touch.current = undefined;
+            if (Math.abs(dx) > 80 && Math.abs(dy) < 50) {
+              const i = navigationPages.findIndex((p) => p.id === activePage.id);
+              const target = navigationPages[i + (dx < 0 ? 1 : -1)];
+              if (target) setPageId(target.id);
+            }
+          }}
+          onTouchCancel={() => {
+            touch.current = undefined;
+          }}
+          className={`dashboard-frame ${design ? 'design-frame' : ''} theme-${profile.theme ?? document.theme} ${profile.width < 900 ? 'compact-dashboard' : ''}`}
+          style={{
+            ...designStyle,
+            width: profile.width,
+            height: profile.height,
+            padding: profile.margin,
+            paddingTop: profile.margin + (profile.experience?.safeTop ?? 0),
+            paddingBottom: profile.margin + (profile.experience?.safeBottom ?? 0),
+          }}
+        >
+          <header className="dashboard-header" style={{ height: profile.headerHeight }}>
+            <div>
+              <div className="dashboard-home-label">
+                <Home size={14} /> {document.name}
+              </div>
+              <h1>
+                {activePage.heading ??
+                  (activePage.id === visiblePages[0].id
+                    ? (profile.greeting ?? document.greeting)
+                    : activePage.name)}
+              </h1>
+              <p>
+                {snapshot.status === 'reconnecting'
+                  ? t('dashboard.disconnected')
+                  : (activePage.subtitle ?? profile.subtitle ?? document.subtitle)}
+              </p>
             </div>
-            <h1>
-              {activePage.heading ??
-                (activePage.id === visiblePages[0].id
-                  ? (profile.greeting ?? document.greeting)
-                  : activePage.name)}
-            </h1>
-            <p>
-              {snapshot.status === 'reconnecting'
-                ? t('dashboard.disconnected')
-                : (activePage.subtitle ?? profile.subtitle ?? document.subtitle)}
-            </p>
-          </div>
-          <div className="dashboard-clock">
-            <strong>
-              {now.toLocaleTimeString(intlLocale, { hour: '2-digit', minute: '2-digit' })}
-            </strong>
-            <span>
-              {now.toLocaleDateString(intlLocale, {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-              })}
-            </span>
-          </div>
-        </header>
-        {children ?? (
-          <StaticGrid
-            document={document}
-            profile={profile}
-            pageId={pageId}
-            snapshot={{ ...snapshot, contactSources: documentContacts(document, snapshot) }}
-            onAction={onAction}
-            mediaBase={mediaBase}
-            onNavigate={setPageId}
-          />
-        )}
-        <footer className="dashboard-footer" style={{ height: profile.footerHeight }}>
-          <nav aria-label={t('dashboard.pages')}>
-            {activePage.hidden && (
-              <button
-                onClick={() =>
-                  setPageId(previousPage.current ?? navigationPages[0]?.id ?? visiblePages[0].id)
-                }
-              >
-                <ChevronLeft size={18} />
-                {t('v2.back')}
-              </button>
-            )}
-            {navigationPages.map((page, index) => (
-              <button
-                key={page.id}
-                className={pageId === page.id ? 'active' : ''}
-                onClick={() => setPageId(page.id)}
-              >
-                {index === 0 ? (
-                  <Home size={17} />
-                ) : (page.originId ?? page.id) === 'energy' ? (
-                  <Zap size={17} />
-                ) : (page.originId ?? page.id) === 'surveillance' ? (
-                  <CameraIcon size={17} />
-                ) : (
-                  <Layers3 size={17} />
-                )}
-                {page.name}
-              </button>
-            ))}
-          </nav>
-        </footer>
-      </section>
-    </StreamBudgetContext.Provider>
+            <div className="dashboard-clock">
+              <strong>
+                {now.toLocaleTimeString(intlLocale, { hour: '2-digit', minute: '2-digit' })}
+              </strong>
+              <span>
+                {now.toLocaleDateString(intlLocale, {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'long',
+                })}
+              </span>
+            </div>
+          </header>
+          {children ?? (
+            <StaticGrid
+              document={document}
+              profile={profile}
+              pageId={pageId}
+              snapshot={{ ...snapshot, contactSources: documentContacts(document, snapshot) }}
+              onAction={onAction}
+              mediaBase={mediaBase}
+              onNavigate={setPageId}
+            />
+          )}
+          <footer className="dashboard-footer" style={{ height: profile.footerHeight }}>
+            <nav aria-label={t('dashboard.pages')}>
+              {activePage.hidden && (
+                <button
+                  onClick={() =>
+                    setPageId(previousPage.current ?? navigationPages[0]?.id ?? visiblePages[0].id)
+                  }
+                >
+                  <ChevronLeft size={18} />
+                  {t('v2.back')}
+                </button>
+              )}
+              {navigationPages.map((page, index) => (
+                <button
+                  key={page.id}
+                  className={pageId === page.id ? 'active' : ''}
+                  onClick={() => setPageId(page.id)}
+                >
+                  {index === 0 ? (
+                    <Home size={17} />
+                  ) : (page.originId ?? page.id) === 'energy' ? (
+                    <Zap size={17} />
+                  ) : (page.originId ?? page.id) === 'surveillance' ? (
+                    <CameraIcon size={17} />
+                  ) : (
+                    <Layers3 size={17} />
+                  )}
+                  {page.name}
+                </button>
+              ))}
+            </nav>
+          </footer>
+        </section>
+      </StreamBudgetContext.Provider>
+    </DesignContext.Provider>
   );
 }
 
