@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.2.0
+
+- Eigene JPEG-/PNG-/WebP-Hintergrundbilder mit lokaler Optimierung, Fokus, Zoom, Bildhelligkeit, Überlagerung, Unschärfe und Palette aus dem Bild.
+- Persistente Bilderbibliothek mit Vorschaubildern, Inhalts-Deduplizierung, Suche, Umbenennen und wiederherstellbarem Archiv. Bilder bleiben über Entwurf, Veröffentlichung und Historie getrennt vom Konfigurations-JSON erhalten.
+- Eigene Designs pro Ansicht mit Display-Vererbung, freie lineare/radiale Farbverläufe und optionale bewegungsarme Seitenübergänge.
+- Übertragbare Design-Dateien mit Bild und vollständige `.hapanel`-Projektdateien mit Layouts, Entitäten, Designvorlagen und zugeordneten Bildern. Import übernimmt einen neuen Entwurf; Veröffentlichung bleibt separat.
+- Bildzugriff folgt der Veröffentlichung und dem erlaubten Displayumfang. Galerie, Uploads und Bearbeitung bleiben Administratoren vorbehalten.
+- Displays ab 2.2 erkennen künftige App-Versionswechsel und laden nach dem Schließen offener Detailfenster automatisch neu.
+- Begrenzte, serialisierte Bildverarbeitung mit Entfernung von EXIF-Daten; nativer WebP-Laufzeittest in beiden Containerarchitekturen.
+- Korrekte Speicheranzeige für kleine Bilder, vollständige DE-/EN-Oberfläche und Bereinigung des Speicherstatus nach Rückgängig.
+
 ## 2.1.0
 
 - Glass-Design mit lokaler Berglandschaft, dunkler/heller Variante, Aurora und deckendem Minimal-Stil. Gemeinsame Darstellung in Designer und Player.

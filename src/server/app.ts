@@ -1,3 +1,4 @@
+import { imageId, imageReferences, imageUploadSchema, imagePatchSchema } from '../shared/assets';
 import Fastify, { type FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
 import websocket from '@fastify/websocket';
@@ -235,7 +236,16 @@ export async function createApp(options: AppOptions) {
   });
   app.setErrorHandler(
     (error: Error & { statusCode?: number; messageKey?: string }, request, reply) => {
-      const status = error instanceof ZodError ? 400 : (error.statusCode ?? 500);
+      const status =
+        error instanceof ZodError
+          ? 400
+          : error instanceof UserError
+            ? error.messageKey === 'image.busy'
+              ? 429
+              : error.messageKey === 'image.storageFull'
+                ? 507
+                : 400
+            : (error.statusCode ?? 500);
       const language = resolveLanguage(request.headers['accept-language']);
       const messageKey =
         error.messageKey && isMessageKey(error.messageKey)
@@ -393,6 +403,30 @@ export async function createApp(options: AppOptions) {
           },
         );
 
+        admin.get('/assets', async () => ({ images: store.images.list() }));
+        admin.post(
+          '/assets',
+          { bodyLimit: 3 * 1024 * 1024, config: { rateLimit: { max: 240, timeWindow: 60_000 } } },
+          async (request) => store.images.upload(imageUploadSchema.parse(request.body)),
+        );
+        admin.patch<{ Params: { id: string } }>('/assets/:id', async (request) =>
+          store.images.update(
+            imageId.parse(request.params.id),
+            imagePatchSchema.parse(request.body),
+          ),
+        );
+        admin.get<{ Params: { id: string }; Querystring: { thumbnail?: string } }>(
+          '/assets/:id',
+          async (request, reply) => {
+            const id = imageId.parse(request.params.id);
+            if (!store.images.has(id)) throw new HttpError(404, 'image.missing');
+            return reply
+              .header('Cache-Control', 'no-store')
+              .type('image/webp')
+              .send(await store.images.read(id, request.query.thumbnail === '1'));
+          },
+        );
+
         admin.post('/pair-code', async () => pairings.createCode());
         admin.delete<{ Params: { id: string } }>('/devices/:id', async (request) => {
           await pairings.revoke(request.params.id);
@@ -469,6 +503,7 @@ export async function createApp(options: AppOptions) {
         reply.header('Cache-Control', 'no-store');
       });
       display.get('/bootstrap', async (request) => ({
+        appVersion: packageInfo.version,
         settings: settingsFor(request),
         identifyUntil: pairings.identification(
           pairings.authenticate(request.cookies.hapanel_device)?.id ?? '',
@@ -483,6 +518,18 @@ export async function createApp(options: AppOptions) {
         canEdit: displayRoles.get(request) === true,
         canControl: canControlDevices(request),
       }));
+      display.get<{ Params: { id: string }; Querystring: { thumbnail?: string } }>(
+        '/assets/:id',
+        async (request, reply) => {
+          const id = imageId.parse(request.params.id);
+          if (!imageReferences(publishedFor(request).document).includes(id))
+            throw new HttpError(403, 'image.notAllowed');
+          if (!store.images.has(id)) throw new HttpError(404, 'image.missing');
+          return reply
+            .type('image/webp')
+            .send(await store.images.read(id, request.query.thumbnail === '1'));
+        },
+      );
       display.get<{ Params: { entityId: string }; Querystring: { range?: string } }>(
         '/statistics/:entityId',
         { config: { rateLimit: { max: 30, timeWindow: 60000 } } },
@@ -576,6 +623,7 @@ export async function createApp(options: AppOptions) {
           socket.send(
             JSON.stringify({
               type: 'snapshot',
+              appVersion: packageInfo.version,
               snapshot: snapshotFor(
                 published.document,
                 canControlAlarm(request),

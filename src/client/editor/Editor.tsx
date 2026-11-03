@@ -1,3 +1,11 @@
+import {
+  exportProject,
+  importProject,
+  parseProject,
+  PROJECT_MAX_BYTES,
+  type ProjectBundle,
+} from '../project';
+import { ImageLibraryContext } from '../ui/ImageContext';
 import { DesignSettings } from './DesignSettings';
 import { TileExperienceSettings, ProfileExperienceSettings } from './ExperienceSettings';
 import { ReviewDialog, TemplateDialog, AlertSettings } from './WorkspaceTools';
@@ -114,7 +122,11 @@ export default function Editor({
         )}
       </div>
     );
-  return <Studio service={service} bootstrap={bootstrap} onExit={onExit} />;
+  return (
+    <ImageLibraryContext.Provider value={service.images}>
+      <Studio service={service} bootstrap={bootstrap} onExit={onExit} />
+    </ImageLibraryContext.Provider>
+  );
 }
 
 function Studio({
@@ -207,6 +219,10 @@ function Studio({
     [format, setFormat] = useState<'json' | 'yaml'>('json');
   const fileRef = useRef<HTMLInputElement>(null);
   const [exportText, setExportText] = useState('');
+  const [importPackage, setImportPackage] = useState<ProjectBundle>();
+  const [transferBusy, setTransferBusy] = useState(false);
+  const importAbort = useRef<AbortController>(undefined);
+  useEffect(() => () => importAbort.current?.abort(), []);
   documentRef.current = document;
   workspaceRef.current = workspace;
   const profile = document.profiles.find((p) => p.id === profileId) ?? document.profiles[0];
@@ -268,7 +284,10 @@ function Studio({
       .then(async () => {
         const candidate = documentRef.current,
           hash = JSON.stringify(candidate);
-        if (hash === saved.current) return workspaceRef.current;
+        if (hash === saved.current) {
+          setStatus('saved');
+          return workspaceRef.current;
+        }
         setStatus('saving');
         const result = await service.save(candidate, workspaceRef.current.draft.revision);
         workspaceRef.current = result;
@@ -1150,8 +1169,8 @@ function Studio({
               <DesignSettings
                 key={profile.id}
                 profile={profile}
+                page={page}
                 document={document}
-                update={profileUpdate}
                 change={change}
                 notify={notify}
                 onOverview={(next, id) => {
@@ -1793,46 +1812,102 @@ function Studio({
           message={toast}
           onDismissMessage={() => setToast('')}
           title={t('editor.importTitle')}
-          onClose={() => setDialog(null)}
+          onClose={() => {
+            importAbort.current?.abort();
+            setDialog(null);
+          }}
         >
           <p className="muted">{t('editor.importHint')}</p>
-          <select
-            aria-label={t('editor.importFormat')}
-            value={format}
-            onChange={(e) => setFormat(e.target.value as 'json' | 'yaml')}
-          >
-            <option value="json">JSON</option>
-            <option value="yaml">YAML</option>
-          </select>
+          {!importPackage && (
+            <select
+              aria-label={t('editor.importFormat')}
+              disabled={transferBusy}
+              value={format}
+              onChange={(e) => setFormat(e.target.value as 'json' | 'yaml')}
+            >
+              <option value="json">JSON</option>
+              <option value="yaml">YAML</option>
+            </select>
+          )}
+          {importPackage && (
+            <div className="project-import-summary">
+              <strong>{importPackage.document.name}</strong>
+              <p>
+                {t('image.projectSummary', {
+                  displays: importPackage.document.profiles.length,
+                  views: importPackage.document.pages.length,
+                  images: importPackage.assets.length,
+                })}
+              </p>
+            </div>
+          )}
           <input
             ref={fileRef}
+            disabled={transferBusy}
             hidden
             type="file"
-            accept=".json,.yaml,.yml"
+            accept=".json,.yaml,.yml,.hapanel"
             onChange={async (e) => {
-              const file = e.target.files?.[0];
+              const input = e.currentTarget;
+              const file = input.files?.[0];
               if (file) {
-                setImportText(await file.text());
-                setFormat(file.name.endsWith('.json') ? 'json' : 'yaml');
+                try {
+                  if (file.size > PROJECT_MAX_BYTES) throw new Error(t('image.projectTooLarge'));
+                  const raw = await file.text();
+                  let project = false;
+                  try {
+                    project = JSON.parse(raw)?.format === 'hapanel-project';
+                  } catch {}
+                  if (project) {
+                    setImportPackage(parseProject(raw));
+                    setImportText('');
+                    setFormat('json');
+                  } else {
+                    if (file.size > 1024 * 1024) throw new Error(t('image.projectConfigTooLarge'));
+                    setImportPackage(undefined);
+                    setImportText(raw);
+                    setFormat(file.name.endsWith('.json') ? 'json' : 'yaml');
+                  }
+                } catch (error) {
+                  notify(describeError(error));
+                }
               }
+              input.value = '';
             }}
           />
-          <button className="button" onClick={() => fileRef.current?.click()}>
+          <button
+            className="button"
+            disabled={transferBusy}
+            onClick={() => fileRef.current?.click()}
+          >
             {t('editor.chooseFile')}
           </button>
-          <textarea
-            aria-label={t('editor.configuration')}
-            className="config-text"
-            value={importText}
-            onChange={(e) => setImportText(e.target.value)}
-            placeholder={t('editor.pasteConfiguration')}
-          />
+          {!importPackage && (
+            <textarea
+              aria-label={t('editor.configuration')}
+              disabled={transferBusy}
+              className="config-text"
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              placeholder={t('editor.pasteConfiguration')}
+            />
+          )}
           <button
             className="button primary"
+            disabled={transferBusy}
             onClick={async () => {
               try {
+                setTransferBusy(true);
+                const controller = new AbortController();
+                importAbort.current = controller;
                 const latest = await flush();
-                const result = await service.import(importText, format, latest.draft.revision);
+                const prepared = importPackage
+                  ? await importProject(importPackage, service.images, controller.signal)
+                  : undefined;
+                if (controller.signal.aborted) return;
+                const result = prepared
+                  ? await service.save(prepared, latest.draft.revision)
+                  : await service.import(importText, format, latest.draft.revision);
                 setPast((p) => [...p, document]);
                 setFuture([]);
                 setDocument(result.draft.document);
@@ -1842,13 +1917,16 @@ function Studio({
                 setStatus('saved');
                 setSelectedId('');
                 setDialog(null);
+                setImportPackage(undefined);
                 notify(t('editor.imported'));
               } catch (e) {
-                notify(describeError(e));
+                if (!importAbort.current?.signal.aborted) notify(describeError(e));
+              } finally {
+                setTransferBusy(false);
               }
             }}
           >
-            {t('editor.importDraft')}
+            {t(transferBusy ? 'image.importWorking' : 'editor.importDraft')}
           </button>
         </Modal>
       )}
@@ -1860,6 +1938,29 @@ function Studio({
           onClose={() => setDialog(null)}
         >
           <p className="muted">{t('editor.exportHint')}</p>
+          <button
+            className="button full-width primary"
+            disabled={transferBusy}
+            onClick={async () => {
+              setTransferBusy(true);
+              try {
+                const raw = await exportProject(documentRef.current, service.images);
+                const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' })),
+                  a = window.document.createElement('a');
+                a.href = url;
+                a.download = 'hapanel-project.hapanel';
+                a.click();
+                URL.revokeObjectURL(url);
+              } catch (error) {
+                notify(describeError(error));
+              } finally {
+                setTransferBusy(false);
+              }
+            }}
+          >
+            {t(transferBusy ? 'image.projectWorking' : 'image.exportProject')}
+          </button>
+          <p className="field-hint">{t('image.projectHint')}</p>
           <select
             aria-label={t('editor.exportFormat')}
             value={format}

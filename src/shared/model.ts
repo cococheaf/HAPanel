@@ -255,6 +255,7 @@ export const dashboardSchema = z
             profileIds: z.array(id).min(1).max(8).optional(),
             originId: id.optional(),
             hidden: z.boolean().optional(),
+            design: designSchema.optional(),
             heading: text(80).optional(),
             subtitle: z.string().max(100).optional(),
             tiles: z.array(tileSchema).max(64),

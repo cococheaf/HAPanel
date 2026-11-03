@@ -1,3 +1,4 @@
+import { ImageLibraryContext } from '../ui/ImageContext';
 import { useI18n } from '../i18n';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { X } from 'lucide-react';
@@ -36,7 +37,7 @@ export default function Demo() {
     );
   if (!data) return <div className="loading-screen">{t('common.loading')}</div>;
   return (
-    <>
+    <ImageLibraryContext.Provider value={service.images}>
       <Player
         published={data.workspace.published}
         snapshot={data.snapshot}
@@ -52,6 +53,6 @@ export default function Demo() {
           </button>
         </div>
       )}
-    </>
+    </ImageLibraryContext.Provider>
   );
 }

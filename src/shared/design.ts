@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { imageId, imageUploadSchema } from './assets';
 
 // Only bounded values become CSS variables. Never execute CSS or URLs from design files.
 const color = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -6,7 +7,30 @@ export const designSchema = z
   .object({
     surface: z.enum(['glass', 'solid']),
     scheme: z.enum(['dark', 'light', 'auto']),
-    wallpaper: z.enum(['landscape', 'aurora', 'gradient', 'plain']),
+    wallpaper: z.enum(['landscape', 'aurora', 'gradient', 'plain', 'image']),
+    image: z
+      .object({
+        assetId: imageId,
+        fit: z.enum(['cover', 'contain']).default('cover'),
+        x: z.number().min(0).max(100).default(50),
+        y: z.number().min(0).max(100).default(50),
+        zoom: z.number().min(1).max(2).default(1),
+        overlay: z.number().min(0).max(80).default(25),
+        brightness: z.number().min(40).max(140).default(100),
+        blur: z.number().min(0).max(20).default(0),
+      })
+      .strict()
+      .optional(),
+    gradient: z
+      .object({
+        from: color,
+        to: color,
+        angle: z.number().int().min(0).max(360),
+        kind: z.enum(['linear', 'radial']),
+      })
+      .strict()
+      .optional(),
+    transition: z.enum(['none', 'fade']).optional(),
     background: color,
     tint: color,
     accent: color,
@@ -31,7 +55,7 @@ export const savedDesignSchema = z
     appearance: designSchema,
   })
   .strict();
-export const designFileSchema = z
+const designFileV1Schema = z
   .object({
     format: z.literal('hapanel-design'),
     version: z.literal(1),
@@ -39,6 +63,20 @@ export const designFileSchema = z
     appearance: designSchema,
   })
   .strict();
+export const designFileSchema = z.discriminatedUnion('version', [
+  designFileV1Schema.refine((v) => !v.appearance.image, 'image.portableMissing'),
+  z
+    .object({
+      format: z.literal('hapanel-design'),
+      version: z.literal(2),
+      name: savedDesignSchema.shape.name,
+      appearance: designSchema,
+      asset: imageUploadSchema.extend({ id: imageId }).strict(),
+    })
+    .strict()
+    .refine((v) => v.asset.id === v.appearance.image?.assetId, 'image.portableMissing'),
+]);
+export const DESIGN_FILE_MAX_BYTES = 3 * 1024 * 1024;
 export const designPresets = {
   glassDark: designSchema.parse({
     surface: 'glass',
@@ -102,12 +140,22 @@ export const designPresets = {
   }),
 } satisfies Record<string, Design>;
 export function parseDesignFile(raw: string) {
-  if (raw.length > 16_384) throw new Error('Design file too large');
+  if (raw.length > DESIGN_FILE_MAX_BYTES) throw new Error('Design file too large');
   return designFileSchema.parse(JSON.parse(raw));
 }
-export function exportDesign(name: string, appearance: Design) {
+export function exportDesign(
+  name: string,
+  appearance: Design,
+  asset?: { id: string; name: string; data: string },
+) {
+  appearance = structuredClone(appearance);
+  if (appearance.wallpaper !== 'image') delete appearance.image;
   return JSON.stringify(
-    designFileSchema.parse({ format: 'hapanel-design', version: 1, name, appearance }),
+    designFileSchema.parse(
+      appearance.image
+        ? { format: 'hapanel-design', version: 2, name, appearance, asset }
+        : { format: 'hapanel-design', version: 1, name, appearance },
+    ),
     null,
     2,
   );
@@ -117,6 +165,14 @@ const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 
 export function designVariables(design: Design): Record<string, string> {
   return {
     '--design-background': design.background,
+    ...(design.gradient
+      ? {
+          '--design-gradient':
+            design.gradient.kind === 'radial'
+              ? `radial-gradient(ellipse at 20% 10%, ${design.gradient.from}, ${design.gradient.to})`
+              : `linear-gradient(${design.gradient.angle}deg, ${design.gradient.from}, ${design.gradient.to})`,
+        }
+      : {}),
     '--design-tint': rgb(design.tint),
     '--design-accent': design.accent,
     '--design-accent-rgb': rgb(design.accent),

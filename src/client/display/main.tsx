@@ -1,5 +1,6 @@
+import packageInfo from '../../../package.json';
 import { I18nProvider, useI18n, LanguageSwitcher } from '../i18n';
-import { StrictMode, useCallback, useEffect, useState } from 'react';
+import { StrictMode, useCallback, useEffect, useState, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { X } from 'lucide-react';
 import { api, liveStream } from '../service';
@@ -23,8 +24,23 @@ function Display() {
   const [code, setCode] = useState(''),
     [name, setName] = useState<string>();
   const displayName = name ?? t('pairing.defaultName');
+  const updateTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const acceptVersion = useCallback((version?: string) => {
+    if (!version || version === packageInfo.version) return true;
+    if (!updateTimer.current) {
+      const update = () => {
+        if (document.querySelector('dialog[open]')) updateTimer.current = setTimeout(update, 1000);
+        else window.location.reload();
+      };
+      updateTimer.current = setTimeout(update, 100);
+    }
+    return false;
+  }, []);
+  useEffect(() => () => clearTimeout(updateTimer.current), []);
+
   const load = useCallback(() => {
     api<{
+      appVersion?: string;
       published: Revision;
       snapshot: Snapshot;
       canEdit?: boolean;
@@ -33,6 +49,7 @@ function Display() {
       identifyUntil?: number;
     }>('api/display/bootstrap')
       .then((result) => {
+        if (!acceptVersion(result.appVersion)) return;
         setData(result);
         setPairing(false);
         setError(undefined);
@@ -46,6 +63,7 @@ function Display() {
   useEffect(() => {
     if (!data) return;
     return liveStream('api/display/stream', (message) => {
+      if (!acceptVersion(message.appVersion)) return;
       if (message.alertId)
         window.dispatchEvent(new CustomEvent('hapanel:alert', { detail: message.alertId }));
       if (message.online === false)

@@ -1,41 +1,94 @@
-import { useRef, useState } from 'react';
+import { UserError } from '../../shared/i18n';
+import { useContext, useRef, useState } from 'react';
 import { Download, Upload, Palette, Save, Trash2 } from 'lucide-react';
-import { designPresets, exportDesign, parseDesignFile, type Design } from '../../shared/design';
+import {
+  designPresets,
+  exportDesign,
+  parseDesignFile,
+  DESIGN_FILE_MAX_BYTES,
+  type Design,
+} from '../../shared/design';
 import { layoutId } from '../../shared/display-layouts';
 import { createGlassOverview } from '../../shared/glass-layout';
 import { pagesForProfile, type Dashboard, type Profile } from '../../shared/model';
 import { useI18n } from '../i18n';
 import { TextInput } from './TextInput';
+import { WallpaperSettings } from './WallpaperSettings';
+import { ImageLibraryContext } from '../ui/ImageContext';
+import { base64Blob } from '../images';
 
 export function DesignSettings({
   profile,
+  page,
   document,
-  update,
   change,
   notify,
   onOverview,
 }: {
   profile: Profile;
+  page?: Dashboard['pages'][number];
   document: Dashboard;
-  update: (patch: Partial<Profile>) => void;
   change: (fn: (draft: Dashboard) => void) => boolean;
   notify: (message: string) => void;
   onOverview?: (document: Dashboard, pageId: string) => void;
 }) {
-  const { t, language, describeError } = useI18n();
-  const [name, setName] = useState('');
-  const file = useRef<HTMLInputElement>(null);
-  const d = profile.design ?? designPresets.glassDark;
-  const patch = (value: Partial<Design>) => update({ design: { ...d, ...value } });
-  const download = () => {
-    const url = URL.createObjectURL(
-      new Blob([exportDesign(name.trim() || profile.name, d)], { type: 'application/json' }),
-    );
-    const a = window.document.createElement('a');
-    a.href = url;
-    a.download = 'hapanel-design.json';
-    a.click();
-    URL.revokeObjectURL(url);
+  const { t, language, describeError } = useI18n(),
+    images = useContext(ImageLibraryContext);
+  const [scope, setScope] = useState<'display' | 'page'>('display'),
+    [name, setName] = useState(''),
+    [busy, setBusy] = useState(false),
+    [keepImage, setKeepImage] = useState(true);
+  const file = useRef<HTMLInputElement>(null),
+    target = useRef('');
+  target.current = profile.id + '/' + (scope === 'page' ? page?.id : 'display');
+  const d =
+    (scope === 'page' ? (page?.design ?? profile.design) : profile.design) ??
+    designPresets.glassDark;
+  const gradientDefault = {
+    from: d.background,
+    to:
+      '#' +
+      [1, 3, 5]
+        .map((i) =>
+          Math.round(
+            parseInt(d.background.slice(i, i + 2), 16) * 0.75 +
+              parseInt(d.tint.slice(i, i + 2), 16) * 0.25,
+          )
+            .toString(16)
+            .padStart(2, '0'),
+        )
+        .join(''),
+    angle: 140,
+    kind: 'linear' as const,
+  };
+  const assigned = scope === 'page' ? page?.design : profile.design;
+  const write = (appearance?: Design) =>
+    change((doc) => {
+      if (scope === 'page' && page) doc.pages.find((p) => p.id === page.id)!.design = appearance;
+      else doc.profiles.find((p) => p.id === profile.id)!.design = appearance;
+    });
+  const patch = (value: Partial<Design>) => write({ ...d, ...value });
+  const download = async () => {
+    setBusy(true);
+    try {
+      const asset =
+        d.wallpaper === 'image' && d.image ? await images.portable(d.image.assetId) : undefined;
+      const raw = exportDesign(
+        name.trim() || (scope === 'page' ? page?.name : profile.name) || profile.name,
+        d,
+        asset,
+      );
+      const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' })),
+        a = window.document.createElement('a');
+      a.href = url;
+      a.download = 'hapanel-design.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      notify(describeError(e));
+    } finally {
+      setBusy(false);
+    }
   };
   return (
     <>
@@ -45,10 +98,43 @@ export function DesignSettings({
         </span>
         <div>
           <h2>{t('design.title')}</h2>
-          <p>{profile.name}</p>
+          <p>
+            {profile.name}
+            {scope === 'page' ? ' · ' + page?.name : ''}
+          </p>
         </div>
       </div>
-      <p className="field-hint">{t('design.hint')}</p>
+      {page && (
+        <fieldset className="design-scope">
+          <legend>{t('design.scope')}</legend>
+          <div>
+            <button
+              disabled={busy}
+              aria-pressed={scope === 'display'}
+              onClick={() => setScope('display')}
+            >
+              {t('design.displayScope')}
+            </button>
+            <button
+              disabled={busy}
+              aria-pressed={scope === 'page'}
+              onClick={() => setScope('page')}
+            >
+              {t('design.pageScope')}
+            </button>
+          </div>
+          <p className="field-hint">
+            {t(
+              scope === 'page'
+                ? page.design
+                  ? 'design.pageOwn'
+                  : 'design.pageInherited'
+                : 'design.hint',
+            )}
+          </p>
+        </fieldset>
+      )}
+      <WallpaperSettings key={target.current} design={d} document={document} update={patch} />
       <div className="form-section">
         <h3>{t('design.presets')}</h3>
         <div className="design-presets">
@@ -57,9 +143,16 @@ export function DesignSettings({
               key={id}
               className={
                 'design-preset ' +
-                (JSON.stringify(d) === JSON.stringify(value) && profile.design ? 'active' : '')
+                (JSON.stringify(d) === JSON.stringify(value) && assigned ? 'active' : '')
               }
-              onClick={() => update({ design: structuredClone(value) })}
+              onClick={() =>
+                write({
+                  ...structuredClone(value),
+                  ...(keepImage && d.wallpaper === 'image' && d.image
+                    ? { wallpaper: 'image' as const, image: structuredClone(d.image) }
+                    : {}),
+                })
+              }
             >
               <span
                 style={{
@@ -71,12 +164,18 @@ export function DesignSettings({
             </button>
           ))}
         </div>
-        <button
-          className="button full-width"
-          disabled={!profile.design}
-          onClick={() => update({ design: undefined })}
-        >
-          {t('design.classic')}
+        {d.wallpaper === 'image' && (
+          <label className="v2-check">
+            <input
+              type="checkbox"
+              checked={keepImage}
+              onChange={(e) => setKeepImage(e.target.checked)}
+            />
+            {t('design.keepImage')}
+          </label>
+        )}
+        <button className="button full-width" disabled={!assigned} onClick={() => write(undefined)}>
+          {t(scope === 'page' ? 'design.inherit' : 'design.classic')}
         </button>
       </div>
       <div className="form-section">
@@ -111,21 +210,101 @@ export function DesignSettings({
           {t('design.wallpaper')}
           <select
             value={d.wallpaper}
-            onChange={(e) => patch({ wallpaper: e.target.value as Design['wallpaper'] })}
+            onChange={(e) =>
+              patch({
+                wallpaper: e.target.value as Design['wallpaper'],
+                ...(e.target.value === 'gradient' && !d.gradient
+                  ? { gradient: gradientDefault }
+                  : {}),
+              })
+            }
           >
-            {(['landscape', 'aurora', 'gradient', 'plain'] as const).map((x) => (
+            {(['landscape', 'aurora', 'gradient', 'plain', 'image'] as const).map((x) => (
               <option key={x} value={x}>
                 {t(`design.${x}`)}
               </option>
             ))}
           </select>
         </label>
+        {d.wallpaper === 'gradient' && (
+          <fieldset className="gradient-controls">
+            <legend>{t('design.gradientBuilder')}</legend>
+            {(['from', 'to'] as const).map((key) => (
+              <label className="design-color" key={key}>
+                {t(`design.gradient.${key}`)}
+                <input
+                  type="color"
+                  aria-label={t(`design.gradient.${key}`)}
+                  value={d.gradient?.[key] ?? (key === 'from' ? d.background : d.tint)}
+                  onChange={(e) =>
+                    patch({
+                      gradient: {
+                        from: d.background,
+                        to: d.tint,
+                        angle: 140,
+                        kind: 'linear',
+                        ...d.gradient,
+                        [key]: e.target.value,
+                      },
+                    })
+                  }
+                />
+              </label>
+            ))}
+            <label>
+              {t('design.gradient.kind')}
+              <select
+                value={d.gradient?.kind ?? 'linear'}
+                onChange={(e) =>
+                  patch({
+                    gradient: {
+                      from: d.background,
+                      to: d.tint,
+                      angle: 140,
+                      ...d.gradient,
+                      kind: e.target.value as 'linear',
+                    },
+                  })
+                }
+              >
+                <option value="linear">{t('design.gradient.linear')}</option>
+                <option value="radial">{t('design.gradient.radial')}</option>
+              </select>
+            </label>
+            {(d.gradient?.kind ?? 'linear') === 'linear' && (
+              <label className="design-range">
+                <span>
+                  {t('design.gradient.angle')}
+                  <output>{d.gradient?.angle ?? 140}°</output>
+                </span>
+                <input
+                  type="range"
+                  aria-label={t('design.gradient.angle')}
+                  min="0"
+                  max="360"
+                  value={d.gradient?.angle ?? 140}
+                  onChange={(e) =>
+                    patch({
+                      gradient: {
+                        from: d.background,
+                        to: d.tint,
+                        kind: 'linear',
+                        ...d.gradient,
+                        angle: Number(e.target.value),
+                      },
+                    })
+                  }
+                />
+              </label>
+            )}
+          </fieldset>
+        )}
         {(['background', 'tint', 'accent'] as const).map((key) => (
           <label className="design-color" key={key}>
             {t(`design.${key}`)}
             <input
-              aria-label={t(`design.${key}`)}
               type="color"
+              aria-label={t(`design.${key}`)}
               value={d[key]}
               onChange={(e) => patch({ [key]: e.target.value })}
             />
@@ -143,7 +322,7 @@ export function DesignSettings({
             ['textScale', 0.8, 1.25, 0.05, '×'],
           ] as const
         ).map(([key, min, max, step, unit]) => (
-          <label key={key} className="design-range">
+          <label className="design-range" key={key}>
             <span>
               {t(`design.${key}`)}
               <output>
@@ -152,8 +331,8 @@ export function DesignSettings({
               </output>
             </span>
             <input
-              aria-label={t(`design.${key}`)}
               type="range"
+              aria-label={t(`design.${key}`)}
               min={min}
               max={max}
               step={step}
@@ -162,6 +341,16 @@ export function DesignSettings({
             />
           </label>
         ))}
+        <label>
+          {t('design.transition')}
+          <select
+            value={d.transition ?? 'none'}
+            onChange={(e) => patch({ transition: e.target.value as 'none' })}
+          >
+            <option value="none">{t('design.noTransition')}</option>
+            <option value="fade">{t('design.fade')}</option>
+          </select>
+        </label>
         <p className="field-hint">{t('design.performance')}</p>
       </div>
       <div className="form-section">
@@ -191,10 +380,7 @@ export function DesignSettings({
         </button>
         {(document.designs ?? []).map((saved) => (
           <div className="design-library-row" key={saved.id}>
-            <button
-              className="button"
-              onClick={() => update({ design: structuredClone(saved.appearance) })}
-            >
+            <button className="button" onClick={() => write(structuredClone(saved.appearance))}>
               {saved.name}
             </button>
             <button
@@ -211,33 +397,51 @@ export function DesignSettings({
           </div>
         ))}
         <div className="v2-button-row">
-          <button className="button" onClick={download}>
+          <button disabled={busy} className="button" onClick={() => void download()}>
             <Download size={16} />
             {t('design.export')}
           </button>
-          <button className="button" onClick={() => file.current?.click()}>
+          <button disabled={busy} className="button" onClick={() => file.current?.click()}>
             <Upload size={16} />
             {t('design.import')}
           </button>
         </div>
         <input
+          hidden
           ref={file}
           type="file"
           accept="application/json,.json"
-          hidden
           onChange={async (e) => {
             const input = e.currentTarget,
-              selected = input.files?.[0];
+              selected = input.files?.[0],
+              destination = target.current;
+            if (!selected) return;
+            setBusy(true);
             try {
-              if (!selected) return;
-              if (selected.size > 16384) throw new Error();
+              if (selected.size > DESIGN_FILE_MAX_BYTES) throw Error();
               const imported = parseDesignFile(await selected.text());
-              if ((document.designs?.length ?? 0) >= 24) throw new Error();
+              if ((document.designs?.length ?? 0) >= 24) throw Error();
+              if (imported.version === 2) {
+                const meta = await images.upload(
+                  base64Blob(imported.asset.data),
+                  imported.asset.name,
+                );
+                imported.appearance.image!.assetId = meta.id;
+              }
+              if (destination !== target.current) {
+                notify(t('image.targetChanged'));
+                return;
+              }
               if (
                 change((doc) => {
-                  doc.profiles.find((p) => p.id === profile.id)!.design = structuredClone(
-                    imported.appearance,
-                  );
+                  if (scope === 'page' && page)
+                    doc.pages.find((p) => p.id === page.id)!.design = structuredClone(
+                      imported.appearance,
+                    );
+                  else
+                    doc.profiles.find((p) => p.id === profile.id)!.design = structuredClone(
+                      imported.appearance,
+                    );
                   (doc.designs ??= []).push({
                     id: layoutId('design'),
                     name: imported.name,
@@ -248,33 +452,36 @@ export function DesignSettings({
                 setName(imported.name);
                 notify(t('design.imported'));
               }
-            } catch {
-              notify(t('design.invalid'));
+            } catch (error) {
+              notify(error instanceof UserError ? describeError(error) : t('design.invalid'));
             } finally {
+              setBusy(false);
               input.value = '';
             }
           }}
         />
         <p className="field-hint">{t('design.transferHint')}</p>
       </div>
-      <div className="form-section">
-        <h3>{t('design.layout')}</h3>
-        <p className="field-hint">{t('design.layoutHint')}</p>
-        <button
-          className="button full-width"
-          disabled={pagesForProfile(document, profile.id).length >= 12}
-          onClick={() => {
-            try {
-              const result = createGlassOverview(document, profile.id, language);
-              onOverview?.(result.document, result.pageId);
-            } catch (e) {
-              notify(describeError(e));
-            }
-          }}
-        >
-          {t('design.createOverview')}
-        </button>
-      </div>
+      {scope === 'display' && (
+        <div className="form-section">
+          <h3>{t('design.layout')}</h3>
+          <p className="field-hint">{t('design.layoutHint')}</p>
+          <button
+            className="button full-width"
+            disabled={pagesForProfile(document, profile.id).length >= 12}
+            onClick={() => {
+              try {
+                const result = createGlassOverview(document, profile.id, language);
+                onOverview?.(result.document, result.pageId);
+              } catch (e) {
+                notify(describeError(e));
+              }
+            }}
+          >
+            {t('design.createOverview')}
+          </button>
+        </div>
+      )}
     </>
   );
 }

@@ -1,8 +1,8 @@
-# Prüfstand für 2.1.0
+# Prüfstand für 2.2.0
 
 ## Automatisiert
 
-89 Tests mit Node.js-Test-Runner: Geometrie aller Beispielprofile, Schema- und Domänenvalidierung, Rastergrenzen und Überlappungen, Revisionskonflikte, Entwurf/Veröffentlichung/Wiederherstellung, persistente Sitzungen, einmalige Kopplungscodes, Zugriffsschutz für Ingress und lokale Verwaltung, eingeschränkte Display-API, YAML-Import und aktiver WebSocket-Widerruf.
+96 Tests mit Node.js-Test-Runner: Geometrie aller Beispielprofile, Schema- und Domänenvalidierung, Rastergrenzen und Überlappungen, Revisionskonflikte, Entwurf/Veröffentlichung/Wiederherstellung, persistente Sitzungen, einmalige Kopplungscodes, Zugriffsschutz für Ingress und lokale Verwaltung, eingeschränkte Display-API, YAML-Import und aktiver WebSocket-Widerruf.
 
 Der HA-Adapter wird mit einem lokalen WebSocket-Simulator geprüft: Authentifizierung, gefilterte Abonnements, komprimierte Attribut-Deltas, Prognosen, Administratorprüfung, typisierte Serviceaufrufe und Unterbrechung. Es werden keine echten HA-Geräte angesteuert.
 
@@ -113,3 +113,15 @@ Browserprüfungen verwenden ausschließlich synthetische Daten. Physische iPad-P
 Im finalen Produktionsbuild geprüft: gekoppelte Anzeige bei tatsächlich gemessenen 1080×810 und 810×1080 CSS-Pixeln, ohne Einrichtungsleiste oder horizontalen Überlauf. Die vier Schnellzugriffe besitzen 48 Pixel hohe Bedienelemente. Raumdetails im hellen Design sind lesbar und ihre Gerätekarten nicht abgeschnitten; die Schließen-Fläche bleibt 48 Pixel hoch und beim Hit-Test erreichbar. Escape schließt die Wetterdetails.
 
 Ein eigenes benanntes Design mit Leerzeichen wurde gespeichert, als JSON heruntergeladen und wieder importiert. Ein angepasster Kachelradius auf einem anderen Display verändert das ursprüngliche Display nicht. Entwurf und Veröffentlichung sind getrennt; nach Veröffentlichung wechselt die gekoppelte Anzeige ohne Neuladen auf die neue Gestaltung. Deutsche und englische Überschriften, Statuszeilen und Designoptionen sind geprüft. Die öffentlichen Screenshots zeigen ausschließlich synthetische Daten.
+
+## 2.2.0 · Eigene Bilder und vollständige Projekte
+
+96 automatisierte Tests einschließlich Bildnormalisierung und EXIF-Entfernung, begrenzter WebP-Vorschauen, persistenter Inhalts-IDs, Duplikaten, wiederherstellbarer Archivierung und des Erhalts verwendeter Dateien in früheren Revisionen. Ungültige Inhalte, SVG, beschädigte Rasterdateien, falsche IDs, übergroße Requests und nicht erlaubte Galeriezugriffe werden abgewiesen. Bildzugriff durch HA-Betrachter und gekoppelte Displays bleibt auf veröffentlichte und erlaubte Profile beschränkt. Nicht aktive oder rein administrative Bildreferenzen reichen nicht zur Freigabe.
+
+Projektprüfungen sichern den einmaligen Transport mehrfach verwendeter Bilder, Konfigurationserhalt, Übertragung in einen unabhängigen Store, Ablehnung unvollständiger/doppelter Referenzen und Abbruch vor der Konfigurationsübernahme. Bestehende Kamera-, Alarm-, Dimmer- und Revisionsprüfungen bleiben enthalten.
+
+Browserprüfung mit synthetischen Daten: eigenes JPEG hochladen und anwenden; Crop/Zoom und Palette ändern; zwischen geerbtem und eigenem Ansichtsdesign wechseln; Rückgängig; Bild umbenennen, archivieren und wiederherstellen; Design mit Bild exportieren und auf eine andere Ansicht importieren; vollständiges Projekt als Datei herunterladen und sowohl im Backend als auch im rein lokalen Browser-Designer wieder einlesen. Das Bild bleibt in IndexedDB nach Neuladen erhalten und erscheint erst nach Veröffentlichung in der Vorschau.
+
+Bei tatsächlich gemessenen 1080×810 und 810×1080 CSS-Pixeln lädt das zugeordnete Bild auf dem gekoppelten Testdisplay ohne horizontales Überlaufen oder Einrichtungsflächen. Schnellzugriffe und Schließen-Flächen bleiben 48 Pixel hoch; Details werden weiter unter `body` gerendert. Deutsche und englische Bilddialoge sind geprüft. Ein künstlicher Versionswechsel hält ein offenes Wetterdetail offen und löst erst nach dem Schließen einen neuen Bootstrap-Ladevorgang aus.
+
+Die CI-Container prüfen zusätzlich zur Installation der nativen Abhängigkeit einen WebP-Encodingvorgang unter amd64 und aarch64. Ein erfolgreicher Test unter Emulation ersetzt keine längere Prüfung auf physischer ARM-/iPad-Hardware. Öffentliche Abbildungen enthalten ausschließlich synthetische Daten und eine eigens gezeichnete Berglandschaft.

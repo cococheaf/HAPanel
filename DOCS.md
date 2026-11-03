@@ -194,3 +194,9 @@ Die neuen Designer-, Display-, Kamera-, Ereignis- und Energiefunktionen beschrei
 ## Eigene Designs
 
 Im Designer rechts **Design** öffnen. [Glass, eigene Vorlagen und Design-Austausch](docs/designs.md).
+
+## Hintergrundbilder und Projektsicherung (2.2)
+
+**Designer → Design → Bilderbibliothek** öffnet Upload und Verwaltung eigener Bilder. Die Gestaltung kann für das gesamte Display oder nur eine Ansicht gelten. **Konfiguration exportieren → Komplettes Projekt mit Bildern sichern** überträgt Layouts und Bilder in einer `.hapanel`-Datei. [Anleitung und Größenlimits](docs/designs.md).
+
+Das Bildverzeichnis gehört zu den persistenten App-Daten und wird im HA-App-Backup mitgesichert. Ein Update benötigt weder neue HA-Berechtigungen noch Änderungen an bestehenden Dashboards. Beim ersten Wechsel von 2.1 auf 2.2 die Anzeige einmal neu laden; folgende App-Versionswechsel werden vom neuen Player erkannt.

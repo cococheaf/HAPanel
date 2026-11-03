@@ -1,3 +1,4 @@
+import { WallpaperPhoto } from './WallpaperPhoto';
 import { designVariables } from '../../shared/design';
 import { DesignContext } from './DesignContext';
 import { StreamBudgetContext } from './stream-budget';
@@ -1066,7 +1067,7 @@ export function DashboardFrame({
     const timer = setInterval(() => setNow(new Date()), 15_000);
     return () => clearInterval(timer);
   }, []);
-  const design = profile.design;
+  const design = activePage.design ?? profile.design;
   const scheme =
     (design?.scheme ?? profile.experience?.colorMode) === 'auto'
       ? isNight(profile.experience, now.getHours())
@@ -1083,6 +1084,7 @@ export function DashboardFrame({
           data-color-mode={scheme}
           data-design={design?.surface}
           data-wallpaper={design?.wallpaper}
+          data-transition={design?.transition ?? 'none'}
           data-background={profile.experience?.background ?? 'gradient'}
           onTouchStart={(event) => {
             touch.current = undefined;
@@ -1126,6 +1128,9 @@ export function DashboardFrame({
             paddingBottom: profile.margin + (profile.experience?.safeBottom ?? 0),
           }}
         >
+          {design?.wallpaper === 'image' && design.image && (
+            <WallpaperPhoto image={design.image} scheme={scheme} />
+          )}
           <header className="dashboard-header" style={{ height: profile.headerHeight }}>
             <div>
               <div className="dashboard-home-label">
@@ -1158,6 +1163,7 @@ export function DashboardFrame({
           </header>
           {children ?? (
             <StaticGrid
+              key={activePage.id}
               document={document}
               profile={profile}
               pageId={pageId}

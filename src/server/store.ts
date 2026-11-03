@@ -12,6 +12,8 @@ import {
 import { z } from 'zod';
 import { dashboardSchema, type Dashboard, type Workspace } from '../shared/model';
 import { independentDisplayViews } from '../shared/display-layouts';
+import { ImageStore } from './assets';
+import { imageReferences } from '../shared/assets';
 import { demoDocument } from '../shared/demo';
 
 export class HttpError extends Error {
@@ -51,11 +53,13 @@ const workspaceSchema = z
   .strict();
 
 export class DocumentStore extends EventEmitter {
+  readonly images: ImageStore;
   private state!: Workspace;
   private queue: Promise<unknown> = Promise.resolve();
   constructor(private directory: string) {
     super();
     this.setMaxListeners(0);
+    this.images = new ImageStore(join(directory, 'images'));
   }
   async init() {
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
@@ -79,6 +83,7 @@ export class DocumentStore extends EventEmitter {
       this.state = structuredClone({ draft: revision, published: revision, history: [] });
       await atomicJson(join(this.directory, 'dashboard.json'), this.state);
     }
+    await this.images.init();
     const before = this.get(),
       next = this.get();
     next.draft.document = independentDisplayViews(next.draft.document);
@@ -115,6 +120,8 @@ export class DocumentStore extends EventEmitter {
   }
   save(document: Dashboard, expectedRevision: number) {
     const parsed = independentDisplayViews(dashboardSchema.parse(document));
+    for (const id of imageReferences(parsed, true))
+      if (!this.images.has(id)) throw new HttpError(400, 'image.missing');
     return this.transact((state) => {
       if (state.draft.revision !== expectedRevision) throw new HttpError(409, 'error.conflict');
       state.history = [state.draft, ...state.history].slice(0, 30);

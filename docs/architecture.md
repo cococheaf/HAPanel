@@ -95,3 +95,15 @@ Tablet-Messungen enthalten ausschließlich CSS-Fläche, DPR und Kontaktzeit. Sie
 ## Konfigurierbare Gestaltung
 
 Optionale `profile.design`-Werte steuern ausschließlich begrenzte CSS-Variablen im gemeinsamen Renderer. Fehlende Designfelder erhalten die klassische Darstellung. `dashboard.designs` speichert unabhängige Vorlagen; Display-Antworten enthalten diese administrative Bibliothek nicht. Designimporte besitzen ein eigenes strikt geprüftes Format, keine HA-Bindungen, URLs oder ausführbares CSS. Lokale SVG-Hintergründe werden mit dem Build gebündelt. Glasfilter sitzen außerhalb der skalierten Kachelinhalte. Ein React-Kontext überträgt die Gestaltung auch in außerhalb des Canvas gerenderte Detaildialoge. Abschnittskacheln besitzen keine Entität und können keine HA-Services auslösen.
+
+## Bildverwaltung und Projektdateien (2.2)
+
+`ImageStore` speichert normalisierte WebP-Dateien und Vorschaubilder außerhalb des Dashboard-JSON unter `images/`. Inhalts-IDs sind SHA-256-Werte der normalisierten Datei. Metadaten und Dateien werden atomar geschrieben; bestehende Dateien bleiben bei Archivierung verfügbar. Der gemeinsam genutzte Store serialisiert Bildverarbeitung, begrenzt Größe, Pixelzahl, Warteschlange, Galerievolumen und Dateianzahl. [sharp](https://sharp.pixelplumbing.com/) dekodiert ausschließlich vorab als JPEG/PNG/WebP erkannte Uploads, entfernt Metadaten und erzeugt begrenzte Vorschaubilder. Die native Cachegröße ist begrenzt; Verarbeitung läuft mit einem Thread pro Bild.
+
+Editor-Routen erfordern Administratorzugriff. Display-Bildrouten prüfen zunächst die bestehende Sitzungs-/Ingressberechtigung und anschließend die Referenzen des veröffentlichten, erlaubten Displayumfangs. Nicht aktive und ausschließlich in der administrativen Designbibliothek gespeicherte Bilder sind nicht abrufbar. Private Bilder werden nicht aus einem öffentlichen Static-Verzeichnis ausgeliefert.
+
+`page.design` übersteuert `profile.design`; ohne Ansichtsdesign wird geerbt. Der gemeinsame Renderer stellt Bilder mit Fit, Fokus, Zoom und Lesbarkeitsoptionen hinter den Bedienelementen dar. Bild-URLs und Bedienelemente sind getrennt; Objekt-URLs der Browser-Vorschau werden bei Ansichtwechseln freigegeben. IndexedDB hält dort die Bilddateien, LocalStorage nur die Konfiguration.
+
+Designformat 2 bettet ein verwendetes Bild ein, Format 1 ohne Bild bleibt gültig. Projektdateien tragen den vollständigen Entwurf und alle zugeordneten Bilddateien einmalig. Der Client validiert die Datei und lädt Bildobjekte vor dem revisionsgeprüften Speichern des Entwurfs. Ein fehlgeschlagener Konfigurationsimport verändert die Veröffentlichung nicht. Bereits übertragene Bilder bleiben bei Abbruch in der lokalen Bibliothek verfügbar. Autorisierte Bildimporte ersetzen keine fremden Dateien oder HA-Konfigurationen.
+
+Player vergleichen die vom Server mit Bootstrap und WebSocket übertragene App-Version mit ihrem Build. Bei Abweichung werden neue Dokumentstrukturen bis zum Neuladen nicht übernommen. Offene Detaildialoge verzögern das Neuladen. Das Verhalten gilt ab dem Player-Build 2.2; ältere Builds benötigen einen manuellen Reload.

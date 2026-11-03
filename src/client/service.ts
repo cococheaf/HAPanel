@@ -1,3 +1,4 @@
+import { ApiImageLibrary, BrowserImageLibrary, type ImageLibrary } from './images';
 import { independentDisplayViews } from '../shared/display-layouts';
 import { UserError, isMessageKey } from '../shared/i18n';
 import { requestLanguage } from './i18n';
@@ -29,6 +30,7 @@ export type Bootstrap = {
   access?: { camera: 'admin' | 'authenticated'; alarm: 'admin' | 'authenticated' };
 };
 export type LiveMessage = {
+  appVersion?: string;
   alertId?: string;
   snapshot?: Snapshot;
   published?: Revision;
@@ -43,6 +45,7 @@ export function serializeDashboard(document: Dashboard, format: 'json' | 'yaml')
 }
 export interface StudioService {
   local: boolean;
+  images: ImageLibrary;
   load(): Promise<Bootstrap>;
   save(document: Dashboard, revision: number): Promise<Workspace>;
   publish(revision: number): Promise<Workspace>;
@@ -120,6 +123,7 @@ export function liveStream(path: string, listener: (message: LiveMessage) => voi
 }
 export const backendService: StudioService = {
   local: false,
+  images: new ApiImageLibrary('api/editor/assets/'),
   load: () => api('api/editor/bootstrap'),
   save: (document, expectedRevision) =>
     api('api/editor/draft', { document, expectedRevision }, 'PUT'),
@@ -145,6 +149,7 @@ export const backendService: StudioService = {
 /** The hosted demo stores layouts only in this browser and never connects to HA. */
 export class BrowserDemoService implements StudioService {
   readonly local = true;
+  readonly images = new BrowserImageLibrary();
   private workspace: Workspace;
   private snapshot = showcaseSnapshot();
   private listeners = new Set<(message: LiveMessage) => void>();
