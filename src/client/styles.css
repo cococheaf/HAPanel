@@ -3358,7 +3358,17 @@ label + label {
   height: 27px;
 }
 .insight-reference-list {
-  margin-top: 15px;
+  border: 0;
+  margin: 15px 0 0;
+  padding: 0;
+  min-width: 0;
+}
+.insight-reference-list legend {
+  padding: 0;
+  margin-bottom: 7px;
+  color: #65726f;
+  font-size: 13px;
+  font-weight: 550;
 }
 .energy-panel.is-compact .energy-lower {
   display: none;

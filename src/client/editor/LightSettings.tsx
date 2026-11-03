@@ -6,10 +6,12 @@ export function LightSettings({
   control,
   catalog,
   update,
+  labelledBy,
 }: {
   control: Pick<Control, 'entityId' | 'light'>;
   catalog: EntityState[];
   update: (light: NonNullable<Control['light']>) => void;
+  labelledBy?: string;
 }) {
   const { t } = useI18n();
   const options = { allowTurnOn: true, allowTurnOff: true, showBrightness: true, ...control.light };
@@ -18,8 +20,8 @@ export function LightSettings({
     Object.fromEntries(catalog.map((entity) => [entity.entity_id, entity])),
   );
   return (
-    <fieldset className="light-settings">
-      <legend>{t('light.settings')}</legend>
+    <fieldset className="light-settings" aria-labelledby={labelledBy}>
+      {!labelledBy && <legend>{t('light.settings')}</legend>}
       {(['allowTurnOn', 'allowTurnOff'] as const).map((key) => (
         <label className="alarm-setting-toggle" key={key}>
           <input

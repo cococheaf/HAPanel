@@ -1,5 +1,5 @@
 import { domainKinds as domains } from '../../shared/widgets';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Plus, X, ChevronUp, ChevronDown } from 'lucide-react';
 import { alarmModes } from '../../shared/model';
 import { alarmModeLabel, supportsAlarmMode } from '../../shared/security';
@@ -23,6 +23,7 @@ export function InsightSettings({
   update: (patch: Partial<Tile>) => void;
 }) {
   const { t, intlLocale } = useI18n();
+  const labelId = useId();
   const [newControl, setNewControl] = useState('');
   const [newConsumer, setNewConsumer] = useState('');
   const [newMetric, setNewMetric] = useState('');
@@ -50,10 +51,15 @@ export function InsightSettings({
     value: string | undefined,
     change: (id: string) => void,
     choices: EntityState[] = catalog,
+    labelledBy?: string,
   ) => (
     <label>
-      {label}
-      <select value={value ?? ''} onChange={(event) => change(event.target.value)}>
+      {!labelledBy && label}
+      <select
+        aria-labelledby={labelledBy}
+        value={value ?? ''}
+        onChange={(event) => change(event.target.value)}
+      >
         <option value="">{t('editor.none')}</option>
         {value && !choices.some((entity) => entity.entity_id === value) && (
           <option value={value} disabled>
@@ -72,8 +78,8 @@ export function InsightSettings({
   );
   const referenceList = (key: 'windows' | 'presence', label: string, candidates: EntityState[]) =>
     tile.room && (
-      <div className="insight-reference-list">
-        <label>{label}</label>
+      <fieldset className="insight-reference-list">
+        <legend id={`${labelId}-${key}`}>{label}</legend>
         {tile.room[key].map((id) => (
           <div className="inspector-reference" key={id}>
             <span>
@@ -95,8 +101,9 @@ export function InsightSettings({
             '',
             (id) => id && room({ [key]: [...new Set([...tile.room![key], id])] }),
             candidates,
+            `${labelId}-${key}`,
           )}
-      </div>
+      </fieldset>
     );
   return (
     <>
@@ -120,7 +127,7 @@ export function InsightSettings({
               )}
             </div>
           ))}
-          <h4>{t('v2.additionalSolar')}</h4>
+          <h4 id={`${labelId}-solar`}>{t('v2.additionalSolar')}</h4>
           {(tile.energy.meters?.solarAdditional ?? []).map((id) => (
             <div className="inspector-reference" key={id}>
               <span>
@@ -164,6 +171,7 @@ export function InsightSettings({
                   ['Wh', 'kWh', 'MWh'].includes(String(e.attributes.unit_of_measurement)) &&
                   e.entity_id !== tile.energy!.meters?.solarEnergy,
               ),
+              `${labelId}-solar`,
             )}
           {(['tariff', 'exportTariff'] as const).map((key) => (
             <label key={key}>
@@ -403,7 +411,6 @@ export function InsightSettings({
       {!['contacts', 'alarm', 'automation', 'camera'].includes(tile.kind) && (
         <>
           <div className="form-section">
-            <h3>{t('editor.cardView')}</h3>
             <label>
               {t('editor.cardView')}
               <select
@@ -535,8 +542,9 @@ export function InsightSettings({
                 </div>
                 {control.kind === 'light' && (
                   <details>
-                    <summary>{t('light.settings')}</summary>
+                    <summary id={`${labelId}-${control.id}-light`}>{t('light.settings')}</summary>
                     <LightSettings
+                      labelledBy={`${labelId}-${control.id}-light`}
                       control={control}
                       catalog={catalog}
                       update={(light) =>

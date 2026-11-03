@@ -1,4 +1,4 @@
-# Prüfstand für 2.2.0
+# Prüfstand für 2.2.1
 
 ## Automatisiert
 
@@ -125,3 +125,7 @@ Browserprüfung mit synthetischen Daten: eigenes JPEG hochladen und anwenden; Cr
 Bei tatsächlich gemessenen 1080×810 und 810×1080 CSS-Pixeln lädt das zugeordnete Bild auf dem gekoppelten Testdisplay ohne horizontales Überlaufen oder Einrichtungsflächen. Schnellzugriffe und Schließen-Flächen bleiben 48 Pixel hoch; Details werden weiter unter `body` gerendert. Deutsche und englische Bilddialoge sind geprüft. Ein künstlicher Versionswechsel hält ein offenes Wetterdetail offen und löst erst nach dem Schließen einen neuen Bootstrap-Ladevorgang aus.
 
 Die CI-Container prüfen zusätzlich zur Installation der nativen Abhängigkeit einen WebP-Encodingvorgang unter amd64 und aarch64. Ein erfolgreicher Test unter Emulation ersetzt keine längere Prüfung auf physischer ARM-/iPad-Hardware. Öffentliche Abbildungen enthalten ausschließlich synthetische Daten und eine eigens gezeichnete Berglandschaft.
+
+## 2.2.1 · Eindeutige Designer-Beschriftungen
+
+Die Raum- und Energie-Einstellungen sind im Produktionsbuild auf Deutsch und Englisch geprüft. Kachelansicht, Fenster-/Türkontakte, Präsenzsensoren, zusätzliche PV-Zähler und aufgeklapptes Schaltverhalten besitzen jeweils genau eine sichtbare Beschriftung. Die Auswahlfelder und Schaltverhaltensgruppen behalten ihre zugänglichen Namen über `aria-labelledby`. Eigenständige Lichteinstellungen zeigen weiterhin ihre eigene Legende. Die 96 bestehenden Tests, Produktionsbuild, Vorschau-Build und Abhängigkeitsprüfung bleiben erfolgreich.

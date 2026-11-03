@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.2.1
+
+- Doppelte Beschriftungen bei Kachelansicht, Fenster-/Präsenzsensoren, zusätzlichen Solarzählern und aufgeklapptem Schaltverhalten entfernt.
+- Eine sichtbare Gruppenüberschrift beschriftet die zugehörigen Felder weiterhin auch für Screenreader. Eigenständige Lichteinstellungen behalten ihre Überschrift.
+- Keine Änderung an Layouts, Entitäten, Geräteaktionen oder gespeicherten Designs.
+
 ## 2.2.0
 
 - Eigene JPEG-/PNG-/WebP-Hintergrundbilder mit lokaler Optimierung, Fokus, Zoom, Bildhelligkeit, Überlagerung, Unschärfe und Palette aus dem Bild.
