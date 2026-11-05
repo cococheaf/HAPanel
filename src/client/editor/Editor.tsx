@@ -1,3 +1,8 @@
+import './editor.css';
+import { ViewSettings } from './ViewSettings';
+import { searchText, entityDetails } from './select-options';
+import { EditorSection } from './EditorSection';
+import { SearchSelect } from './SearchSelect';
 import {
   exportProject,
   importProject,
@@ -15,7 +20,7 @@ import { transformSelection, pasteTiles } from '../../shared/designer';
 import { domainKinds } from '../../shared/widgets';
 import { localizeSampleDocument, localizedSampleTile, sampleEntityName } from '../../shared/demo';
 import { useI18n, LanguageSwitcher } from '../i18n';
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import GridLayout, { type Layout } from 'react-grid-layout';
 import { transformStrategy, getCompactor } from 'react-grid-layout/core';
 import {
@@ -67,7 +72,7 @@ import { kindIcons, kindLabelKeys } from '../ui/kinds';
 import { Modal } from '../ui/Modal';
 import { DisplayManager, type DisplayIntent } from './DisplayManager';
 import { createDisplay, resizeDisplay, layoutId } from '../../shared/display-layouts';
-import { InsightSettings } from './InsightSettings';
+import { InsightSettings, CardViewSettings } from './InsightSettings';
 import { TextInput } from './TextInput';
 
 const freshId = layoutId;
@@ -82,6 +87,7 @@ type Dialog =
   | 'template'
   | 'alerts'
   | 'diagnostics'
+  | 'help'
   | null;
 
 export default function Editor({
@@ -161,16 +167,26 @@ function Studio({
     }),
     [pageId, setPageId] = useState(document.pages[0].id);
   const [selectedId, setSelectedId] = useState('light');
-  const [inspector, setInspector] = useState<'tile' | 'display' | 'design'>('tile');
+  const [inspector, setInspector] = useState<'tile' | 'view' | 'display' | 'design'>('tile');
   const [leftOpen, setLeftOpen] = useState(false),
     [rightOpen, setRightOpen] = useState(false);
+  const libraryDrawer = useMediaQuery('(max-width: 1150px)');
+  const inspectorDrawer = useMediaQuery('(max-width: 900px)');
   const [status, setStatus] = useState<'saved' | 'saving' | 'dirty' | 'error'>('saved');
   const [search, setSearch] = useState('');
+  const [libraryTab, setLibraryTab] = useState<'blocks' | 'entities'>('blocks');
+  const [entityLimit, setEntityLimit] = useState(100);
+  const inspectorContent = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    inspectorContent.current?.scrollTo({ top: 0 });
+  }, [inspector, selectedId, profileId]);
   const [areaFilter, setAreaFilter] = useState(''),
     [kindFilter, setKindFilter] = useState(''),
     [unplaced, setUnplaced] = useState(false);
+  useEffect(() => setEntityLimit(100), [search, areaFilter, kindFilter, unplaced]);
   const [selection, setSelection] = useState<string[]>([]);
   const clipboard = useRef<Tile[]>([]);
+  const [clipboardCount, setClipboardCount] = useState(0);
   const [simple, setSimple] = useState(false);
   useEffect(() => {
     setSelection([]);
@@ -354,6 +370,7 @@ function Studio({
     clipboard.current = structuredClone(
       page.tiles.filter((tile) => (selection.length ? selection : [selectedId]).includes(tile.id)),
     );
+    setClipboardCount(clipboard.current.length);
   };
   const pasteSelection = () => {
     try {
@@ -374,7 +391,11 @@ function Studio({
     });
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if ((event.target as HTMLElement).matches('input, textarea, select, [contenteditable]'))
+      if (
+        (event.target as HTMLElement).closest(
+          'input, textarea, select, dialog, [role=combobox], [contenteditable], button:not(.tile-select-area):not(.tile-drag)',
+        )
+      )
         return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
         event.preventDefault();
@@ -391,7 +412,13 @@ function Studio({
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setLeftOpen(true);
-        window.document.querySelector<HTMLInputElement>('.search-field input')?.focus();
+        setRightOpen(false);
+        setLibraryTab('entities');
+        requestAnimationFrame(() =>
+          window.document
+            .querySelector<HTMLInputElement>('.search-field input')
+            ?.focus({ preventScroll: true }),
+        );
       }
       if (selected && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
         event.preventDefault();
@@ -485,6 +512,8 @@ function Studio({
     ) {
       setSelectedId(id);
       setInspector('tile');
+      setLeftOpen(false);
+      setRightOpen(true);
     }
   };
   const addPage = () => {
@@ -501,6 +530,8 @@ function Studio({
     ) {
       setPageId(id);
       setSelectedId('');
+      setInspector('view');
+      setRightOpen(true);
     }
   };
   const act = async (action: Action) => {
@@ -552,17 +583,37 @@ function Studio({
           tile.layouts[profile.id] = { x: r.x, y: r.y, w: r.w, h: r.h };
       }
     });
-  const matchingEntities = catalog.filter(
-    (e) =>
-      domainKinds[e.entity_id.split('.')[0]] &&
-      (!areaFilter || e.area?.id === areaFilter) &&
-      (!kindFilter || domainKinds[e.entity_id.split('.')[0]] === kindFilter) &&
-      (!unplaced ||
-        !visiblePages.some((page) => page.tiles.some((tile) => tile.entityId === e.entity_id))) &&
-      `${e.entity_id} ${e.attributes.friendly_name} ${entityName(e)} ${e.area?.name ?? ''} ${e.area?.floor ?? ''} ${e.deviceName ?? ''}`
-        .toLowerCase()
-        .includes(search.toLowerCase()),
+  const searchableCatalog = useMemo(
+    () =>
+      catalog.map((entity) => ({
+        entity,
+        text: searchText(
+          `${entity.entity_id} ${entity.attributes.friendly_name} ${entityName(entity)} ${entity.area?.name ?? ''} ${entity.area?.floor ?? ''} ${entity.deviceName ?? ''}`,
+        ),
+      })),
+    [catalog, language, bootstrap.mode],
   );
+  const matchingEntities = useMemo(() => {
+    const terms = searchText(search).split(' ').filter(Boolean);
+    const used = new Set(
+      visiblePages.flatMap((page) =>
+        page.tiles.flatMap((tile) => [
+          tile.entityId,
+          ...(tile.room?.controls.map((control) => control.entityId) ?? []),
+        ]),
+      ),
+    );
+    return searchableCatalog
+      .filter(
+        ({ entity: e, text }) =>
+          domainKinds[e.entity_id.split('.')[0]] &&
+          (!areaFilter || e.area?.id === areaFilter) &&
+          (!kindFilter || domainKinds[e.entity_id.split('.')[0]] === kindFilter) &&
+          (!unplaced || !used.has(e.entity_id)) &&
+          terms.every((term) => text.includes(term)),
+      )
+      .map((row) => row.entity);
+  }, [searchableCatalog, areaFilter, kindFilter, unplaced, search, document.pages, profile.id]);
   const layout = page.tiles.map((t) => ({
     i: t.id,
     ...t.layouts[profile.id],
@@ -592,10 +643,7 @@ function Studio({
           <span className="studio-tag">STUDIO</span>
         </div>
         <span className="header-divider" />
-        <div className="project-name">
-          {viewDocument.name}
-          <ChevronDown size={14} />
-        </div>
+        <div className="project-name">{viewDocument.name}</div>
         <div className="header-spacer" />
         <button className="button v2-simple-toggle" onClick={() => setSimple(!simple)}>
           {t(simple ? 'v2.fullEditor' : 'v2.simpleEditor')}
@@ -632,6 +680,7 @@ function Studio({
         )}
         <button
           className="button preview-button"
+          aria-label={t('editor.preview')}
           onClick={async () => {
             try {
               await flush();
@@ -645,13 +694,31 @@ function Studio({
           <Eye size={16} />
           {t('editor.preview')}
         </button>
-        <button className="button primary publish-button" onClick={() => void publish()}>
+        <button
+          className="button primary publish-button"
+          aria-label={t(isPublished ? 'editor.published' : 'editor.publish')}
+          onClick={() => void publish()}
+        >
           <CheckCheck size={17} />
           <span>{isPublished ? t('editor.published') : t('editor.publish')}</span>
         </button>
       </header>
       <div className="studio-body">
-        <aside className={`library-panel ${leftOpen ? 'mobile-open' : ''}`}>
+        {((libraryDrawer && leftOpen) || (inspectorDrawer && rightOpen)) && (
+          <button
+            className="studio-drawer-backdrop"
+            aria-label={t('studio.closeSidebar')}
+            onClick={() => {
+              setLeftOpen(false);
+              setRightOpen(false);
+            }}
+          />
+        )}
+        <aside
+          inert={libraryDrawer && !leftOpen}
+          aria-hidden={(libraryDrawer && !leftOpen) || undefined}
+          className={`library-panel ${leftOpen ? 'mobile-open' : ''}`}
+        >
           <div className="panel-heading">
             <span>{t('editor.buildingBlocks')}</span>
             <button
@@ -663,149 +730,191 @@ function Studio({
             </button>
           </div>
           <p className="panel-subtitle">{t('editor.librarySubtitle')}</p>
+          <div className="library-tabs" role="group" aria-label={t('studio.libraryTabs')}>
+            {(['blocks', 'entities'] as const).map((tab) => (
+              <button
+                key={tab}
+                aria-pressed={libraryTab === tab}
+                onClick={() => {
+                  setLibraryTab(tab);
+                  setSearch('');
+                }}
+              >
+                {t(tab === 'blocks' ? 'studio.blocks' : 'studio.entities')}
+              </button>
+            ))}
+          </div>
           <label className="search-field">
-            <Search size={16} />
+            <Search size={17} />
             <input
-              aria-label={t('editor.searchEntities')}
-              placeholder={t('editor.searchPlaceholder')}
+              aria-label={t(
+                libraryTab === 'blocks' ? 'studio.searchBlocks' : 'editor.searchEntities',
+              )}
+              placeholder={t(
+                libraryTab === 'blocks' ? 'studio.searchBlocks' : 'editor.searchPlaceholder',
+              )}
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(event) => setSearch(event.target.value)}
             />
-            <kbd>⌕</kbd>
+            {search && (
+              <button
+                type="button"
+                className="icon-button"
+                aria-label={t('studio.clearSearch')}
+                onClick={() => setSearch('')}
+              >
+                <X size={15} />
+              </button>
+            )}
           </label>
-          <button
-            className="button full-width"
-            onClick={async () => {
-              try {
-                setCatalog(
-                  service.local ? (await service.load()).catalog : await api('api/editor/catalog'),
-                );
-              } catch (e) {
-                notify(describeError(e));
-              }
-            }}
-          >
-            {t('v2.refreshCatalog')}
-          </button>
-          <div className="v2-library-filters">
-            <select
-              aria-label={t('v2.allRooms')}
-              value={areaFilter}
-              onChange={(e) => setAreaFilter(e.target.value)}
-            >
-              <option value="">{t('v2.allRooms')}</option>
-              {[
-                ...new Map(
-                  catalog.filter((e) => e.area).map((e) => [e.area!.id, e.area!]),
-                ).values(),
-              ].map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.floor ? a.floor + ' · ' : ''}
-                  {a.name}
-                </option>
-              ))}
-            </select>
-            <select
-              aria-label={t('v2.allKinds')}
-              value={kindFilter}
-              onChange={(e) => setKindFilter(e.target.value)}
-            >
-              <option value="">{t('v2.allKinds')}</option>
-              {tileKinds.map((kind) => (
-                <option key={kind} value={kind}>
-                  {t(kindLabelKeys[kind])}
-                </option>
-              ))}
-            </select>
-            <label className="v2-check">
-              <input
-                type="checkbox"
-                checked={unplaced}
-                onChange={(e) => setUnplaced(e.target.checked)}
-              />
-              {t('v2.unplaced')}
-            </label>
-          </div>
-          <button className="button full-width" onClick={() => setDialog('template')}>
-            {t('v2.wizard')}
-          </button>
-          <div className="library-label">{t('editor.tilesHeading')}</div>
-          <div className="tile-library">
-            {tileKinds.map((kind) => {
-              const Icon = kindIcons[kind];
-              return (
+          <div className="library-content">
+            {libraryTab === 'blocks' ? (
+              <>
                 <button
-                  key={kind}
-                  className={`library-tile kind-${kind}`}
-                  draggable
-                  onDragStart={(event) => {
-                    event.dataTransfer.setData('application/hapanel', kind);
-                    event.dataTransfer.setData('text/plain', kind);
-                  }}
-                  onClick={() => addTile(kind)}
+                  className="button full-width library-template"
+                  onClick={() => setDialog('template')}
                 >
-                  <span>
-                    <Icon size={21} />
-                  </span>
-                  <strong>{t(kindLabelKeys[kind])}</strong>
-                  <Plus size={15} />
+                  <Plus size={16} />
+                  {t('v2.wizard')}
                 </button>
-              );
-            })}
-          </div>
-          {search && (
-            <div className="v2-search-navigation">
-              {document.profiles
-                .filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
-                .map((p) => (
-                  <button
-                    className="button full-width"
-                    key={p.id}
-                    onClick={() => setProfileId(p.id)}
+                <div className="tile-library">
+                  {tileKinds
+                    .filter((kind) =>
+                      searchText(t(kindLabelKeys[kind])).includes(searchText(search)),
+                    )
+                    .map((kind) => {
+                      const Icon = kindIcons[kind];
+                      return (
+                        <button
+                          key={kind}
+                          className={`library-tile kind-${kind}`}
+                          draggable
+                          onDragStart={(event) => {
+                            event.dataTransfer.setData('application/hapanel', kind);
+                            event.dataTransfer.setData('text/plain', kind);
+                          }}
+                          onClick={() => addTile(kind)}
+                        >
+                          <span>
+                            <Icon size={21} />
+                          </span>
+                          <strong>{t(kindLabelKeys[kind])}</strong>
+                          <Plus size={15} />
+                        </button>
+                      );
+                    })}
+                </div>
+
+                {!tileKinds.some((kind) =>
+                  searchText(t(kindLabelKeys[kind])).includes(searchText(search)),
+                ) && <p className="muted library-empty">{t('studio.noBlocks')}</p>}
+              </>
+            ) : (
+              <>
+                <div className="v2-library-filters">
+                  <SearchSelect
+                    aria-label={t('v2.allRooms')}
+                    value={areaFilter}
+                    onValueChange={(value) => setAreaFilter(value)}
                   >
-                    {p.name}
-                  </button>
-                ))}
-              {document.pages
-                .filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
-                .map((p) => (
+                    <option value="">{t('v2.allRooms')}</option>
+                    {[
+                      ...new Map(
+                        catalog.filter((e) => e.area).map((e) => [e.area!.id, e.area!]),
+                      ).values(),
+                    ].map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.floor ? a.floor + ' · ' : ''}
+                        {a.name}
+                      </option>
+                    ))}
+                  </SearchSelect>
+                  <SearchSelect
+                    aria-label={t('v2.allKinds')}
+                    value={kindFilter}
+                    onValueChange={(value) => setKindFilter(value)}
+                  >
+                    <option value="">{t('v2.allKinds')}</option>
+                    {tileKinds.map((kind) => (
+                      <option key={kind} value={kind}>
+                        {t(kindLabelKeys[kind])}
+                      </option>
+                    ))}
+                  </SearchSelect>
+                  <label className="v2-check">
+                    <input
+                      type="checkbox"
+                      checked={unplaced}
+                      onChange={(e) => setUnplaced(e.target.checked)}
+                    />
+                    {t('v2.unplaced')}
+                  </label>
+                </div>
+
+                {(areaFilter || kindFilter || unplaced || search) && (
                   <button
-                    className="button full-width"
-                    key={p.id}
+                    className="library-reset"
                     onClick={() => {
-                      if (p.profileIds?.[0]) setProfileId(p.profileIds[0]);
-                      setPageId(p.id);
+                      setAreaFilter('');
+                      setKindFilter('');
+                      setUnplaced(false);
+                      setSearch('');
                     }}
                   >
-                    {p.name}
+                    {t('studio.filterReset')}
                   </button>
-                ))}
-            </div>
-          )}
-          <div className="library-label entity-heading">
-            {t('editor.entitiesHeading')}
-            <span>{matchingEntities.length}</span>
-          </div>
-          <div className="entity-list">
-            {matchingEntities.map((entity) => {
-              const kind = domainKinds[entity.entity_id.split('.')[0]],
-                Icon = kindIcons[kind];
-              return (
+                )}
                 <button
-                  key={entity.entity_id}
-                  onClick={() => addTile(kind, entity.entity_id)}
-                  title={entity.entity_id}
+                  className="button full-width library-refresh"
+                  onClick={async () => {
+                    try {
+                      setCatalog(
+                        service.local
+                          ? (await service.load()).catalog
+                          : await api('api/editor/catalog'),
+                      );
+                    } catch (error) {
+                      notify(describeError(error));
+                    }
+                  }}
                 >
-                  <Icon size={17} />
-                  <span>
-                    <strong>{entityName(entity)}</strong>
-                    <small>{entity.entity_id}</small>
-                  </span>
-                  <Plus size={14} />
+                  {t('v2.refreshCatalog')}
                 </button>
-              );
-            })}
-            {matchingEntities.length === 0 && <p className="muted">{t('editor.noEntity')}</p>}
+                <div className="library-label entity-heading">
+                  {t('editor.entitiesHeading')}
+                  <span>{matchingEntities.length}</span>
+                </div>
+                <div className="entity-list">
+                  {matchingEntities.slice(0, entityLimit).map((entity) => {
+                    const kind = domainKinds[entity.entity_id.split('.')[0]],
+                      Icon = kindIcons[kind];
+                    return (
+                      <button
+                        key={entity.entity_id}
+                        onClick={() => addTile(kind, entity.entity_id)}
+                        title={entity.entity_id}
+                      >
+                        <Icon size={17} />
+                        <span>
+                          <strong>{entityName(entity)}</strong>
+                          <small>{entity.entity_id}</small>
+                        </span>
+                        <Plus size={14} />
+                      </button>
+                    );
+                  })}
+                  {matchingEntities.length > entityLimit && (
+                    <button
+                      className="button full-width"
+                      onClick={() => setEntityLimit(entityLimit + 100)}
+                    >
+                      {t('studio.moreOptions', { count: matchingEntities.length - entityLimit })}
+                    </button>
+                  )}
+                  {matchingEntities.length === 0 && <p className="muted">{t('editor.noEntity')}</p>}
+                </div>
+              </>
+            )}
           </div>
           <div className="library-bottom">
             <span className="connection-dot" />
@@ -876,17 +985,14 @@ function Studio({
               <Plus size={16} />
               {t('editor.tiles')}
             </button>
-            <label className="display-select-label" htmlFor="editor-display-choice">
-              <Tablet size={17} />
-              {t('display.editing')}
-            </label>
-            <select
+            <SearchSelect
+              caption={t('common.display')}
               id="editor-display-choice"
               aria-label={t('editor.displayProfile')}
               value={profile.id}
-              onChange={(e) => {
-                setProfileId(e.target.value);
-                setPageId(pagesForProfile(document, e.target.value)[0].id);
+              onValueChange={(value) => {
+                setProfileId(value);
+                setPageId(pagesForProfile(document, value)[0].id);
                 setSelectedId('');
               }}
             >
@@ -895,11 +1001,23 @@ function Studio({
                   {p.name}
                 </option>
               ))}
-            </select>
-            <button className="button display-manage-button" onClick={() => manageDisplays()}>
-              <Monitor size={16} />
-              {t('display.manage')}
-            </button>
+            </SearchSelect>
+            <SearchSelect
+              aria-label={t('studio.view')}
+              caption={t('studio.view')}
+              value={page.id}
+              onValueChange={(value) => {
+                setPageId(value);
+                setSelectedId('');
+                setInspector('view');
+              }}
+            >
+              {visiblePages.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {viewDocument.pages.find((p) => p.id === item.id)!.name}
+                </option>
+              ))}
+            </SearchSelect>
             <span className="device-resolution">
               {profile.width} × {profile.height} CSS px
             </span>
@@ -934,32 +1052,60 @@ function Studio({
               {t('editor.properties')}
             </button>
           </div>
-          <div className="v2-bulk-toolbar">
-            <span>
-              {t('v2.selection')}: {selection.length || Number(Boolean(selected))}
-            </span>
-            <button className="button" onClick={() => bulk('left')}>
-              {t('v2.alignLeft')}
-            </button>
-            <button className="button" onClick={() => bulk('top')}>
-              {t('v2.alignTop')}
-            </button>
-            <button className="button" onClick={() => bulk('space')}>
-              {t('v2.spaceHorizontal')}
-            </button>
-            <button className="button" onClick={() => bulk('size')}>
-              {t('v2.sameSize')}
-            </button>
-            <button className="button" onClick={copySelection}>
-              {t('v2.copy')}
-            </button>
-            <button className="button" onClick={pasteSelection}>
-              {t('v2.paste')}
-            </button>
-            <button className="button" onClick={() => setDialog('review')}>
-              {t('v2.review')}
-            </button>
-          </div>
+          <details className="layout-tools">
+            <summary>
+              <Settings2 size={16} />
+              {t('studio.layoutTools')}
+              <ChevronDown size={15} />
+            </summary>
+            <div className="v2-bulk-toolbar">
+              <span>
+                {t('v2.selection')}: {selection.length || Number(Boolean(selected))}
+              </span>
+              <button
+                className="button"
+                disabled={selection.length < 2}
+                onClick={() => bulk('left')}
+              >
+                {t('v2.alignLeft')}
+              </button>
+              <button
+                className="button"
+                disabled={selection.length < 2}
+                onClick={() => bulk('top')}
+              >
+                {t('v2.alignTop')}
+              </button>
+              <button
+                className="button"
+                disabled={selection.length < 2}
+                onClick={() => bulk('space')}
+              >
+                {t('v2.spaceHorizontal')}
+              </button>
+              <button
+                className="button"
+                disabled={selection.length < 2}
+                onClick={() => bulk('size')}
+              >
+                {t('v2.sameSize')}
+              </button>
+              <button
+                className="button"
+                disabled={!selected && !selection.length}
+                onClick={copySelection}
+              >
+                {t('v2.copy')}
+              </button>
+              <button className="button" disabled={!clipboardCount} onClick={pasteSelection}>
+                {t('v2.paste')}
+              </button>
+              <button className="button" onClick={() => setDialog('review')}>
+                {t('v2.review')}
+              </button>
+            </div>
+            <p className="field-hint">{t('studio.selectionHint')}</p>
+          </details>
           <div className="canvas-workspace">
             <ScaledCanvas profile={profile} zoom={zoom}>
               {(scale) => (
@@ -1060,6 +1206,7 @@ function Studio({
                             onClick={() => {
                               setSelectedId(tile.id);
                               setInspector('tile');
+                              setRightOpen(true);
                             }}
                           />
                           <button
@@ -1091,31 +1238,18 @@ function Studio({
             </ScaledCanvas>
           </div>
           <footer className="workspace-footer">
-            <span className="pages-label">{t('editor.pagesHeading')}</span>
-            <div className="page-tabs">
-              {pagesForProfile(viewDocument, profile.id).map((p, index) => (
-                <button
-                  key={p.id}
-                  className={page.id === p.id ? 'active' : ''}
-                  onClick={() => {
-                    setPageId(p.id);
-                    setSelectedId('');
-                  }}
-                >
-                  <span>{index + 1}</span>
-                  {p.name}
-                </button>
-              ))}
-              <button
-                className="add-page"
-                aria-label={t('editor.addPage')}
-                title={t('editor.addPage')}
-                onClick={addPage}
-              >
-                <Plus size={17} />
-              </button>
-            </div>
+            <button className="button" onClick={() => manageDisplays()}>
+              <Layers3 size={16} />
+              {t('studio.manageDisplays')}
+            </button>
+            <button className="button" disabled={visiblePages.length >= 12} onClick={addPage}>
+              <Plus size={16} />
+              {t('editor.addPage')}
+            </button>
             <div className="footer-spacer" />
+            <span className={`editor-save-summary ${status}`} role="status">
+              {statusText}
+            </span>
             <button
               className="zoom-reset"
               onClick={() => setZoom(1)}
@@ -1136,22 +1270,36 @@ function Studio({
             />
           </footer>
         </main>
-        <aside className={`inspector-panel ${rightOpen ? 'mobile-open' : ''}`}>
+        <aside
+          inert={inspectorDrawer && !rightOpen}
+          aria-hidden={(inspectorDrawer && !rightOpen) || undefined}
+          className={`inspector-panel ${rightOpen ? 'mobile-open' : ''}`}
+        >
           <div className="inspector-tabs">
             <button
               className={inspector === 'tile' ? 'active' : ''}
+              aria-pressed={inspector === 'tile'}
               onClick={() => setInspector('tile')}
             >
               {t('editor.tile')}
             </button>
             <button
+              aria-pressed={inspector === 'view'}
+              className={inspector === 'view' ? 'active' : ''}
+              onClick={() => setInspector('view')}
+            >
+              {t('studio.view')}
+            </button>
+            <button
               className={inspector === 'display' ? 'active' : ''}
+              aria-pressed={inspector === 'display'}
               onClick={() => setInspector('display')}
             >
               {t('common.display')}
             </button>
             <button
               className={inspector === 'design' ? 'active' : ''}
+              aria-pressed={inspector === 'design'}
               onClick={() => setInspector('design')}
             >
               {t('design.title')}
@@ -1164,7 +1312,11 @@ function Studio({
               <X size={18} />
             </button>
           </div>
-          <div className="inspector-content">
+          <div
+            ref={inspectorContent}
+            className="inspector-content"
+            key={inspector === 'tile' ? selected?.id : inspector + profile.id}
+          >
             {inspector === 'design' ? (
               <DesignSettings
                 key={profile.id}
@@ -1179,6 +1331,16 @@ function Studio({
                     setSelectedId('');
                   }
                 }}
+              />
+            ) : inspector === 'view' ? (
+              <ViewSettings
+                key={page.id}
+                page={page}
+                visiblePage={viewPage}
+                pageCount={visiblePages.length}
+                visibleCount={visiblePages.filter((p) => !p.hidden).length}
+                change={change}
+                manage={manageDisplays}
               />
             ) : inspector === 'tile' ? (
               selected ? (
@@ -1204,8 +1366,9 @@ function Studio({
                       </p>
                     </div>
                   </div>
-                  <div
-                    className="form-section"
+                  <EditorSection
+                    title={t('editor.connectionHeading')}
+                    defaultOpen
                     style={
                       selected.kind === 'section' ||
                       selected.room ||
@@ -1215,12 +1378,12 @@ function Studio({
                         : undefined
                     }
                   >
-                    <h3>{t('editor.connectionHeading')}</h3>
                     <label>
                       {t('editor.entity')}
-                      <select
+                      <SearchSelect
+                        aria-label={t('editor.entity')}
                         value={selected.entityId}
-                        onChange={(e) => updateTile({ entityId: e.target.value })}
+                        onValueChange={(value) => updateTile({ entityId: value })}
                       >
                         {!catalog.some(
                           (e) =>
@@ -1235,28 +1398,19 @@ function Studio({
                           .filter((e) => domainKinds[e.entity_id.split('.')[0]] === selected.kind)
                           .sort((a, b) => entityName(a).localeCompare(entityName(b), intlLocale))
                           .map((e) => (
-                            <option key={e.entity_id} value={e.entity_id}>
+                            <option
+                              data-description={entityDetails(e)}
+                              key={e.entity_id}
+                              value={e.entity_id}
+                            >
                               {entityName(e)}
                             </option>
                           ))}
-                      </select>
+                      </SearchSelect>
                     </label>
                     <span className="field-hint">{selected.entityId}</span>
-                  </div>
-                  <TileExperienceSettings
-                    tile={selected}
-                    catalog={catalog}
-                    pages={visiblePages}
-                    update={updateTile}
-                  />
-                  <InsightSettings
-                    tile={selected}
-                    catalog={catalog}
-                    pages={pagesForProfile(viewDocument, profile.id)}
-                    update={updateTile}
-                  />
-                  <div className="form-section">
-                    <h3>{t('editor.appearanceHeading')}</h3>
+                  </EditorSection>
+                  <EditorSection title={t('studio.basic')} defaultOpen>
                     <label>
                       {t('common.title')}
                       <TextInput
@@ -1267,6 +1421,7 @@ function Studio({
                         onValue={(title) => updateTile({ title })}
                       />
                     </label>
+                    <CardViewSettings tile={selected} update={updateTile} />
                     <label>{t('editor.accent')}</label>
                     <div className="color-options">
                       {(
@@ -1292,9 +1447,21 @@ function Studio({
                         </button>
                       ))}
                     </div>
-                  </div>
-                  <div className="form-section">
-                    <h3>{t('editor.positionHeading')}</h3>
+                  </EditorSection>
+                  <TileExperienceSettings
+                    tile={selected}
+                    catalog={catalog}
+                    pages={visiblePages}
+                    update={updateTile}
+                  />
+                  <InsightSettings
+                    tile={selected}
+                    catalog={catalog}
+                    pages={pagesForProfile(viewDocument, profile.id)}
+                    update={updateTile}
+                  />
+
+                  <EditorSection title={t('editor.positionHeading')}>
                     <div className="number-grid">
                       {(['x', 'y', 'w', 'h'] as const).map((key) => (
                         <NumberField
@@ -1324,7 +1491,7 @@ function Studio({
                     <span className="field-hint">
                       {t('editor.profileHint', { name: viewProfile.name })}
                     </span>
-                  </div>
+                  </EditorSection>
                   <div className="tile-inspector-actions">
                     <button
                       className="button"
@@ -1383,81 +1550,9 @@ function Studio({
                   <Layers3 size={30} />
                   <h2>{t('editor.noSelectionTitle')}</h2>
                   <p>{t('editor.noSelectionHint')}</p>
-                  <label>
-                    {t('editor.pageName')}
-                    <TextInput
-                      key={page.id + '-name'}
-                      value={viewPage.name}
-                      maxLength={40}
-                      required
-                      onValue={(value) => {
-                        change((d) => {
-                          d.pages.find((p) => p.id === page.id)!.name = value;
-                        });
-                      }}
-                    />
-                  </label>
-                  <label>
-                    {t('editor.pageHeading')}
-                    <TextInput
-                      key={page.id + '-heading'}
-                      value={page.heading ?? ''}
-                      maxLength={80}
-                      onValue={(value) =>
-                        change((d) => {
-                          d.pages.find((item) => item.id === page.id)!.heading = value.trim()
-                            ? value
-                            : undefined;
-                        })
-                      }
-                    />
-                  </label>
-                  <label>
-                    {t('editor.pageSubtitle')}
-                    <input
-                      value={page.subtitle ?? ''}
-                      maxLength={100}
-                      onChange={(event) =>
-                        change((d) => {
-                          d.pages.find((item) => item.id === page.id)!.subtitle =
-                            event.target.value || undefined;
-                        })
-                      }
-                    />
-                  </label>
-                  <label className="v2-check">
-                    <input
-                      type="checkbox"
-                      disabled={!page.hidden && visiblePages.filter((p) => !p.hidden).length === 1}
-                      checked={page.hidden ?? false}
-                      onChange={(e) =>
-                        change((d) => {
-                          d.pages.find((p) => p.id === page.id)!.hidden = e.target.checked;
-                        })
-                      }
-                    />
-                    {t('v2.hidden')}
-                  </label>
-                  <div className="view-management-actions">
-                    <button
-                      className="button"
-                      onClick={() => manageDisplays({ type: 'copyView', id: page.id })}
-                    >
-                      <Copy size={15} />
-                      {t('display.copyViewNamed', { name: page.name })}
-                    </button>
-                    <button
-                      className="button danger"
-                      disabled={visiblePages.length === 1}
-                      onClick={() => manageDisplays({ type: 'deleteView', id: page.id })}
-                    >
-                      <Trash2 size={15} />
-                      {t('display.removeViewNamed', { name: page.name })}
-                    </button>
-                    <button className="button" onClick={() => manageDisplays()}>
-                      {t('display.manageViews')}
-                    </button>
-                  </div>
+                  <button className="button full-width" onClick={() => setInspector('view')}>
+                    {t('studio.editView')}
+                  </button>
                 </div>
               )
             ) : (
@@ -1501,8 +1596,7 @@ function Studio({
                   <Plus size={15} />
                   {t('editor.duplicateProfile')}
                 </button>
-                <div className="form-section">
-                  <h3>{t('editor.atmosphereHeading')}</h3>
+                <EditorSection title={t('editor.atmosphereHeading')}>
                   <p className="field-hint">{t('display.appearanceHint')}</p>
                   {!profile.design && (
                     <div className="theme-options">
@@ -1537,60 +1631,68 @@ function Studio({
                       onChange={(e) => profileUpdate({ subtitle: e.target.value })}
                     />
                   </label>
-                </div>
+                </EditorSection>
               </>
             )}
           </div>
           <div className="inspector-bottom">
-            <button className="button full-width" onClick={() => setDialog('alerts')}>
-              {t('v2.alerts')}
-            </button>
-            <button
-              className="button full-width"
-              onClick={async () => {
-                try {
-                  setDiagnostics(
-                    service.local
-                      ? {
-                          mode: 'preview',
-                          profiles: document.profiles.length,
-                          publishedRevision: workspace.published.revision,
-                        }
-                      : await api('api/editor/diagnostics'),
-                  );
-                  setDialog('diagnostics');
-                } catch (e) {
-                  notify(describeError(e));
-                }
-              }}
-            >
-              {t('v2.diagnostics')}
-            </button>
-            <button className="button full-width" onClick={loadDevices}>
-              <Monitor size={16} />
-              {t('editor.connectDisplays')}
-            </button>
-            {onExit && (
-              <button
-                className="button full-width subtle"
-                onClick={async () => {
-                  try {
-                    await flush();
+            <details className="inspector-tools">
+              <summary>{t('studio.tools')}</summary>
+              <div>
+                <button className="button" onClick={() => setDialog('help')}>
+                  {t('studio.help')}
+                </button>
+                <button className="button full-width" onClick={() => setDialog('alerts')}>
+                  {t('v2.alerts')}
+                </button>
+                <button
+                  className="button full-width"
+                  onClick={async () => {
                     try {
-                      localStorage.setItem('hapanel-display-profile', profile.id);
-                    } catch {
-                      /* Keep the current session usable when storage is unavailable. */
+                      setDiagnostics(
+                        service.local
+                          ? {
+                              mode: 'preview',
+                              profiles: document.profiles.length,
+                              publishedRevision: workspace.published.revision,
+                            }
+                          : await api('api/editor/diagnostics'),
+                      );
+                      setDialog('diagnostics');
+                    } catch (e) {
+                      notify(describeError(e));
                     }
-                    onExit();
-                  } catch (e) {
-                    notify(describeError(e));
-                  }
-                }}
-              >
-                <ArrowLeft size={15} />
-                {t('editor.backDashboard')}
-              </button>
-            )}
+                  }}
+                >
+                  {t('v2.diagnostics')}
+                </button>
+                <button className="button full-width" onClick={loadDevices}>
+                  <Monitor size={16} />
+                  {t('editor.connectDisplays')}
+                </button>
+                {onExit && (
+                  <button
+                    className="button full-width subtle"
+                    onClick={async () => {
+                      try {
+                        await flush();
+                        try {
+                          localStorage.setItem('hapanel-display-profile', profile.id);
+                        } catch {
+                          /* Keep the current session usable when storage is unavailable. */
+                        }
+                        onExit();
+                      } catch (e) {
+                        notify(describeError(e));
+                      }
+                    }}
+                  >
+                    <ArrowLeft size={15} />
+                    {t('editor.backDashboard')}
+                  </button>
+                )}
+              </div>
+            </details>
           </div>
         </aside>
       </div>
@@ -1752,6 +1854,10 @@ function Studio({
           onChange={(next, page) => {
             if (commit(next)) {
               setPageId(page);
+              setSelectedId('');
+              setInspector('view');
+              setLeftOpen(false);
+              setRightOpen(true);
               setDialog(null);
             }
           }}
@@ -1807,6 +1913,12 @@ function Studio({
           </div>
         </Modal>
       )}
+      {dialog === 'help' && (
+        <Modal title={t('studio.helpTitle')} onClose={() => setDialog(null)}>
+          <p className="studio-help-text">{t('studio.helpText')}</p>
+          <p className="studio-help-text">{t('studio.helpKeys')}</p>
+        </Modal>
+      )}
       {dialog === 'import' && (
         <Modal
           message={toast}
@@ -1819,15 +1931,15 @@ function Studio({
         >
           <p className="muted">{t('editor.importHint')}</p>
           {!importPackage && (
-            <select
+            <SearchSelect
               aria-label={t('editor.importFormat')}
               disabled={transferBusy}
               value={format}
-              onChange={(e) => setFormat(e.target.value as 'json' | 'yaml')}
+              onValueChange={(value) => setFormat(value as 'json' | 'yaml')}
             >
               <option value="json">JSON</option>
               <option value="yaml">YAML</option>
-            </select>
+            </SearchSelect>
           )}
           {importPackage && (
             <div className="project-import-summary">
@@ -1961,18 +2073,18 @@ function Studio({
             {t(transferBusy ? 'image.projectWorking' : 'image.exportProject')}
           </button>
           <p className="field-hint">{t('image.projectHint')}</p>
-          <select
+          <SearchSelect
             aria-label={t('editor.exportFormat')}
             value={format}
-            onChange={(e) => {
-              const next = e.target.value as 'json' | 'yaml';
+            onValueChange={(value) => {
+              const next = value as 'json' | 'yaml';
               setFormat(next);
               setExportText(serializeDashboard(documentRef.current, next));
             }}
           >
             <option value="json">JSON</option>
             <option value="yaml">YAML</option>
-          </select>
+          </SearchSelect>
           <textarea
             className="config-text"
             aria-label={t('editor.exportedConfiguration')}
@@ -2039,8 +2151,7 @@ function DisplayFields({
 
   return (
     <>
-      <div className="form-section">
-        <h3>{t('editor.profileHeading')}</h3>
+      <EditorSection title={t('editor.profileHeading')} defaultOpen>
         <label>
           {t('common.name')}
           <TextInput
@@ -2097,9 +2208,8 @@ function DisplayFields({
         >
           {t('editor.deriveViewport')}
         </button>
-      </div>
-      <div className="form-section">
-        <h3>{t('editor.viewportHeading')}</h3>
+      </EditorSection>
+      <EditorSection title={t('editor.viewportHeading')} defaultOpen>
         <div className="number-grid">
           <NumberField
             label={t('editor.width')}
@@ -2117,13 +2227,14 @@ function DisplayFields({
         <span className="field-hint">{t('editor.viewportHint')}</span>
         <label>
           {t('editor.renderMode')}
-          <select
+          <SearchSelect
+            aria-label={t('editor.renderMode')}
             value={p.mode}
-            onChange={(e) => onChange({ mode: e.target.value as Profile['mode'] })}
+            onValueChange={(value) => onChange({ mode: value as Profile['mode'] })}
           >
             <option value="fit">{t('editor.fit')}</option>
             <option value="exact">{t('editor.exact')}</option>
-          </select>
+          </SearchSelect>
         </label>
         <button
           className="button full-width"
@@ -2139,9 +2250,8 @@ function DisplayFields({
           <Smartphone size={15} />
           {t('editor.rotate')}
         </button>
-      </div>
-      <div className="form-section">
-        <h3>{t('editor.gridHeading')}</h3>
+      </EditorSection>
+      <EditorSection title={t('editor.gridHeading')}>
         <div className="number-grid">
           <NumberField
             label={t('editor.columns')}
@@ -2185,7 +2295,19 @@ function DisplayFields({
           />
         </div>
         <span className="field-hint">{t('editor.gridHint')}</span>
-      </div>
+      </EditorSection>
     </>
   );
+}
+
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const update = () => setMatches(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, [query]);
+  return matches;
 }

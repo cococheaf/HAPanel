@@ -107,3 +107,9 @@ Editor-Routen erfordern Administratorzugriff. Display-Bildrouten prüfen zunäch
 Designformat 2 bettet ein verwendetes Bild ein, Format 1 ohne Bild bleibt gültig. Projektdateien tragen den vollständigen Entwurf und alle zugeordneten Bilddateien einmalig. Der Client validiert die Datei und lädt Bildobjekte vor dem revisionsgeprüften Speichern des Entwurfs. Ein fehlgeschlagener Konfigurationsimport verändert die Veröffentlichung nicht. Bereits übertragene Bilder bleiben bei Abbruch in der lokalen Bibliothek verfügbar. Autorisierte Bildimporte ersetzen keine fremden Dateien oder HA-Konfigurationen.
 
 Player vergleichen die vom Server mit Bootstrap und WebSocket übertragene App-Version mit ihrem Build. Bei Abweichung werden neue Dokumentstrukturen bis zum Neuladen nicht übernommen. Offene Detaildialoge verzögern das Neuladen. Das Verhalten gilt ab dem Player-Build 2.2; ältere Builds benötigen einen manuellen Reload.
+
+## Designer selections and property sections (2.3)
+
+`SearchSelect` uses a native modal dialog as a combobox popup. Filtering is entirely local and token-based; it does not issue HA queries. Entity options carry stable IDs and optional area/floor/device metadata. Lists initially render 80 choices, while filtering covers the full option set; disabled values cannot be committed. The selected value changes only on explicit selection. Native dialog focus boundaries preserve nested editor dialogs, with focus returned after dismissal. The pattern follows the [WAI-ARIA combobox guidance](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/).
+
+The entity library initially renders 100 entries and caches its normalized search index across live-state updates. Editor-only sections and CSS are kept apart from the display surface. Responsive sidebars use media-query state and `inert`; navigation and property UI state are not part of a dashboard document. This release requires no configuration migration.

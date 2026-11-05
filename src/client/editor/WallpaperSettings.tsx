@@ -1,3 +1,5 @@
+import { EditorSection } from './EditorSection';
+import { SearchSelect } from './SearchSelect';
 import { useContext, useEffect, useState } from 'react';
 import { ImagePlus, RotateCcw, WandSparkles, X } from 'lucide-react';
 import type { Design } from '../../shared/design';
@@ -36,11 +38,10 @@ export function WallpaperSettings({
     if (image) update({ image: { ...image, ...value } });
   };
   return (
-    <div className="form-section wallpaper-settings">
-      <h3>{t('image.background')}</h3>
+    <EditorSection title={t('image.background')} defaultOpen className="wallpaper-settings">
       <button
         className="wallpaper-preview"
-        aria-label={t('image.choose')}
+        aria-label={t('image.library')}
         onClick={() => setOpen(true)}
       >
         {image && design.wallpaper === 'image' ? (
@@ -52,20 +53,21 @@ export function WallpaperSettings({
           {image && design.wallpaper === 'image'
             ? (selected?.name ?? t('image.current'))
             : t('image.choose')}
+          <small>{t('image.library')}</small>
         </span>
-      </button>
-      <button className="button full-width" onClick={() => setOpen(true)}>
-        <ImagePlus size={16} />
-        {t('image.library')}
       </button>
       {image && design.wallpaper === 'image' && (
         <>
           <label>
             {t('image.fit')}
-            <select value={image.fit} onChange={(e) => patch({ fit: e.target.value as 'cover' })}>
+            <SearchSelect
+              aria-label={t('image.fit')}
+              value={image.fit}
+              onValueChange={(value) => patch({ fit: value as 'cover' })}
+            >
               <option value="cover">{t('image.cover')}</option>
               <option value="contain">{t('image.contain')}</option>
-            </select>
+            </SearchSelect>
           </label>
           {(
             [
@@ -163,6 +165,6 @@ export function WallpaperSettings({
           }}
         />
       )}
-    </div>
+    </EditorSection>
   );
 }

@@ -1,3 +1,5 @@
+import { EditorSection } from './EditorSection';
+import { SearchSelect } from './SearchSelect';
 import { UserError } from '../../shared/i18n';
 import { useContext, useRef, useState } from 'react';
 import { Download, Upload, Palette, Save, Trash2 } from 'lucide-react';
@@ -135,8 +137,7 @@ export function DesignSettings({
         </fieldset>
       )}
       <WallpaperSettings key={target.current} design={d} document={document} update={patch} />
-      <div className="form-section">
-        <h3>{t('design.presets')}</h3>
+      <EditorSection title={t('design.presets')} defaultOpen>
         <div className="design-presets">
           {Object.entries(designPresets).map(([id, value]) => (
             <button
@@ -177,45 +178,45 @@ export function DesignSettings({
         <button className="button full-width" disabled={!assigned} onClick={() => write(undefined)}>
           {t(scope === 'page' ? 'design.inherit' : 'design.classic')}
         </button>
-      </div>
-      <div className="form-section">
-        <h3>{t('design.customize')}</h3>
+      </EditorSection>
+      <EditorSection title={t('design.customize')}>
         <label>
           {t('design.surface')}
-          <select
+          <SearchSelect
+            aria-label={t('design.surface')}
             value={d.surface}
-            onChange={(e) => patch({ surface: e.target.value as Design['surface'] })}
+            onValueChange={(value) => patch({ surface: value as Design['surface'] })}
           >
             {(['glass', 'solid'] as const).map((x) => (
               <option key={x} value={x}>
                 {t(`design.${x}`)}
               </option>
             ))}
-          </select>
+          </SearchSelect>
         </label>
         <label>
           {t('design.scheme')}
-          <select
+          <SearchSelect
+            aria-label={t('design.scheme')}
             value={d.scheme}
-            onChange={(e) => patch({ scheme: e.target.value as Design['scheme'] })}
+            onValueChange={(value) => patch({ scheme: value as Design['scheme'] })}
           >
             {(['dark', 'light', 'auto'] as const).map((x) => (
               <option key={x} value={x}>
                 {t(`design.${x}`)}
               </option>
             ))}
-          </select>
+          </SearchSelect>
         </label>
         <label>
           {t('design.wallpaper')}
-          <select
+          <SearchSelect
+            aria-label={t('design.wallpaper')}
             value={d.wallpaper}
-            onChange={(e) =>
+            onValueChange={(value) =>
               patch({
-                wallpaper: e.target.value as Design['wallpaper'],
-                ...(e.target.value === 'gradient' && !d.gradient
-                  ? { gradient: gradientDefault }
-                  : {}),
+                wallpaper: value as Design['wallpaper'],
+                ...(value === 'gradient' && !d.gradient ? { gradient: gradientDefault } : {}),
               })
             }
           >
@@ -224,7 +225,7 @@ export function DesignSettings({
                 {t(`design.${x}`)}
               </option>
             ))}
-          </select>
+          </SearchSelect>
         </label>
         {d.wallpaper === 'gradient' && (
           <fieldset className="gradient-controls">
@@ -253,23 +254,24 @@ export function DesignSettings({
             ))}
             <label>
               {t('design.gradient.kind')}
-              <select
+              <SearchSelect
+                aria-label={t('design.gradient.kind')}
                 value={d.gradient?.kind ?? 'linear'}
-                onChange={(e) =>
+                onValueChange={(value) =>
                   patch({
                     gradient: {
                       from: d.background,
                       to: d.tint,
                       angle: 140,
                       ...d.gradient,
-                      kind: e.target.value as 'linear',
+                      kind: value as 'linear',
                     },
                   })
                 }
               >
                 <option value="linear">{t('design.gradient.linear')}</option>
                 <option value="radial">{t('design.gradient.radial')}</option>
-              </select>
+              </SearchSelect>
             </label>
             {(d.gradient?.kind ?? 'linear') === 'linear' && (
               <label className="design-range">
@@ -343,18 +345,18 @@ export function DesignSettings({
         ))}
         <label>
           {t('design.transition')}
-          <select
+          <SearchSelect
+            aria-label={t('design.transition')}
             value={d.transition ?? 'none'}
-            onChange={(e) => patch({ transition: e.target.value as 'none' })}
+            onValueChange={(value) => patch({ transition: value as 'none' })}
           >
             <option value="none">{t('design.noTransition')}</option>
             <option value="fade">{t('design.fade')}</option>
-          </select>
+          </SearchSelect>
         </label>
         <p className="field-hint">{t('design.performance')}</p>
-      </div>
-      <div className="form-section">
-        <h3>{t('design.library')}</h3>
+      </EditorSection>
+      <EditorSection title={t('design.library')}>
         <label>
           {t('design.name')}
           <TextInput value={name} onValue={setName} maxLength={64} />
@@ -461,10 +463,9 @@ export function DesignSettings({
           }}
         />
         <p className="field-hint">{t('design.transferHint')}</p>
-      </div>
+      </EditorSection>
       {scope === 'display' && (
-        <div className="form-section">
-          <h3>{t('design.layout')}</h3>
+        <EditorSection title={t('design.layout')}>
           <p className="field-hint">{t('design.layoutHint')}</p>
           <button
             className="button full-width"
@@ -480,7 +481,7 @@ export function DesignSettings({
           >
             {t('design.createOverview')}
           </button>
-        </div>
+        </EditorSection>
       )}
     </>
   );

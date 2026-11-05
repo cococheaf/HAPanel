@@ -1,4 +1,4 @@
-# Prüfstand für 2.2.1
+# Prüfstand für 2.3.0
 
 ## Automatisiert
 
@@ -129,3 +129,13 @@ Die CI-Container prüfen zusätzlich zur Installation der nativen Abhängigkeit 
 ## 2.2.1 · Eindeutige Designer-Beschriftungen
 
 Die Raum- und Energie-Einstellungen sind im Produktionsbuild auf Deutsch und Englisch geprüft. Kachelansicht, Fenster-/Türkontakte, Präsenzsensoren, zusätzliche PV-Zähler und aufgeklapptes Schaltverhalten besitzen jeweils genau eine sichtbare Beschriftung. Die Auswahlfelder und Schaltverhaltensgruppen behalten ihre zugänglichen Namen über `aria-labelledby`. Eigenständige Lichteinstellungen zeigen weiterhin ihre eigene Legende. Die 96 bestehenden Tests, Produktionsbuild, Vorschau-Build und Abhängigkeitsprüfung bleiben erfolgreich.
+
+## 2.3.0 · Designer-Überarbeitung
+
+100 automatisierte Tests. Die neuen Suchprüfungen decken technische IDs, Räume/Geschosse/Geräteinformationen, kombinierte Suchwörter, Umlaute und Schreibvarianten, unveränderte Quelllisten, nicht verfügbare Optionen, Tastaturnavigation und Treffer jenseits der sichtbaren Ergebnisseite in 10.000 Einträgen ab. Die bestehenden Revisions-, Projekt-, Bild-, Kamera-, Alarm- und Dimmerprüfungen bleiben enthalten.
+
+Browserprüfungen mit synthetischem Backend und 1.059 Entitäten: Bibliothekswechsel und Filterrücksetzung; Suche nach Namen, Metadaten und IDs jenseits der ersten Ergebnisliste; begrenzte Renderlisten; Abbruch ohne Wertänderung; Enter-Auswahl und Rückgängig; leere Treffer; Display-/Ansichtswechsel und unabhängiger Ansichtsreiter; Mehrfachauswahl und Freischaltung der Layout-Werkzeuge.
+
+Suchauswahlen innerhalb der Display-Verwaltung schließen per Escape oder Schließen nur den inneren Dialog und geben den Fokus zurück. Ein lokaler Zuweisungswechsel in der Geräteverwaltung erhält andere gewählte Einschränkungen. Es wurden dabei keine Benutzerregeln auf einem echten HA gespeichert. Bildbibliothek, Hilfe und die deutschen/englischen Bedienelemente sind im neuen Aufbau erreichbar.
+
+Bei 1.440×900, 1.024×768 und 390×844 CSS-Pixeln werden sichtbare bzw. ausgeblendete Seitenleisten, Inert-Zustände und fehlender horizontaler Überlauf geprüft. Mobile Kopfleistenflächen und Seitenleisten-Schließen sind mindestens 44 Pixel hoch, der Suchdialog-Schließen-Bereich 48 Pixel. Versteckte Seitenleisten bleiben aus der Tastaturbedienung ausgeschlossen. Diese Prüfungen ersetzen keine Tests auf physischer iPad-/Touch-Hardware. Öffentliche Screenshots verwenden ausschließlich synthetische Daten.

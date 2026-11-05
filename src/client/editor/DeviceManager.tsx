@@ -1,3 +1,4 @@
+import { SearchSelect } from './SearchSelect';
 import { localizeSampleDocument } from '../../shared/demo';
 import { useEffect, useState } from 'react';
 import type { Dashboard, Profile } from '../../shared/model';
@@ -66,10 +67,11 @@ export function DeviceManager({
     <div className="v2-form-grid">
       <label>
         {t('v2.assignment')}
-        <select
+        <SearchSelect
+          aria-label={t('v2.assignment')}
           value={value.profileId ?? ''}
-          onChange={(e) =>
-            patch({ ...value, profileId: e.target.value || undefined, pageId: undefined })
+          onValueChange={(choice) =>
+            patch({ ...value, profileId: choice || undefined, pageId: undefined })
           }
         >
           <option value="">{t('v2.noAssignment')}</option>
@@ -78,13 +80,14 @@ export function DeviceManager({
               {p.name}
             </option>
           ))}
-        </select>
+        </SearchSelect>
       </label>
       <label>
         {t('v2.home')}
-        <select
+        <SearchSelect
+          aria-label={t('v2.home')}
           value={value.pageId ?? ''}
-          onChange={(e) => patch({ ...value, pageId: e.target.value || undefined })}
+          onValueChange={(choice) => patch({ ...value, pageId: choice || undefined })}
         >
           <option value="">{t('v2.default')}</option>
           {document.pages
@@ -100,20 +103,21 @@ export function DeviceManager({
                 {p.name}
               </option>
             ))}
-        </select>
+        </SearchSelect>
       </label>
       <label>
         {t('language.label')}
-        <select
+        <SearchSelect
+          aria-label={t('language.label')}
           value={value.language ?? 'auto'}
-          onChange={(e) =>
-            patch({ ...value, language: e.target.value as DeviceSettings['language'] })
+          onValueChange={(choice) =>
+            patch({ ...value, language: choice as DeviceSettings['language'] })
           }
         >
           <option value="auto">{t('v2.auto')}</option>
           <option value="de">Deutsch</option>
           <option value="en">English</option>
-        </select>
+        </SearchSelect>
       </label>
       {(['readOnly', 'cameraBlocked', 'alarmBlocked'] as const).map((key) => (
         <label key={key} className="v2-check">
@@ -278,11 +282,12 @@ export function DeviceManager({
         {users.length > 0 && (
           <label>
             {t('v2.viewerUser')}
-            <select
+            <SearchSelect
+              aria-label={t('v2.viewerUser')}
               value={viewer}
-              onChange={(e) => {
-                setViewer(e.target.value);
-                setViewerSettings(viewers[e.target.value] ?? {});
+              onValueChange={(value) => {
+                setViewer(value);
+                setViewerSettings(viewers[value] ?? {});
               }}
             >
               <option value="">{t('v2.default')}</option>
@@ -293,7 +298,7 @@ export function DeviceManager({
                     {user.name}
                   </option>
                 ))}
-            </select>
+            </SearchSelect>
           </label>
         )}
         <details>

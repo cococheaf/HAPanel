@@ -1,3 +1,5 @@
+import { entityDetails } from './select-options';
+import { SearchSelect } from './SearchSelect';
 import { useState } from 'react';
 import { useI18n } from '../i18n';
 import type { Dashboard, EntityState } from '../../shared/model';
@@ -32,7 +34,11 @@ export function ReviewDialog({
     <Modal title={t('v2.reviewTitle')} wide onClose={onClose} message={error}>
       <label>
         {t('v2.allowedProfiles')}
-        <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+        <SearchSelect
+          aria-label={t('v2.allowedProfiles')}
+          value={filter}
+          onValueChange={(value) => setFilter(value)}
+        >
           <option value="">
             {t('v2.allProfiles')} · {issues.length}
           </option>
@@ -41,7 +47,7 @@ export function ReviewDialog({
               {profile.name} · {issues.filter((issue) => issue.profileId === profile.id).length}
             </option>
           ))}
-        </select>
+        </SearchSelect>
       </label>
       {!issues.length && <p>{t('v2.reviewClean')}</p>}
       <div className="v2-review-list">
@@ -69,22 +75,26 @@ export function ReviewDialog({
                 </button>
                 {issue.key === 'missingEntity' && (
                   <div>
-                    <select
+                    <SearchSelect
                       aria-label={t('v2.replaceWith')}
                       value={replacement[issue.tileId] ?? ''}
-                      onChange={(e) =>
-                        setReplacement({ ...replacement, [issue.tileId]: e.target.value })
+                      onValueChange={(value) =>
+                        setReplacement({ ...replacement, [issue.tileId]: value })
                       }
                     >
                       <option value="">{t('v2.replaceWith')}</option>
                       {catalog
                         .filter((e) => e.entity_id.split('.')[0] === tile.entityId.split('.')[0])
                         .map((e) => (
-                          <option key={e.entity_id} value={e.entity_id}>
+                          <option
+                            data-description={entityDetails(e)}
+                            key={e.entity_id}
+                            value={e.entity_id}
+                          >
                             {String(e.attributes.friendly_name ?? e.entity_id)}
                           </option>
                         ))}
-                    </select>
+                    </SearchSelect>
                     <button
                       className="button"
                       disabled={!replacement[issue.tileId]}
@@ -155,10 +165,11 @@ export function TemplateDialog({
       <div className="v2-form-grid">
         <label>
           {t('v2.wizard')}
-          <select
+          <SearchSelect
+            aria-label={t('v2.wizard')}
             value={template}
-            onChange={(e) => {
-              setTemplate(e.target.value as typeof template);
+            onValueChange={(value) => {
+              setTemplate(value as typeof template);
               setSelected([]);
             }}
           >
@@ -167,7 +178,7 @@ export function TemplateDialog({
                 {t(`v2.${v}Template`)}
               </option>
             ))}
-          </select>
+          </SearchSelect>
         </label>
         <label>
           {t('v2.viewName')}
@@ -175,10 +186,11 @@ export function TemplateDialog({
         </label>
         <label>
           {t('v2.allRooms')}
-          <select
+          <SearchSelect
+            aria-label={t('v2.allRooms')}
             value={area}
-            onChange={(e) => {
-              setArea(e.target.value);
+            onValueChange={(value) => {
+              setArea(value);
               setSelected([]);
             }}
           >
@@ -189,7 +201,7 @@ export function TemplateDialog({
                 {a.name}
               </option>
             ))}
-          </select>
+          </SearchSelect>
         </label>
       </div>
       {template !== 'blank' && (
@@ -290,26 +302,28 @@ export function AlertSettings({
             </label>
             <label>
               {t('v2.conditionEntity')}
-              <select
+              <SearchSelect
+                aria-label={t('v2.conditionEntity')}
                 value={rule.condition.entityId}
-                onChange={(e) =>
-                  patch(rule.id, { condition: { ...rule.condition, entityId: e.target.value } })
+                onValueChange={(value) =>
+                  patch(rule.id, { condition: { ...rule.condition, entityId: value } })
                 }
               >
                 {catalog.map((e) => (
-                  <option key={e.entity_id} value={e.entity_id}>
+                  <option data-description={entityDetails(e)} key={e.entity_id} value={e.entity_id}>
                     {String(e.attributes.friendly_name ?? e.entity_id)}
                   </option>
                 ))}
-              </select>
+              </SearchSelect>
             </label>
             <label>
               {t('v2.visibleWhen')}
-              <select
+              <SearchSelect
+                aria-label={t('v2.visibleWhen')}
                 value={rule.condition.operator}
-                onChange={(e) =>
+                onValueChange={(value) =>
                   patch(rule.id, {
-                    condition: { ...rule.condition, operator: e.target.value as 'is' },
+                    condition: { ...rule.condition, operator: value as 'is' },
                   })
                 }
               >
@@ -318,7 +332,7 @@ export function AlertSettings({
                     {t(`v2.${v}` as 'v2.is')}
                   </option>
                 ))}
-              </select>
+              </SearchSelect>
             </label>
             <label>
               {t('v2.conditionValue')}
@@ -339,22 +353,24 @@ export function AlertSettings({
             </label>
             <label>
               {t('v2.priority')}
-              <select
+              <SearchSelect
+                aria-label={t('v2.priority')}
                 value={rule.priority}
-                onChange={(e) => patch(rule.id, { priority: e.target.value as 'info' })}
+                onValueChange={(value) => patch(rule.id, { priority: value as 'info' })}
               >
                 {['info', 'warning', 'critical'].map((v) => (
                   <option key={v} value={v}>
                     {t(`v2.${v}` as 'v2.info')}
                   </option>
                 ))}
-              </select>
+              </SearchSelect>
             </label>
             <label>
               {t('v2.alertCamera')}
-              <select
+              <SearchSelect
+                aria-label={t('v2.alertCamera')}
                 value={rule.cameraTileId ?? ''}
-                onChange={(e) => patch(rule.id, { cameraTileId: e.target.value || undefined })}
+                onValueChange={(value) => patch(rule.id, { cameraTileId: value || undefined })}
               >
                 <option value="">{t('v2.none')}</option>
                 {document.pages
@@ -365,7 +381,7 @@ export function AlertSettings({
                       {tile.title}
                     </option>
                   ))}
-              </select>
+              </SearchSelect>
             </label>
           </div>
           <div className="v2-button-row">

@@ -1,3 +1,4 @@
+import { SearchSelect } from './SearchSelect';
 import { useState } from 'react';
 import {
   Copy,
@@ -274,16 +275,17 @@ export function DisplayManager({
           </label>
           <label>
             {t('display.useDimensions')}
-            <select
+            <SearchSelect
+              aria-label={t('display.useDimensions')}
               value={task.source}
-              onChange={(event) => setTask({ ...task, source: event.target.value })}
+              onValueChange={(value) => setTask({ ...task, source: value })}
             >
               {document.profiles.map((profile) => (
                 <option key={profile.id} value={profile.id}>
                   {profileLabel(profile.id)}
                 </option>
               ))}
-            </select>
+            </SearchSelect>
           </label>
           <label className="display-checkbox">
             <input
@@ -354,7 +356,11 @@ export function DisplayManager({
           </label>
           <label>
             {t('display.target')}
-            <select value={target} onChange={(event) => setTarget(event.target.value)}>
+            <SearchSelect
+              aria-label={t('display.target')}
+              value={target}
+              onValueChange={(value) => setTarget(value)}
+            >
               {document.profiles.map((profile) => (
                 <option key={profile.id} value={profile.id}>
                   {profileLabel(profile.id)}
@@ -363,7 +369,7 @@ export function DisplayManager({
               <option value="new" disabled={document.profiles.length >= 8}>
                 {t('display.newTarget')}
               </option>
-            </select>
+            </SearchSelect>
           </label>
           {target === 'new' && (
             <label>

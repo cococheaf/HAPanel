@@ -1,3 +1,6 @@
+import { entityDetails } from './select-options';
+import { EditorSection } from './EditorSection';
+import { SearchSelect } from './SearchSelect';
 import { useI18n } from '../i18n';
 import type { Dashboard, EntityState, Profile, Tile } from '../../shared/model';
 import { availableCommands } from '../../shared/widgets';
@@ -45,15 +48,15 @@ export function TileExperienceSettings({
     return (
       <fieldset>
         <legend>{t(`v2.${key}`)}</legend>
-        <select
+        <SearchSelect
           aria-label={t(`v2.${key}`)}
           value={v.type}
-          onChange={(e) =>
+          onValueChange={(value) =>
             patch({
               [key]: {
-                type: e.target.value as typeof v.type,
-                ...(e.target.value === 'command' ? { command: actions[0] ?? 'activate' } : {}),
-                ...(e.target.value === 'navigate' ? { pageId: pages[0]?.id } : {}),
+                type: value as typeof v.type,
+                ...(value === 'command' ? { command: actions[0] ?? 'activate' } : {}),
+                ...(value === 'navigate' ? { pageId: pages[0]?.id } : {}),
               },
             })
           }
@@ -71,30 +74,30 @@ export function TileExperienceSettings({
               {t(`v2.${type}` as 'v2.automatic')}
             </option>
           ))}
-        </select>
+        </SearchSelect>
         {v.type === 'navigate' && (
-          <select
+          <SearchSelect
             aria-label={t('v2.home')}
             value={v.pageId}
-            onChange={(e) => patch({ [key]: { ...v, pageId: e.target.value } })}
+            onValueChange={(value) => patch({ [key]: { ...v, pageId: value } })}
           >
             {pages.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
             ))}
-          </select>
+          </SearchSelect>
         )}
         {v.type === 'command' && (
           <>
-            <select
+            <SearchSelect
               aria-label={t('v2.command')}
               value={v.command}
-              onChange={(e) =>
+              onValueChange={(value) =>
                 patch({
                   [key]: {
                     ...v,
-                    command: e.target.value as typeof v.command,
+                    command: value as typeof v.command,
                     value: undefined,
                     option: undefined,
                   },
@@ -108,7 +111,7 @@ export function TileExperienceSettings({
                     {t(`v2.${command}` as 'v2.activate')}
                   </option>
                 ))}
-            </select>
+            </SearchSelect>
             {[
               'brightness',
               'temperature',
@@ -149,37 +152,42 @@ export function TileExperienceSettings({
     );
   };
   return (
-    <details className="form-section v2-settings">
-      <summary>{t('v2.experience')}</summary>
+    <EditorSection title={t('studio.actions')} className="v2-settings">
       <label>
         {t('v2.icon')}
-        <select value={x.icon ?? ''} onChange={(e) => patch({ icon: e.target.value || undefined })}>
+        <SearchSelect
+          aria-label={t('v2.icon')}
+          value={x.icon ?? ''}
+          onValueChange={(value) => patch({ icon: value || undefined })}
+        >
           <option value="">{t('v2.default')}</option>
           {Object.keys(iconChoices).map((key) => (
             <option key={key} value={key}>
               {t(`icon.${key}` as 'icon.House')}
             </option>
           ))}
-        </select>
+        </SearchSelect>
       </label>
       <label>
         {t('v2.background')}
-        <select
+        <SearchSelect
+          aria-label={t('v2.background')}
           value={x.background ?? 'default'}
-          onChange={(e) => patch({ background: e.target.value as typeof x.background })}
+          onValueChange={(value) => patch({ background: value as typeof x.background })}
         >
           {['default', 'none', 'pastel'].map((value) => (
             <option key={value} value={value}>
               {t(`v2.${value}` as 'v2.default')}
             </option>
           ))}
-        </select>
+        </SearchSelect>
       </label>
       <label>
         {t('v2.presentation')}
-        <select
+        <SearchSelect
+          aria-label={t('v2.presentation')}
           value={x.presentation ?? 'auto'}
-          onChange={(e) => patch({ presentation: e.target.value as typeof x.presentation })}
+          onValueChange={(value) => patch({ presentation: value as typeof x.presentation })}
         >
           {[
             'auto',
@@ -193,20 +201,21 @@ export function TileExperienceSettings({
               {t(v === 'compact' ? 'v2.compactQuick' : (`v2.${v}` as 'v2.auto'))}
             </option>
           ))}
-        </select>
+        </SearchSelect>
       </label>
       <label>
         {t('v2.secondary')}
-        <select
+        <SearchSelect
+          aria-label={t('v2.secondary')}
           value={x.secondary ?? 'auto'}
-          onChange={(e) => patch({ secondary: e.target.value as typeof x.secondary })}
+          onValueChange={(value) => patch({ secondary: value as typeof x.secondary })}
         >
           {['auto', 'none', 'attribute', 'text'].map((v) => (
             <option key={v} value={v}>
               {t(`v2.${v}` as 'v2.auto')}
             </option>
           ))}
-        </select>
+        </SearchSelect>
       </label>
       {['attribute', 'text'].includes(x.secondary ?? '') && (
         <TextInput
@@ -245,24 +254,24 @@ export function TileExperienceSettings({
       </label>
       {x.visibleWhen && (
         <>
-          <select
+          <SearchSelect
             aria-label={t('v2.conditionEntity')}
             value={x.visibleWhen.entityId}
-            onChange={(e) =>
-              patch({ visibleWhen: { ...x.visibleWhen!, entityId: e.target.value } })
+            onValueChange={(value) =>
+              patch({ visibleWhen: { ...x.visibleWhen!, entityId: value } })
             }
           >
             {catalog.map((e) => (
-              <option key={e.entity_id} value={e.entity_id}>
+              <option data-description={entityDetails(e)} key={e.entity_id} value={e.entity_id}>
                 {String(e.attributes.friendly_name ?? e.entity_id)}
               </option>
             ))}
-          </select>
-          <select
+          </SearchSelect>
+          <SearchSelect
             aria-label={t('v2.visibleWhen')}
             value={x.visibleWhen.operator}
-            onChange={(e) =>
-              patch({ visibleWhen: { ...x.visibleWhen!, operator: e.target.value as 'is' } })
+            onValueChange={(value) =>
+              patch({ visibleWhen: { ...x.visibleWhen!, operator: value as 'is' } })
             }
           >
             {['is', 'is_not', 'above', 'below'].map((v) => (
@@ -270,7 +279,7 @@ export function TileExperienceSettings({
                 {t(`v2.${v}` as 'v2.is')}
               </option>
             ))}
-          </select>
+          </SearchSelect>
           <TextInput
             label={t('v2.conditionValue')}
             value={x.visibleWhen.value}
@@ -300,7 +309,7 @@ export function TileExperienceSettings({
           <p className="field-hint">{t('v2.favoriteHint')}</p>
         </fieldset>
       )}
-    </details>
+    </EditorSection>
   );
 }
 export function ProfileExperienceSettings({
@@ -317,18 +326,18 @@ export function ProfileExperienceSettings({
   const patch = (p: Partial<NonNullable<Profile['experience']>>) =>
     update({ experience: { ...x, ...p } });
   return (
-    <div className="form-section v2-settings">
-      <h3>{t('v2.experience')}</h3>
+    <EditorSection title={t('v2.experience')} className="v2-settings">
       {(['density', 'colorMode', 'background'] as const)
         .filter((key) => !profile.design || key === 'density')
         .map((key) => (
           <label key={key}>
             {t(`v2.${key}`)}
-            <select
+            <SearchSelect
+              aria-label={t(`v2.${key}`)}
               value={
                 x[key] ?? (key === 'density' ? 'normal' : key === 'colorMode' ? 'dark' : 'gradient')
               }
-              onChange={(e) => patch({ [key]: e.target.value })}
+              onValueChange={(value) => patch({ [key]: value })}
             >
               {(key === 'density'
                 ? ['comfortable', 'normal', 'compact']
@@ -340,7 +349,7 @@ export function ProfileExperienceSettings({
                   {t(`v2.${v}` as 'v2.normal')}
                 </option>
               ))}
-            </select>
+            </SearchSelect>
           </label>
         ))}
       {(['adaptive', 'swipe'] as const).map((key) => (
@@ -355,16 +364,17 @@ export function ProfileExperienceSettings({
       ))}
       <label>
         {t('v2.home')}
-        <select
+        <SearchSelect
+          aria-label={t('v2.home')}
           value={x.homePageId ?? pages[0]?.id}
-          onChange={(e) => patch({ homePageId: e.target.value })}
+          onValueChange={(value) => patch({ homePageId: value })}
         >
           {pages.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
             </option>
           ))}
-        </select>
+        </SearchSelect>
       </label>
       {(
         [
@@ -417,6 +427,6 @@ export function ProfileExperienceSettings({
           />
         </label>
       ))}
-    </div>
+    </EditorSection>
   );
 }

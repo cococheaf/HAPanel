@@ -1,3 +1,6 @@
+import { entityDetails } from './select-options';
+import { EditorSection } from './EditorSection';
+import { SearchSelect } from './SearchSelect';
 import { domainKinds as domains } from '../../shared/widgets';
 import { useId, useState } from 'react';
 import { Plus, X, ChevronUp, ChevronDown } from 'lucide-react';
@@ -55,10 +58,11 @@ export function InsightSettings({
   ) => (
     <label>
       {!labelledBy && label}
-      <select
+      <SearchSelect
+        aria-label={labelledBy ? undefined : label}
         aria-labelledby={labelledBy}
         value={value ?? ''}
-        onChange={(event) => change(event.target.value)}
+        onValueChange={(value) => change(value)}
       >
         <option value="">{t('editor.none')}</option>
         {value && !choices.some((entity) => entity.entity_id === value) && (
@@ -69,11 +73,15 @@ export function InsightSettings({
         {[...choices]
           .sort((a, b) => name(a).localeCompare(name(b), intlLocale))
           .map((entity) => (
-            <option key={entity.entity_id} value={entity.entity_id}>
+            <option
+              data-description={entityDetails(entity)}
+              key={entity.entity_id}
+              value={entity.entity_id}
+            >
               {name(entity)}
             </option>
           ))}
-      </select>
+      </SearchSelect>
     </label>
   );
   const referenceList = (key: 'windows' | 'presence', label: string, candidates: EntityState[]) =>
@@ -113,8 +121,7 @@ export function InsightSettings({
         </div>
       )}
       {tile.energy && (
-        <div className="form-section">
-          <h3>{t('v2.energyTotals')}</h3>
+        <EditorSection title={t('v2.energyTotals')}>
           {(['importEnergy', 'exportEnergy', 'solarEnergy', 'houseEnergy'] as const).map((key) => (
             <div key={key}>
               {picker(
@@ -195,22 +202,22 @@ export function InsightSettings({
           ))}
           <label>
             {t('v2.currency')}
-            <select
+            <SearchSelect
+              aria-label={t('v2.currency')}
               value={tile.energy.meters?.currency ?? 'EUR'}
-              onChange={(e) =>
-                energy({ meters: { ...tile.energy!.meters, currency: e.target.value as 'EUR' } })
+              onValueChange={(value) =>
+                energy({ meters: { ...tile.energy!.meters, currency: value as 'EUR' } })
               }
             >
               {['EUR', 'USD', 'GBP', 'CHF'].map((v) => (
                 <option key={v}>{v}</option>
               ))}
-            </select>
+            </SearchSelect>
           </label>
-        </div>
+        </EditorSection>
       )}
       {tile.kind === 'camera' && (
-        <div className="form-section">
-          <h3>{t('kind.camera')}</h3>
+        <EditorSection title={t('kind.camera')} defaultOpen>
           {picker(
             t('v2.overviewSource'),
             tile.camera?.overviewEntityId,
@@ -229,43 +236,43 @@ export function InsightSettings({
           </label>
           <label>
             {t('camera.fit')}
-            <select
+            <SearchSelect
+              aria-label={t('camera.fit')}
               value={tile.camera?.fit ?? 'cover'}
-              onChange={(event) => camera({ fit: event.target.value as 'cover' | 'contain' })}
+              onValueChange={(value) => camera({ fit: value as 'cover' | 'contain' })}
             >
               <option value="cover">{t('camera.fitCover')}</option>
               <option value="contain">{t('camera.fitContain')}</option>
-            </select>
+            </SearchSelect>
           </label>
           <label>
             {t('camera.overview')}
-            <select
+            <SearchSelect
+              aria-label={t('camera.overview')}
               value={tile.camera?.overview ?? 'snapshot'}
-              onChange={(event) => camera({ overview: event.target.value as 'snapshot' | 'live' })}
+              onValueChange={(value) => camera({ overview: value as 'snapshot' | 'live' })}
             >
               <option value="snapshot">{t('camera.overviewSnapshot')}</option>
               <option value="live">{t('camera.overviewLive')}</option>
-            </select>
+            </SearchSelect>
           </label>
           <label>
             {t('camera.connection')}
-            <select
+            <SearchSelect
+              aria-label={t('camera.connection')}
               value={tile.camera?.transport ?? 'auto'}
-              onChange={(event) =>
-                camera({ transport: event.target.value as 'auto' | 'webrtc' | 'hls' })
-              }
+              onValueChange={(value) => camera({ transport: value as 'auto' | 'webrtc' | 'hls' })}
             >
               <option value="auto">{t('camera.connectionAuto')}</option>
               <option value="webrtc">WebRTC</option>
               <option value="hls">HLS</option>
-            </select>
+            </SearchSelect>
           </label>
           <p className="field-hint">{t('camera.liveOverviewHint')}</p>
-        </div>
+        </EditorSection>
       )}
       {tile.kind === 'alarm' && (
-        <div className="form-section">
-          <h3>{t('kind.alarm')}</h3>
+        <EditorSection title={t('kind.alarm')} defaultOpen>
           <label className="alarm-setting-toggle">
             <input
               type="checkbox"
@@ -351,11 +358,10 @@ export function InsightSettings({
             </>
           )}
           <p className="field-hint">{t('alarm.codePrivacy')}</p>
-        </div>
+        </EditorSection>
       )}
       {tile.contacts && (
-        <div className="form-section">
-          <h3>{t('kind.contacts')}</h3>
+        <EditorSection title={t('kind.contacts')} defaultOpen>
           {tile.contacts.map((item) => (
             <div className="inspector-reference" key={item.entityId}>
               <TextInput
@@ -406,72 +412,23 @@ export function InsightSettings({
                   ['door', 'window', 'opening'].includes(String(entity.attributes.device_class)),
               ),
             )}
-        </div>
-      )}
-      {!['contacts', 'alarm', 'automation', 'camera'].includes(tile.kind) && (
-        <>
-          <div className="form-section">
-            <label>
-              {t('editor.cardView')}
-              <select
-                value={tile.room ? 'room' : tile.energy ? 'energy' : 'standard'}
-                onChange={(event) => {
-                  const view = event.target.value;
-                  update({
-                    room:
-                      view === 'room'
-                        ? {
-                            icon: 'home',
-                            controls: [
-                              {
-                                id: freshControl(),
-                                kind: tile.kind,
-                                title: tile.title,
-                                entityId: tile.entityId,
-                                accent: tile.accent,
-                              },
-                            ],
-                            presence: [],
-                            windows: [],
-                          }
-                        : undefined,
-                    energy:
-                      view === 'energy'
-                        ? {
-                            solarPower: [tile.entityId],
-                            batteryPositive: 'charge',
-                            consumers: [],
-                            metrics: [],
-                          }
-                        : undefined,
-                  });
-                }}
-              >
-                <option value="standard">{t('editor.standardView')}</option>
-                <option value="room">{t('editor.roomView')}</option>
-                {tile.kind === 'sensor' && tile.entityId.startsWith('sensor.') && (
-                  <option value="energy">{t('editor.energyView')}</option>
-                )}
-              </select>
-            </label>
-          </div>
-        </>
+        </EditorSection>
       )}
       {tile.room && (
-        <div className="form-section">
-          <h3>{t('editor.roomView')}</h3>
+        <EditorSection title={t('editor.roomView')} defaultOpen>
           <label>
             {t('editor.roomIcon')}
-            <select
+            <SearchSelect
+              aria-label={t('editor.roomIcon')}
               value={tile.room.icon}
-              onChange={(event) => room({ icon: event.target.value as Room['icon'] })}
+              onValueChange={(value) => room({ icon: value as Room['icon'] })}
             >
               {(['home', 'sofa', 'kitchen', 'bed', 'bath', 'door', 'hall'] as const).map((icon) => (
                 <option key={icon} value={icon}>
                   {t(('roomIcon.' + icon) as 'roomIcon.home')}
                 </option>
               ))}
-            </select>
+            </SearchSelect>
           </label>
           {picker(
             t('editor.temperatureSource'),
@@ -509,96 +466,96 @@ export function InsightSettings({
                 ),
             ),
           )}
-          <h3>{t('editor.roomControls')}</h3>
-          <div className="inspector-controls">
-            {tile.room.controls.map((control) => (
-              <div className="room-control-settings" key={control.id}>
-                <div className="inspector-reference">
-                  <TextInput
-                    key={control.id}
-                    aria-label={control.title}
-                    value={control.title}
-                    maxLength={64}
-                    required
-                    onValue={(value) =>
-                      room({
-                        controls: tile.room!.controls.map((item) =>
-                          item.id === control.id ? { ...item, title: value } : item,
-                        ),
-                      })
-                    }
-                  />
-                  <button
-                    className="icon-button"
-                    aria-label={t('editor.remove')}
-                    onClick={() =>
-                      room({
-                        controls: tile.room!.controls.filter((item) => item.id !== control.id),
-                      })
-                    }
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-                {control.kind === 'light' && (
-                  <details>
-                    <summary id={`${labelId}-${control.id}-light`}>{t('light.settings')}</summary>
-                    <LightSettings
-                      labelledBy={`${labelId}-${control.id}-light`}
-                      control={control}
-                      catalog={catalog}
-                      update={(light) =>
+          <EditorSection title={t('editor.roomControls')}>
+            <div className="inspector-controls">
+              {tile.room.controls.map((control) => (
+                <div className="room-control-settings" key={control.id}>
+                  <div className="inspector-reference">
+                    <TextInput
+                      key={control.id}
+                      aria-label={control.title}
+                      value={control.title}
+                      maxLength={64}
+                      required
+                      onValue={(value) =>
                         room({
                           controls: tile.room!.controls.map((item) =>
-                            item.id === control.id ? { ...item, light } : item,
+                            item.id === control.id ? { ...item, title: value } : item,
                           ),
                         })
                       }
                     />
-                  </details>
+                    <button
+                      className="icon-button"
+                      aria-label={t('editor.remove')}
+                      onClick={() =>
+                        room({
+                          controls: tile.room!.controls.filter((item) => item.id !== control.id),
+                        })
+                      }
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  {control.kind === 'light' && (
+                    <details>
+                      <summary id={`${labelId}-${control.id}-light`}>{t('light.settings')}</summary>
+                      <LightSettings
+                        labelledBy={`${labelId}-${control.id}-light`}
+                        control={control}
+                        catalog={catalog}
+                        update={(light) =>
+                          room({
+                            controls: tile.room!.controls.map((item) =>
+                              item.id === control.id ? { ...item, light } : item,
+                            ),
+                          })
+                        }
+                      />
+                    </details>
+                  )}
+                </div>
+              ))}
+            </div>
+            {tile.room.controls.length < 24 && (
+              <>
+                {picker(
+                  t('editor.entity'),
+                  newControl,
+                  setNewControl,
+                  catalog.filter((entity) => domains[entity.entity_id.split('.')[0]]),
                 )}
-              </div>
-            ))}
-          </div>
-          {tile.room.controls.length < 24 && (
-            <>
-              {picker(
-                t('editor.entity'),
-                newControl,
-                setNewControl,
-                catalog.filter((entity) => domains[entity.entity_id.split('.')[0]]),
-              )}
-              <button
-                className="button"
-                disabled={!newControl}
-                onClick={() => {
-                  const entity = catalog.find((item) => item.entity_id === newControl);
-                  if (entity)
-                    room({
-                      controls: [
-                        ...tile.room!.controls,
-                        {
-                          id: freshControl(),
-                          kind: domains[newControl.split('.')[0]],
-                          title: name(entity).slice(0, 64),
-                          entityId: newControl,
-                          accent: tile.accent,
-                        },
-                      ],
-                    });
-                  setNewControl('');
-                }}
-              >
-                <Plus size={14} />
-                {t('editor.addControl')}
-              </button>
-            </>
-          )}
-        </div>
+                <button
+                  className="button"
+                  disabled={!newControl}
+                  onClick={() => {
+                    const entity = catalog.find((item) => item.entity_id === newControl);
+                    if (entity)
+                      room({
+                        controls: [
+                          ...tile.room!.controls,
+                          {
+                            id: freshControl(),
+                            kind: domains[newControl.split('.')[0]],
+                            title: name(entity).slice(0, 64),
+                            entityId: newControl,
+                            accent: tile.accent,
+                          },
+                        ],
+                      });
+                    setNewControl('');
+                  }}
+                >
+                  <Plus size={14} />
+                  {t('editor.addControl')}
+                </button>
+              </>
+            )}
+          </EditorSection>
+        </EditorSection>
       )}
       {tile.energy && (
-        <div className="form-section">
-          <h3>{t('editor.energyBindings')}</h3>
+        <EditorSection title={t('editor.energyBindings')} defaultOpen>
           {picker(
             t('energy.solar'),
             tile.energy.solarPower[0],
@@ -637,15 +594,16 @@ export function InsightSettings({
           )}
           <label>
             {t('editor.batteryDirection')}
-            <select
+            <SearchSelect
+              aria-label={t('editor.batteryDirection')}
               value={tile.energy.batteryPositive}
-              onChange={(event) =>
-                energy({ batteryPositive: event.target.value as Energy['batteryPositive'] })
+              onValueChange={(value) =>
+                energy({ batteryPositive: value as Energy['batteryPositive'] })
               }
             >
               <option value="charge">{t('energy.charging')}</option>
               <option value="discharge">{t('energy.discharging')}</option>
-            </select>
+            </SearchSelect>
           </label>
           {(['consumers', 'metrics'] as const).map((key) => (
             <div key={key}>
@@ -709,8 +667,65 @@ export function InsightSettings({
               )}
             </div>
           ))}
-        </div>
+        </EditorSection>
       )}
     </>
+  );
+}
+
+export function CardViewSettings({
+  tile,
+  update,
+}: {
+  tile: Tile;
+  update: (patch: Partial<Tile>) => void;
+}) {
+  const { t } = useI18n();
+  if (['contacts', 'alarm', 'automation', 'camera', 'section'].includes(tile.kind)) return null;
+  return (
+    <label>
+      {t('editor.cardView')}
+      <SearchSelect
+        aria-label={t('editor.cardView')}
+        value={tile.room ? 'room' : tile.energy ? 'energy' : 'standard'}
+        onValueChange={(value) => {
+          const view = value;
+          update({
+            room:
+              view === 'room'
+                ? {
+                    icon: 'home',
+                    controls: [
+                      {
+                        id: freshControl(),
+                        kind: tile.kind,
+                        title: tile.title,
+                        entityId: tile.entityId,
+                        accent: tile.accent,
+                      },
+                    ],
+                    presence: [],
+                    windows: [],
+                  }
+                : undefined,
+            energy:
+              view === 'energy'
+                ? {
+                    solarPower: [tile.entityId],
+                    batteryPositive: 'charge',
+                    consumers: [],
+                    metrics: [],
+                  }
+                : undefined,
+          });
+        }}
+      >
+        <option value="standard">{t('editor.standardView')}</option>
+        <option value="room">{t('editor.roomView')}</option>
+        {tile.kind === 'sensor' && tile.entityId.startsWith('sensor.') && (
+          <option value="energy">{t('editor.energyView')}</option>
+        )}
+      </SearchSelect>
+    </label>
   );
 }

@@ -18,11 +18,19 @@
 
 HAPanel combines rounded tiles, calm colours and direct touch controls with a visual layout editor. It runs as a Home Assistant app (add-on) or a local Node.js process. Existing Lovelace dashboards and HA configuration files are preserved.
 
-**Version: 2.2.1.** The preview, editor and API are implemented. The HA adapter is tested against a simulated WebSocket server. Installation, updates, Ingress and live data are verified on HA OS 18.4 / Core 2026.10.4 (amd64). Testing on physical iPad hardware remains pending.
+**Version: 2.3.0.** The preview, editor and API are implemented. The HA adapter is tested against a simulated WebSocket server. Installation, updates, Ingress and live data are verified on HA OS 18.4 / Core 2026.10.4 (amd64). Testing on physical iPad hardware remains pending.
 
 ![Adaptive iPad view](docs/images/adaptive-light-v2.png)
 
 ![Displays and access](docs/images/devices-v2.png)
+
+## New in 2.3
+
+A reorganized designer with separate building-block/entity libraries, searchable selection fields, room/device metadata, a dedicated View tab and expandable property sections. Layout tools and administration actions stay compact. Smaller screens use drawers with a dismissible background and larger header controls.
+
+[Use the designer](docs/designer.md)
+
+![Updated designer](docs/images/designer-v2.3.png)
 
 ## New in 2.2
 

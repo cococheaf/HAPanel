@@ -12,6 +12,7 @@ export function Modal({
   message,
   onDismissMessage,
   className = '',
+  id,
 }: {
   title: string;
   children: ReactNode;
@@ -20,6 +21,7 @@ export function Modal({
   message?: string;
   onDismissMessage?: () => void;
   className?: string;
+  id?: string;
 }) {
   const { t } = useI18n();
   const design = useContext(DesignContext);
@@ -40,6 +42,7 @@ export function Modal({
   return createPortal(
     <dialog
       ref={ref}
+      id={id}
       aria-labelledby={titleId}
       className={
         'modal ' + (design ? 'design-modal ' : '') + (wide ? 'wide-modal ' : '') + className
@@ -64,7 +67,10 @@ export function Modal({
           type="button"
           className="icon-button modal-close"
           aria-label={t('common.close')}
-          onClick={onClose}
+          onClick={(event) => {
+            event.preventDefault();
+            onClose();
+          }}
         >
           <X size={20} />
           <span>{t('common.close')}</span>

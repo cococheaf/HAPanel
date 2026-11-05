@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.3.0
+
+- Neu geordnete Bibliothek mit getrennten Bereichen für Bausteine und Entitäten, kombinierbarer Suche, Filtern und begrenzt gerenderten Ergebnislisten.
+- Durchsuchbare Designer-Auswahlfelder einschließlich Entitäts-IDs, Raum-, Geschoss- und Geräteinformationen; Tastaturwahl, Ergebniszustände, Fokus-Rückgabe und verschachtelte Dialoge.
+- Eigener Reiter für Ansichten, getrennte Display-/Ansichtsauswahl und ein zentraler Zugang zur Layout-Verwaltung.
+- Aufklappbare Eigenschaftsbereiche, kompakte Layout-Werkzeuge und zusammengefasste Hilfe-/Verwaltungsaktionen.
+- Seitenleisten mit Hintergrundfläche und Fokus-Ausschluss auf kleinen Bildschirmen; größere mobile Kopfleistenflächen und sichtbarer Speicherstatus.
+- Keine Änderung an bestehenden Konfigurationen oder am Umfang der Geräte-, Kamera- und Alarmfreigaben.
+
 ## 2.2.1
 
 - Doppelte Beschriftungen bei Kachelansicht, Fenster-/Präsenzsensoren, zusätzlichen Solarzählern und aufgeklapptem Schaltverhalten entfernt.
